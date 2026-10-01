@@ -31,5 +31,14 @@ export default tseslint.config(
     files: ["*.config.{js,ts}", "e2e/**/*.ts"],
     languageOptions: { globals: globals.node },
   },
+  {
+    // tools/ 는 Node CLI: 진단 메시지에 숫자 보간을 허용하고 index 접근 단언을 허용한다.
+    files: ["tools/**/*.ts"],
+    languageOptions: { globals: globals.node },
+    rules: {
+      "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
+      "@typescript-eslint/no-non-null-assertion": "off",
+    },
+  },
   { files: ["eslint.config.js"], ...tseslint.configs.disableTypeChecked },
 );
