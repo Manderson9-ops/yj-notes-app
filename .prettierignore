@@ -1,0 +1,13 @@
+# design docs are hand-formatted (tables, ASCII diagrams); do not reformat
+docs/*.md
+docs/adr/
+# root policy docs are hand-written; keep them untouched
+/*.md
+dist
+coverage
+playwright-report
+test-results
+node_modules
+package-lock.json
+fixtures
+.github

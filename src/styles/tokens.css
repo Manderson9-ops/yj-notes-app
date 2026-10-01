@@ -1,0 +1,41 @@
+/* Design tokens (docs/06 §5). Light by default, dark via prefers-color-scheme. */
+:root {
+  color-scheme: light dark;
+
+  --c-bg: #ffffff;
+  --c-fg: #1b1d21;
+  --c-muted: #5b6068;
+  --c-border: #d9dce1;
+  --c-accent: #1558c0;
+  --c-warn: #a14a00;
+  --c-alert: #b3261e;
+  --c-ok: #1b6e3a;
+
+  --fs-base: 17px;
+  --fs-lg: 20px;
+  --fs-xl: 26px;
+  --lh-base: 1.6;
+
+  --tap: 48px;
+  --radius: 12px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg: #121316;
+    --c-fg: #ececf0;
+    --c-muted: #a3a8b1;
+    --c-border: #34373d;
+    --c-accent: #7fb0ff;
+    --c-warn: #ffb066;
+    --c-alert: #ff8a80;
+    --c-ok: #7dd69a;
+  }
+}
