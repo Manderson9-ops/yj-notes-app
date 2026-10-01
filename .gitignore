@@ -60,3 +60,5 @@ desktop.ini
 !.vscode/extensions.json
 !.vscode/settings.json
 *.log
+
+!.dev.vars.example

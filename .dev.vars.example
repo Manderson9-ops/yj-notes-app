@@ -1,0 +1,6 @@
+# 복사해서 .dev.vars 로 쓴다(.dev.vars 는 git 무시). 아래 값은 가짜 자리표시자다.
+# PIN_HASH / PIN_SALT: npm run pin:hash 로 생성 (T-06)
+PIN_HASH=FAKE_PLACEHOLDER_pin_hash
+PIN_SALT=FAKE_PLACEHOLDER_pin_salt
+SESSION_SECRET=FAKE_PLACEHOLDER_session_secret_change_me
+IP_HASH_SALT=FAKE_PLACEHOLDER_ip_hash_salt
