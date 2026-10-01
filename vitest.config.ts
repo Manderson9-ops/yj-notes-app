@@ -40,6 +40,15 @@ export default defineConfig({
           globals: true,
         },
       },
+      {
+        extends: true,
+        test: {
+          name: "tools",
+          environment: "node",
+          include: ["tools/**/*.test.ts"],
+          testTimeout: 30_000,
+        },
+      },
     ],
   },
 });

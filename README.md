@@ -11,6 +11,7 @@
 | 항목 | 상태 |
 |---|---|
 | 단계 | **M1 진행 중 (T-01 완료)** |
+| CI | [![CI](https://github.com/Manderson9-ops/yj-notes-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Manderson9-ops/yj-notes-app/actions/workflows/ci.yml) (타입·린트·테스트·가드·빌드·gitleaks·E2E) |
 | 배포 | 아직 없음 (기존 정적 보고서 사이트가 별도로 운영 중) |
 | 라이선스 | 결정 대기 (`docs/10-roadmap.md` 결정 목록 D-04) |
 
@@ -21,13 +22,14 @@
 ```
 npm ci                 # 의존성 설치 (정확한 버전 고정)
 npm run dev            # 개발 서버 http://127.0.0.1:5173
-npm run check          # 타입 + 린트 + 포맷 + 단위 테스트
+npm run check          # 타입 + 린트 + 포맷 + 단위 테스트 + 유출 방지 가드
+npm run guard          # 유출 방지 검사 (tools/guard/README.md)
 npm run build          # 프로덕션 빌드 (dist/)
 npx playwright install chromium webkit   # 최초 1회
 npm run test:e2e       # 모바일(360px) E2E
 ```
 
-> `npm run guard`(유출 방지 검사)는 T-02 에서 추가되며, 그때 `check` 에 포함된다.
+> 커밋 시 husky pre-commit 이 `npm run guard:staged` 를 실행한다. 자료 폴더가 있는 PC 에서는 환경변수 `DATA_DIR` 를 설정해 실제 문장 대조(G4·G5)를 켠다. [	ools/guard/README.md](tools/guard/README.md)
 ## 문서
 
 | # | 문서 | 내용 |
