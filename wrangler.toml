@@ -7,22 +7,25 @@ compatibility_date = "2026-09-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "yj-notes-db"
-# 관리자가 `wrangler d1 create yj-notes-db` 후 실제 ID 로 교체한다(ID 는 비밀이 아니지만 자원 생성 전까지 자리표시자).
-database_id = "00000000-0000-0000-0000-000000000000"
+# 운영 D1 ID (비밀 아님). docs/09 §1.
+database_id = "9129a64a-5e90-450f-9bc5-1b8179d0fdd5"
 migrations_dir = "migrations"
 
-[[r2_buckets]]
-binding = "FILES"
-bucket_name = "yj-notes-private"
+# M4: R2 활성화 후 주석 해제 (Cloudflare 대시보드에서 R2 사용 신청 필요, docs/09 §3-1)
+# [[r2_buckets]]
+# binding = "FILES"
+# bucket_name = "yj-notes-private"
 
-[env.preview]
-
-[[env.preview.d1_databases]]
-binding = "DB"
-database_name = "yj-notes-db-preview"
-database_id = "00000000-0000-0000-0000-000000000000"
-migrations_dir = "migrations"
-
-[[env.preview.r2_buckets]]
-binding = "FILES"
-bucket_name = "yj-notes-private-preview"
+# preview 환경: 자원은 M2 이후 만든다. 미리보기에는 fixtures 만 적재한다(docs/09 §1).
+# 실제 자료를 절대 넣지 않는다. 자원 생성 후 아래 주석을 해제하고 ID 를 채운다.
+# [env.preview]
+#
+# [[env.preview.d1_databases]]
+# binding = "DB"
+# database_name = "yj-notes-db-preview"
+# database_id = "<preview D1 ID>"
+# migrations_dir = "migrations"
+#
+# [[env.preview.r2_buckets]]
+# binding = "FILES"
+# bucket_name = "yj-notes-private-preview"

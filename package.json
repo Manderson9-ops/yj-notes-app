@@ -29,7 +29,8 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:seed:local": "wrangler d1 execute DB --local --file fixtures/seed/fixtures.sql",
     "db:reset:local": "node -e \"require('node:fs').rmSync('.wrangler/state',{recursive:true,force:true})\" && npm run db:migrate:local && npm run db:seed:local",
-    "db:migrate:prod": "wrangler d1 migrations apply DB --remote"
+    "db:migrate:prod": "wrangler d1 migrations apply DB --remote",
+    "deploy:prod": "npm run build && npm run guard:bundle && wrangler pages deploy dist --project-name yj-notes-app --branch main"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.0",
