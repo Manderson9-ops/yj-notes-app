@@ -6,6 +6,8 @@
   --c-fg: #1b1d21;
   --c-muted: #5b6068;
   --c-border: #d9dce1;
+  --c-surface: #eef0f4;
+  --c-on-accent: #ffffff;
   --c-accent: #1558c0;
   --c-warn: #a14a00;
   --c-alert: #b3261e;
@@ -33,9 +35,18 @@
     --c-fg: #ececf0;
     --c-muted: #a3a8b1;
     --c-border: #34373d;
+    --c-surface: #1e2025;
+    --c-on-accent: #0b1220;
     --c-accent: #7fb0ff;
     --c-warn: #ffb066;
     --c-alert: #ff8a80;
     --c-ok: #7dd69a;
   }
+}
+
+/* 큰 글씨 설정 (docs/06 §1): <html data-large-text="1"> */
+:root[data-large-text="1"] {
+  --fs-base: 20px;
+  --fs-lg: 23px;
+  --fs-xl: 30px;
 }
