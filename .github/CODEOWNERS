@@ -1,0 +1,8 @@
+* @Manderson9-ops
+
+# 보안 경계 (AGENTS.md §0-4, 설계 담당 검토 필수)
+/functions/_middleware.ts @Manderson9-ops
+/server/auth/ @Manderson9-ops
+/tools/guard/ @Manderson9-ops
+/tools/ingest/ @Manderson9-ops
+/docs/04-security-privacy.md @Manderson9-ops

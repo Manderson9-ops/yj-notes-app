@@ -1,0 +1,49 @@
+name: 결정 기록
+description: docs/10-roadmap.md 결정 목록(D-XX)에 올릴 결정 사항
+title: "[D-XX] "
+labels: ["decision"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        이 저장소는 **공개**다. 실제 아이 자료·이름·비밀값을 쓰지 않는다.
+  - type: input
+    id: decision-id
+    attributes:
+      label: ID
+      placeholder: D-XX
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: 배경
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: 선택지
+      description: 선택지별 장단점(비용·보안·유지보수)을 적는다.
+    validations:
+      required: true
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: 권고
+    validations:
+      required: true
+  - type: input
+    id: due
+    attributes:
+      label: 결정 기한
+      placeholder: YYYY-MM-DD 또는 마일스톤
+    validations:
+      required: true
+  - type: checkboxes
+    id: no-real-data
+    attributes:
+      label: 개인정보 확인
+      options:
+        - label: 이 이슈에 실제 아이 자료·이름·날짜 기록·스크린샷·비밀값을 넣지 않았다.
+          required: true

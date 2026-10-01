@@ -1,0 +1,75 @@
+name: 작업 카드
+description: docs/10-roadmap.md 의 작업 카드 1장 (브랜치 1개 = PR 1개)
+title: "[T-XX] "
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        이 저장소는 **공개**다. 실제 아이 자료·이름·스크린샷을 쓰지 않는다. 예시는 `fixtures/` 합성 값만 쓴다.
+  - type: input
+    id: card-id
+    attributes:
+      label: ID
+      description: 작업 카드 번호
+      placeholder: T-XX
+    validations:
+      required: true
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: 마일스톤
+      options:
+        - M1 기반·보안
+        - M2 가족 기록
+        - M3 알림장 + 적재 CLI
+        - M4 보고서·검진·실적재
+        - M5 검수·전환
+        - M6 자동 갱신 v2
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: 목표
+    validations:
+      required: true
+  - type: textarea
+    id: inputs
+    attributes:
+      label: 입력 문서
+      description: 시작 전에 읽을 문서 (예. docs/04 §3, docs/05)
+    validations:
+      required: true
+  - type: textarea
+    id: outputs
+    attributes:
+      label: 산출 파일
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 수용 기준
+      description: 테스트로 증명할 수 있는 항목을 체크리스트로 적는다.
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: dropdown
+    id: owner-model
+    attributes:
+      label: 담당 모델
+      options:
+        - Sonnet 5.5
+        - Opus 검토 필수
+        - 관리자
+    validations:
+      required: true
+  - type: checkboxes
+    id: no-real-data
+    attributes:
+      label: 개인정보 확인
+      options:
+        - label: 이 이슈에 실제 아이 자료·이름·날짜 기록·스크린샷·비밀값을 넣지 않았다.
+          required: true
