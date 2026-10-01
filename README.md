@@ -11,6 +11,7 @@
 | 항목 | 상태 |
 |---|---|
 | 단계 | **M1 진행 중 (T-01 완료)** |
+| CI | [![CI](https://github.com/Manderson9-ops/yj-notes-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Manderson9-ops/yj-notes-app/actions/workflows/ci.yml) (타입·린트·테스트·가드·빌드·gitleaks·E2E) |
 | 배포 | 아직 없음 (기존 정적 보고서 사이트가 별도로 운영 중) |
 | 라이선스 | 결정 대기 (`docs/10-roadmap.md` 결정 목록 D-04) |
 
