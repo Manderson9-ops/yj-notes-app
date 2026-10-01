@@ -25,7 +25,10 @@ export const FORBIDDEN_BASENAME_REGEXES: readonly { re: RegExp; label: string }[
 ];
 
 /** G1: 위 규칙의 예외(basename). / Basename exceptions. */
-export const FORBIDDEN_BASENAME_EXCEPTIONS: readonly string[] = [".env.example", ".dev.vars.example"];
+export const FORBIDDEN_BASENAME_EXCEPTIONS: readonly string[] = [
+  ".env.example",
+  ".dev.vars.example",
+];
 
 /** G2: 바이너리·문서 확장자. / Binary & document extensions. */
 export const BINARY_EXTENSIONS: readonly string[] = [
