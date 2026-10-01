@@ -1,0 +1,28 @@
+name = "yj-notes-app"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-09-01"
+
+# 비밀값(PIN_HASH 등)은 이 파일에 넣지 않는다. 로컬은 .dev.vars, 배포는 Pages 시크릿.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "yj-notes-db"
+# 관리자가 `wrangler d1 create yj-notes-db` 후 실제 ID 로 교체한다(ID 는 비밀이 아니지만 자원 생성 전까지 자리표시자).
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "yj-notes-private"
+
+[env.preview]
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "yj-notes-db-preview"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[env.preview.r2_buckets]]
+binding = "FILES"
+bucket_name = "yj-notes-private-preview"

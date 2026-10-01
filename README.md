@@ -27,9 +27,17 @@ npm run guard          # 유출 방지 검사 (tools/guard/README.md)
 npm run build          # 프로덕션 빌드 (dist/)
 npx playwright install chromium webkit   # 최초 1회
 npm run test:e2e       # 모바일(360px) E2E
+
+# 로컬 DB (D1 시뮬레이터, .wrangler/state — git 무시)
+npm run db:migrate:local   # migrations/ 적용
+npm run db:seed:local      # 합성 fixture 적재
+npm run db:reset:local     # 로컬 DB 삭제 후 migrate + seed
 ```
 
-> 커밋 시 husky pre-commit 이 `npm run guard:staged` 를 실행한다. 자료 폴더가 있는 PC 에서는 환경변수 `DATA_DIR` 를 설정해 실제 문장 대조(G4·G5)를 켠다. [	ools/guard/README.md](tools/guard/README.md)
+> 커밋 시 husky pre-commit 이 `npm run guard:staged` 를 실행한다. 자료 폴더가 있는 PC 에서는 환경변수 `DATA_DIR` 를 설정해 실제 문장 대조(G4·G5)를 켠다. [tools/guard/README.md](tools/guard/README.md)
+> 운영 DB 마이그레이션 `npm run db:migrate:prod` 는 **관리자만, 실행 전 백업(docs/09) 후** 수행한다. 개발·에이전트는 `--local` 만 쓴다.
+> 비밀값은 `.dev.vars.example` 를 `.dev.vars` 로 복사해 채운다.
+
 ## 문서
 
 | # | 문서 | 내용 |
