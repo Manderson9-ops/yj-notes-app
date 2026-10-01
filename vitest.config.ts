@@ -16,8 +16,9 @@ export default defineConfig({
       // Coverage runs only via `vitest run --coverage` (not part of `npm run check` yet), and
       // include is limited to server/**, so the web project never affects the threshold.
       include: ["server/**/*.ts"],
-      exclude: ["server/**/*.test.ts"],
-      thresholds: { lines: 85 },
+      exclude: ["server/**/*.test.ts", "server/test-utils/**"],
+      // Q-UNIT (docs/08): server/ lines >= 85%, server/auth lines >= 95%.
+      thresholds: { lines: 85, "server/auth/**": { lines: 95 } },
     },
     projects: [
       {
@@ -36,7 +37,7 @@ export default defineConfig({
         test: {
           name: "server",
           environment: "node",
-          include: ["server/**/*.test.ts"],
+          include: ["server/**/*.test.ts", "tests/**/*.test.ts"],
           globals: true,
         },
       },

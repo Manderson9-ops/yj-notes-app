@@ -112,6 +112,7 @@ CREATE TABLE report_doc (
 -- 보안
 CREATE TABLE auth_attempt (ip_hash TEXT NOT NULL, at TEXT NOT NULL, ok INTEGER NOT NULL);
 CREATE INDEX idx_auth_attempt ON auth_attempt(ip_hash, at);
+CREATE INDEX idx_auth_attempt_at ON auth_attempt(at, ok);   -- 0003, 전역 잠금 집계·정리용
 CREATE TABLE app_setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);  -- session_epoch 등
 ```
 

@@ -10,7 +10,7 @@
 
 | 항목 | 상태 |
 |---|---|
-| 단계 | **M1 진행 중 (T-01 완료)** |
+| 단계 | **M1 진행 중 (T-01~T-07)** |
 | CI | [![CI](https://github.com/Manderson9-ops/yj-notes-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Manderson9-ops/yj-notes-app/actions/workflows/ci.yml) (타입·린트·테스트·가드·빌드·gitleaks·E2E) |
 | 배포 | 아직 없음 (기존 정적 보고서 사이트가 별도로 운영 중) |
 | 라이선스 | 결정 대기 (`docs/10-roadmap.md` 결정 목록 D-04) |
@@ -28,6 +28,9 @@ npm run build          # 프로덕션 빌드 (dist/)
 npx playwright install chromium webkit   # 최초 1회
 npm run test:e2e       # 모바일(360px) E2E
 
+# API 포함 로컬 실행 (Pages Functions + 로컬 D1) — 아래 "API 로컬 실행" 참고
+npm run dev:api        # 빌드 후 wrangler pages dev dist (http://127.0.0.1:8999)
+
 # 로컬 DB (D1 시뮬레이터, .wrangler/state — git 무시)
 npm run db:migrate:local   # migrations/ 적용
 npm run db:seed:local      # 합성 fixture 적재
@@ -37,6 +40,23 @@ npm run db:reset:local     # 로컬 DB 삭제 후 migrate + seed
 > 커밋 시 husky pre-commit 이 `npm run guard:staged` 를 실행한다. 자료 폴더가 있는 PC 에서는 환경변수 `DATA_DIR` 를 설정해 실제 문장 대조(G4·G5)를 켠다. [tools/guard/README.md](tools/guard/README.md)
 > 운영 DB 마이그레이션 `npm run db:migrate:prod` 는 **관리자만, 실행 전 백업(docs/09) 후** 수행한다. 개발·에이전트는 `--local` 만 쓴다.
 > 비밀값은 `.dev.vars.example` 를 `.dev.vars` 로 복사해 채운다.
+
+### API 로컬 실행 (T-05·T-06)
+
+`npm run dev` (Vite) 는 화면만 띄운다. `/api/*` 와 보안 미들웨어는 Pages Functions 라서 `wrangler pages dev` 로 확인한다.
+
+```
+npm run db:reset:local          # 로컬 D1 초기화 (session_epoch 포함)
+npm run pin:hash                # PIN 해시 생성 (출력만, 파일 저장 없음)
+# .dev.vars 에 PIN_SALT / PIN_HASH 와 임의의 SESSION_SECRET / IP_HASH_SALT 를 넣는다 (.dev.vars 는 git 무시)
+npm run dev:api                 # http://127.0.0.1:8999
+```
+
+- 포트 8999 인 이유: Windows 에서 8788~8888 일대는 Hyper-V 예약 구간이라 wrangler 기본 포트가 막힐 수 있다. 다른 포트는 `npx wrangler pages dev dist --port <포트>` 로 직접 실행한다.
+- 쿠키는 `Secure` 로 발급된다. 브라우저는 `http://localhost`·`127.0.0.1` 에서도 Secure 쿠키를 허용하지만, `curl` 은 쿠키 항아리를 거부할 수 있으니 `-H "Cookie: yjs=…"` 로 직접 전달한다.
+- 쓰기 요청(curl 등)에는 `Origin: http://127.0.0.1:8999` 와 `Content-Type: application/json` 이 필요하다 (docs/05).
+- 전체 로그아웃: `npm run session:revoke -- --local` (운영은 `-- --remote` 로 명령만 출력, 관리자가 직접 실행).
+- 테스트: `npm run test:cov` (server/ 줄 ≥85%, server/auth ≥95% 강제). D1 은 `node:sqlite` 기반 대역(`server/test-utils/fake-d1.ts`)으로 실제 `migrations/` 를 적용해 쓴다.
 
 ## 문서
 
