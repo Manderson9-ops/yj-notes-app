@@ -62,3 +62,6 @@ desktop.ini
 *.log
 
 !.dev.vars.example
+
+# 로컬 functions 빌드 확인 산출물
+.tmp-fn/

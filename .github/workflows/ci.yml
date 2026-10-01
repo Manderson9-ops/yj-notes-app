@@ -54,7 +54,11 @@ jobs:
     name: e2e
     needs: check
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    # 브라우저가 미리 설치된 공식 이미지(@playwright/test 와 버전 일치 필수). 매 실행 설치(10분+)를 없앤다.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,7 +68,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - name: Upload Playwright report (fixtures-only app)
         if: failure()

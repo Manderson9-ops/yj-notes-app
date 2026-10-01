@@ -2,7 +2,8 @@
 // Bindings and secrets available to Pages Functions.
 export interface Env {
   DB: D1Database;
-  FILES: R2Bucket;
+  /** R2 binding. M4 에서 R2 활성화 전까지 없음(wrangler.toml 주석). 사용하는 코드는 존재 확인 필수. */
+  FILES?: R2Bucket;
   /** PBKDF2-SHA256(pin, PIN_SALT, 100000) base64. 비밀값. */
   PIN_HASH: string;
   /** base64 salt for PIN_HASH. */
