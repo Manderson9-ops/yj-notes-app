@@ -27,7 +27,7 @@
 ### M1
 | ID | 목표 | 산출 | 수용 기준 | 모델 |
 |---|---|---|---|---|
-| T-01 | 프로젝트 골격 (Dependabot npm 항목은 이때부터 정상 동작) | package.json, tsconfig(strict), vite, eslint/prettier, vitest, playwright 설정, `src/` 빈 앱 | `npm ci && npm run check` 통과, Node 22 LTS 고정(.nvmrc) | Sonnet |
+| T-01 | 프로젝트 골격 (Dependabot npm 항목은 이때부터 정상 동작) | package.json, tsconfig(strict), vite, eslint/prettier, vitest, playwright 설정, `src/` 빈 앱 | `npm ci && npm run check` 통과, Node 24 LTS 고정(.nvmrc) | Sonnet |
 | T-02 | 유출 방지 가드 | `tools/guard/` (Node 스크립트), husky pre-commit, `npm run guard` | `04` §5 표의 검사 전부 + 위반 예시 테스트 10건(음성대조) | Sonnet |
 | T-03 | CI | `.github/workflows/ci.yml` | Q-TYPE·LINT·UNIT·GUARD·gitleaks 실행, PR 필수 체크 | Sonnet |
 | T-04 | D1 스키마 | `migrations/0001_init.sql`, `npm run db:migrate:local` | `03` §2 와 1:1, 로컬 적용 성공, fixture 시드 | Sonnet |

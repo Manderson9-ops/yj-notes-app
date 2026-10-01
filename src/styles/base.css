@@ -1,0 +1,55 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--c-bg);
+  color: var(--c-fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Apple SD Gothic Neo",
+    "Noto Sans KR",
+    "Malgun Gothic",
+    sans-serif;
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.shell-header,
+.shell-footer {
+  padding: var(--space-3) var(--space-4);
+  min-height: var(--tap);
+  color: var(--c-muted);
+}
+
+.app-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.shell-main {
+  flex: 1;
+  padding: var(--space-4);
+}
+
+.shell-main h1 {
+  margin: 0;
+  font-size: var(--fs-xl);
+}
+
+.shell-footer {
+  border-top: 1px solid var(--c-border);
+  font-size: 14px;
+}
