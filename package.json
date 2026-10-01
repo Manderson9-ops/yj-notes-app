@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "npm run build && wrangler pages dev dist --ip 127.0.0.1 --port 8999",
+    "dev:mock": "node tools/dev-mock.ts",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
@@ -39,6 +40,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@cloudflare/workers-types": "5.20261001.1",
     "@eslint/js": "9.39.5",
     "@playwright/test": "1.63.0",
