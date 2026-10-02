@@ -1,6 +1,9 @@
-// TH-6: 기본 테마 번들(JS+CSS, gzip) 합계가 기준을 넘으면 실패한다.
+// 번들 한도 검사(TH-6, Q-PERF). 한도는 하나로 통일한다(임시 여유값 없음):
+//   1) 초기 로드(index.html 이 직접 부르는 JS+CSS, gzip) <= main 기준값 + 20 KB
+//   2) 전체 JS(lazy 청크 포함, gzip) <= 200 KB (docs/08 Q-PERF)
+//   3) 폰트 woff2 각 파일 <= 80 KiB
+// 한도를 넘으면 한도를 늘리지 말고 초기 청크의 것을 React.lazy 로 옮긴다. 측정법: docs/design/theme-system.md §4.
 //   npm run build && npm run size:check
-// 기준 = 테마 도입 전 main 의 합계(119.50 KB) + 15 KB. 폰트(woff2)는 별도 파일이라 합계에 없다.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -9,40 +12,79 @@ const DIST = process.argv[2] ?? "dist";
 // 테마 도입 전 main 빌드(index-Qj9rEqG7.js + index-DjmQs9Ld.css)를 이 스크립트로 잰 값(zlib 기본 레벨, 1 KB = 1000 B).
 // 주의: Vite 의 "gzip: N kB" 출력과는 약 1% 다르다(두 값을 섞어 비교하지 말 것).
 const BASELINE_KB = 119.5;
-const BUDGET_KB = 15;
+const BUDGET_KB = 20;
+const TOTAL_JS_MAX_KB = 200;
+// 한도에 바짝 붙지 않게: 한도까지 남은 여유가 이 값보다 적으면 실패한다(새 기능은 lazy 로 두고 시작한다).
+const HEADROOM_MIN_KB = 5;
+const FONT_MAX_BYTES = 80 * 1024;
+// 한도까지 여유가 이만큼보다 적으면 경고(실패 아님): 한글이 늘면 곧 한도를 넘는다는 신호.
+const FONT_WARN_MARGIN_BYTES = 8 * 1024;
 
 function gzipKb(file: string): number {
   return gzipSync(readFileSync(file)).byteLength / 1000;
 }
 
+const html = readFileSync(join(DIST, "index.html"), "utf8");
+const initial = new Set<string>();
+for (const m of html.matchAll(/(?:src|href)="[^"]*\/assets\/([^"]+\.(?:js|css))"/g)) {
+  if (m[1]) initial.add(m[1]);
+}
+if (initial.size === 0) {
+  console.error("TH-6 실패: index.html 에서 초기 로드 파일을 찾지 못했습니다.");
+  process.exit(1);
+}
 const assets = join(DIST, "assets");
 let total = 0;
+let totalJs = 0;
 for (const name of readdirSync(assets)) {
   if (!/\.(js|css)$/.test(name)) continue;
   const kb = gzipKb(join(assets, name));
-  total += kb;
-  console.log(`${name}  ${kb.toFixed(2)} KB gzip`);
+  const isInitial = initial.has(name);
+  if (isInitial) total += kb;
+  if (name.endsWith(".js")) totalJs += kb;
+  console.log(`${name}  ${kb.toFixed(2)} KB gzip${isInitial ? "  [초기]" : "  [lazy]"}`);
 }
 const limit = BASELINE_KB + BUDGET_KB;
 console.log(
-  `합계 ${total.toFixed(2)} KB (main ${BASELINE_KB.toFixed(2)} KB 대비 ${(total - BASELINE_KB >= 0 ? "+" : "") + (total - BASELINE_KB).toFixed(2)} KB, 한도 +${String(BUDGET_KB)} KB = ${limit.toFixed(2)} KB)`,
+  `초기 로드(entry JS+CSS) 합계 ${total.toFixed(2)} KB (main ${BASELINE_KB.toFixed(2)} KB 대비 ${(total - BASELINE_KB >= 0 ? "+" : "") + (total - BASELINE_KB).toFixed(2)} KB, 한도 +${String(BUDGET_KB)} KB = ${limit.toFixed(2)} KB)`,
 );
+console.log(
+  `초기 로드 여유 ${(limit - total).toFixed(2)} KB (최소 ${String(HEADROOM_MIN_KB)} KB 유지)`,
+);
+console.log(
+  `전체 JS 합계 ${totalJs.toFixed(2)} KB (한도 ${String(TOTAL_JS_MAX_KB)} KB, docs/08 Q-PERF)`,
+);
+let failed = false;
+if (limit - total < HEADROOM_MIN_KB && total <= limit) {
+  console.error(
+    `TH-6 실패: 한도까지 여유가 ${(limit - total).toFixed(2)} KB 로 최소 ${String(HEADROOM_MIN_KB)} KB 보다 적습니다. 초기 청크의 것을 lazy 로 옮기세요(한도를 늘리지 않는다).`,
+  );
+  failed = true;
+}
 if (total > limit) {
-  console.error("TH-6 실패: 기본 테마 번들 증가가 한도를 넘었습니다.");
-  process.exit(1);
+  console.error("TH-6 실패: 초기 로드가 한도를 넘었습니다. 초기 청크의 것을 lazy 로 옮기세요.");
+  failed = true;
+}
+if (totalJs > TOTAL_JS_MAX_KB) {
+  console.error("Q-PERF 실패: 전체 JS 가 한도를 넘었습니다.");
+  failed = true;
 }
 
-// TH-6(폰트): 장식 폰트 woff2 는 파일마다 80 KB(= 81920 B) 이하여야 한다.
-const FONT_MAX_BYTES = 80 * 1024;
 const fonts = join(DIST, "fonts");
 if (existsSync(fonts)) {
   for (const name of readdirSync(fonts)) {
     if (!name.endsWith(".woff2")) continue;
     const bytes = statSync(join(fonts, name)).size;
     console.log(`${name}  ${bytes} B (한도 ${FONT_MAX_BYTES} B)`);
+    if (bytes <= FONT_MAX_BYTES && FONT_MAX_BYTES - bytes < FONT_WARN_MARGIN_BYTES) {
+      console.warn(
+        `경고: ${name} 의 한도 여유가 ${String(FONT_MAX_BYTES - bytes)} B 로 ${String(FONT_WARN_MARGIN_BYTES)} B 보다 적습니다. 화면 한글이 늘면 한도를 넘습니다(줄이는 방법: docs/design/theme-system.md §4).`,
+      );
+    }
     if (bytes > FONT_MAX_BYTES) {
-      console.error(`TH-6 실패: ${name} 이(가) 80 KB 를 넘었습니다.`);
-      process.exit(1);
+      console.error(`TH-6 실패: ${name} 이(가) 80 KiB 를 넘었습니다.`);
+      failed = true;
     }
   }
 }
+if (failed) process.exit(1);

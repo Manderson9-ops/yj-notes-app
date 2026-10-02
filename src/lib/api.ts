@@ -1,26 +1,34 @@
-import type { z } from "zod";
-import { errorBodySchema } from "./schemas";
+import { parseErrorBody, type Parser } from "./schemas";
 
 /** Typed API error. status 0 means the request never reached the server. */
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly retryAfterSec: number | undefined;
+  /** 422 validation_error: field name -> reason (docs/05). */
+  readonly fields: Record<string, string> | undefined;
 
-  constructor(status: number, code: string, message: string, retryAfterSec?: number) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    retryAfterSec?: number,
+    fields?: Record<string, string>,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.retryAfterSec = retryAfterSec;
+    this.fields = fields;
   }
 }
 
-export async function api<S extends z.ZodType>(
+export async function api<S extends Parser<unknown>>(
   method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   options: { body?: unknown; schema: S },
-): Promise<z.infer<S>>;
+): Promise<ReturnType<S["parse"]>>;
 export async function api(
   method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
@@ -29,7 +37,7 @@ export async function api(
 export async function api(
   method: string,
   path: string,
-  options: { body?: unknown; schema?: z.ZodType } = {},
+  options: { body?: unknown; schema?: Parser<unknown> } = {},
 ): Promise<unknown> {
   const init: RequestInit = { method, credentials: "same-origin", headers: {} };
   if (options.body !== undefined) {
@@ -43,18 +51,18 @@ export async function api(
     throw new ApiError(0, "network", "network error");
   }
   if (!res.ok) {
-    let parsed: ReturnType<typeof errorBodySchema.safeParse> | undefined;
+    let body: ReturnType<typeof parseErrorBody> = null;
     try {
-      parsed = errorBodySchema.safeParse(await res.json());
+      body = parseErrorBody(await res.json());
     } catch {
-      parsed = undefined;
+      body = null;
     }
-    const body = parsed?.success ? parsed.data : undefined;
     throw new ApiError(
       res.status,
       body?.error ?? "unknown",
       body?.message ?? "",
       body?.retryAfterSec,
+      body?.fields,
     );
   }
   if (res.status === 204 || !options.schema) return undefined;

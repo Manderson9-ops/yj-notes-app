@@ -1,0 +1,11 @@
+label,milestone_ko,milestone_en,age_month,domain_ko,domain,source_id,evidence_id
+CONFIRMED,합성 이정표 1: 블록 쌓기,synthetic SYN-12M-GM-01,12,대근육 운동,gross_motor,SYN,SYN-12M-GM-01
+CONFIRMED,합성 이정표 2: 숟가락 사용,synthetic SYN-12M-FM-01,12,소근육 운동,fine_motor,SYN,SYN-12M-FM-01
+CONFIRMED,합성 이정표 3: 이름을 부르면 대답,synthetic SYN-18M-LA-01,18,언어·의사소통,language,SYN,SYN-18M-LA-01
+CONFIRMED,합성 이정표 4: 친구 달래기,synthetic SYN-18M-SE-01,18,사회성·정서,social,SYN,SYN-18M-SE-01
+CONFIRMED,합성 이정표 5: 그림책 짚기,synthetic SYN-24M-CG-01,24,인지,cognitive,SYN,SYN-24M-CG-01
+CONFIRMED,합성 이정표 6: 계단 오르기,synthetic SYN-24M-GM-02,24,대근육 운동,gross_motor,SYN,SYN-24M-GM-02
+CONFIRMED,합성 이정표 7: 노래 따라 하기,synthetic SYN-30M-LA-02,30,언어·의사소통,language,SYN,SYN-30M-LA-02
+CONFIRMED,합성 이정표 8: 정리 돕기,synthetic SYN-30M-SE-02,30,사회성·정서,social,SYN,SYN-30M-SE-02
+CONFIRMED,합성 이정표 9: 모래 채우기,synthetic SYN-36M-CG-02,36,인지,cognitive,SYN,SYN-36M-CG-02
+CONFIRMED,합성 이정표 10: 신발 신기,synthetic SYN-36M-FM-02,36,소근육 운동,fine_motor,SYN,SYN-36M-FM-02

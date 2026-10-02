@@ -1,0 +1,461 @@
+/* 자료실·검진·성장 화면 전용(lazy 청크에 실린다). 색·모양은 토큰만, 테마 분기 없음. */
+
+/* ---- S40 문서 카드 ---- */
+a.doc-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-height: var(--tap);
+  color: var(--c-fg);
+  text-decoration: none;
+}
+
+.doc-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  line-height: 1.3;
+}
+
+.card-title {
+  margin: 0 0 var(--space-3);
+}
+
+/* ---- S41 문서 ---- */
+.doc-note {
+  margin: var(--space-2) 0;
+}
+
+.doc-frame {
+  display: block;
+  width: 100%;
+  height: calc(100dvh - var(--tap) * 2);
+  min-height: 420px;
+  border: var(--bw) solid var(--c-line);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+}
+
+.doc-toc {
+  margin: var(--space-3) 0;
+  border: var(--bw) solid var(--c-line);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+}
+
+.doc-toc summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.doc-toc ol {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3) var(--space-5);
+}
+
+.doc-toc ol ol {
+  padding: 0 0 0 var(--space-4);
+}
+
+.doc-toc li.doc-toc-sub {
+  margin-left: var(--space-3);
+  list-style: none;
+}
+
+.doc-toc-sub .toc-btn {
+  font-size: var(--fs-sm);
+}
+
+.toc-btn {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-link);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* 긴 글 가독성: 줄 길이 ~38em, 큰 글씨, 넉넉한 줄간격 */
+.doc-body {
+  max-width: 38em;
+  margin-top: var(--space-4);
+  font-size: var(--fs-lg);
+  line-height: 1.8;
+}
+
+.doc-body h2,
+.doc-body h3,
+.doc-body h4 {
+  scroll-margin-top: var(--space-4);
+  margin: var(--space-6) 0 var(--space-3);
+  line-height: 1.35;
+}
+
+.doc-body h3 {
+  font-size: var(--fs-base);
+}
+
+.doc-body p,
+.doc-body ul,
+.doc-body ol {
+  margin: 0 0 var(--space-4);
+}
+
+.doc-body ul,
+.doc-body ol {
+  padding-left: 1.4em;
+}
+
+.doc-body li + li {
+  margin-top: var(--space-1);
+}
+
+.doc-body blockquote {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-left: 4px solid var(--c-accent);
+  background: var(--c-surface);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.doc-body pre {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3);
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background: var(--c-surface);
+  font-size: var(--fs-base);
+  line-height: 1.5;
+}
+
+.doc-body code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+.doc-body hr {
+  margin: var(--space-5) 0;
+  border: 0;
+  border-top: 1px solid var(--c-line);
+}
+
+/* 열이 셋 이상인 표: 줄마다 카드처럼 쌓는다(가로 스크롤 없이 읽힌다) */
+.doc-body .md-rows {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.md-row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.md-row-title {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-base);
+}
+
+.md-row-cells {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--fs-base);
+  line-height: 1.6;
+}
+
+.md-row-cells dt {
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+
+.md-row-cells dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 접는 칸(<details>) */
+.md-details {
+  margin: 0 0 var(--space-4);
+  border: var(--bw) solid var(--c-line);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+}
+
+.md-details > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: var(--space-1) var(--space-4);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.md-details-body {
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+/* 체크박스 목록 */
+.doc-body li.md-task {
+  list-style: none;
+  margin-left: -1.4em;
+}
+
+.md-box {
+  margin-right: var(--space-2);
+}
+
+.doc-body li > ul,
+.doc-body li > ol {
+  margin: var(--space-1) 0 0;
+}
+
+/* ---- 표 (문서·검진·성장 공용) ---- */
+.table-scroll {
+  margin: var(--space-3) 0;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table caption {
+  padding-bottom: var(--space-2);
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--c-line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+.data-table thead th {
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.data-table .num {
+  white-space: nowrap;
+}
+
+.data-table tbody th {
+  font-weight: 600;
+}
+
+.data-table td:last-child,
+.data-table th:last-child {
+  padding-right: 0;
+}
+
+.growth-body .data-table {
+  min-width: 720px;
+}
+
+.growth-body .data-table th,
+.growth-body .data-table td {
+  white-space: nowrap;
+}
+
+/* 판독 불확실 배지: 색 + 글자(색만으로 구분하지 않는다) */
+.badge[data-status="uncertain"] {
+  background: var(--c-warn-bg);
+  color: var(--c-warn);
+  white-space: nowrap;
+}
+
+.card .notice,
+.card .table-scroll {
+  margin-top: var(--space-3);
+}
+
+/* ---- S43 성장 차트 ---- */
+.growth-body {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.growth-body > .btn {
+  justify-self: start;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  margin: 0 auto;
+  overflow: visible;
+}
+
+.chart-grid {
+  stroke: var(--c-line);
+  stroke-width: 1;
+}
+
+.chart-axis {
+  stroke: var(--c-border);
+  stroke-width: 1.5;
+}
+
+.chart-tick,
+.chart-label,
+.chart-ref-label {
+  fill: var(--c-muted);
+  font-size: calc(var(--fs-sm) * 0.8);
+}
+
+.chart-label {
+  fill: var(--c-fg);
+}
+
+.chart-ref {
+  fill: none;
+  stroke: var(--c-muted);
+  stroke-width: 1.5;
+  opacity: 0.55;
+}
+
+.chart-ref-edge {
+  stroke-dasharray: 5 4;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--c-accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.chart-point {
+  cursor: pointer;
+  outline: none;
+}
+
+.chart-hit {
+  fill: transparent;
+}
+
+.chart-dot {
+  fill: var(--c-accent);
+  stroke: var(--c-bg);
+  stroke-width: 2;
+}
+
+.chart-dot-open {
+  fill: var(--c-bg);
+  stroke: var(--c-accent);
+  stroke-width: 3;
+}
+
+.chart-ring {
+  fill: none;
+  stroke: var(--c-fg);
+  stroke-width: 2;
+}
+
+.chart-point:focus-visible .chart-hit {
+  stroke: var(--c-accent);
+  stroke-width: 3;
+}
+
+.chart-legend {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+  list-style: none;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 28px;
+  height: 0;
+  margin-right: var(--space-2);
+  vertical-align: middle;
+  border-top: 2px solid var(--c-muted);
+  opacity: 0.7;
+}
+
+.legend-edge {
+  border-top-style: dashed;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin: 0 var(--space-2) 0 var(--space-2);
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--c-accent);
+}
+
+/* ---- 긴 글에서 맨 위로: 탭바 위에 떠 있는 단추(스크롤한 뒤에만 보인다) ---- */
+.back-top {
+  position: sticky;
+  bottom: calc(var(--tap) + var(--space-6) + var(--space-3));
+  z-index: 2;
+  height: 0;
+}
+
+.back-top .btn {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  box-shadow: var(--shadow);
+  background: var(--c-bg);
+}
+
+/* ---- S40 문서 카드: 설명 한 줄 ---- */
+.doc-summary {
+  margin: 0;
+  color: var(--c-muted);
+  font-size: var(--fs-base);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.lib-intro {
+  margin: calc(var(--space-2) * -1) 0 var(--space-3);
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+
+.card-subtitle {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--fs-base);
+}
+
+.source-note {
+  margin: var(--space-2) 0 0;
+}

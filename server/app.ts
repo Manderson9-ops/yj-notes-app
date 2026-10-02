@@ -4,6 +4,13 @@ import { Hono } from "hono";
 import { defaultDeps, type Deps } from "./deps";
 import type { Env } from "./env";
 import { errorResponse, toErrorResponse } from "./http/errors";
+import { noteRoutes } from "./routes/notes";
+import { overviewRoutes } from "./routes/overview";
+import { checkupRoutes } from "./routes/checkups";
+import { fileRoutes } from "./routes/files";
+import { growthRoutes } from "./routes/growth";
+import { reportRoutes } from "./routes/reports";
+import { logRoutes } from "./routes/logs";
 import { sessionRoutes } from "./routes/session";
 
 export interface AppVariables {
@@ -26,6 +33,13 @@ export function createApp(deps: Deps = defaultDeps): Hono<AppEnv> {
   app.notFound(() => errorResponse(404, "not_found", "찾을 수 없어요."));
 
   app.route("/", sessionRoutes);
+  app.route("/", noteRoutes);
+  app.route("/", overviewRoutes);
+  app.route("/", reportRoutes);
+  app.route("/", checkupRoutes);
+  app.route("/", growthRoutes);
+  app.route("/", fileRoutes);
+  app.route("/", logRoutes);
 
   return app;
 }

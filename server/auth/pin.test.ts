@@ -1,7 +1,15 @@
 import { pbkdf2Sync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { base64ToBytes, base64UrlToBytes, bytesToBase64, bytesToBase64Url, utf8 } from "./encoding";
-import { PBKDF2_ITERATIONS, hashPin, isValidPinFormat, timingSafeEqual, verifyPin } from "./pin";
+import {
+  PBKDF2_ITERATIONS,
+  hashPin,
+  isPinConfigured,
+  isValidPinFormat,
+  parsePinLength,
+  timingSafeEqual,
+  verifyPin,
+} from "./pin";
 
 // 합성 값: 소금 00..0f, PIN 123456 (실제 PIN 아님). 기댓값은 node:crypto 로 독립 계산한 것.
 const SALT = "AAECAwQFBgcICQoLDA0ODw==";
@@ -86,5 +94,23 @@ describe("encoding", () => {
 
   it("utf8 encodes", () => {
     expect(utf8("가")).toEqual(new Uint8Array([0xea, 0xb0, 0x80]));
+  });
+});
+
+describe("parsePinLength", () => {
+  it("accepts only integer strings 4..12", () => {
+    for (let n = 4; n <= 12; n++) expect(parsePinLength(String(n))).toBe(n);
+    for (const bad of [undefined, "", "3", "13", "004", "4.0", " 4", "4 ", "abc", "-4", "1e1"]) {
+      expect(parsePinLength(bad), String(bad)).toBeUndefined();
+    }
+  });
+});
+
+describe("isPinConfigured", () => {
+  it("needs non-empty string PIN_HASH and PIN_SALT", () => {
+    expect(isPinConfigured({ PIN_HASH: "a", PIN_SALT: "b" })).toBe(true);
+    expect(isPinConfigured({ PIN_HASH: "", PIN_SALT: "b" })).toBe(false);
+    expect(isPinConfigured({ PIN_HASH: "a" })).toBe(false);
+    expect(isPinConfigured({ PIN_HASH: 1, PIN_SALT: "b" })).toBe(false);
   });
 });

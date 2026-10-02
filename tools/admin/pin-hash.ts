@@ -14,14 +14,21 @@ export function computePinHash(pin: string, salt: Buffer): string {
   return pbkdf2Sync(pin, salt, PBKDF2_ITERATIONS, 32, "sha256").toString("base64");
 }
 
-export function formatOutput(saltB64: string, hashB64: string): string {
+export function formatOutput(saltB64: string, hashB64: string, pinLength?: number): string {
   return [
     "PIN_SALT=" + saltB64,
     "PIN_HASH=" + hashB64,
+    ...(pinLength === undefined ? [] : ["PIN_LENGTH=" + String(pinLength)]),
     "",
     "# Cloudflare Pages secret 등록 (프롬프트에 위 값을 붙여 넣는다). 운영은 production, 미리보기는 --env preview:",
     `npx wrangler pages secret put PIN_SALT --project-name ${PROJECT_NAME}`,
     `npx wrangler pages secret put PIN_HASH --project-name ${PROJECT_NAME}`,
+    ...(pinLength === undefined
+      ? []
+      : [
+          `npx wrangler pages secret put PIN_LENGTH --project-name ${PROJECT_NAME}   # 입력값: ${String(pinLength)}`,
+          "# 주의: PIN_LENGTH 가 실제 PIN 길이와 다르면 아무도 로그인할 수 없다. 세 값(PIN_SALT·PIN_HASH·PIN_LENGTH)을 함께 등록하고 재배포한다.",
+        ]),
     "",
     "# SESSION_SECRET / IP_HASH_SALT 이 아직 없다면 (각각 한 번씩 실행해 나온 값을 secret 으로 등록):",
     `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`,
@@ -102,7 +109,8 @@ async function main(): Promise<void> {
     return;
   }
   const salt = randomBytes(16);
-  console.log(formatOutput(salt.toString("base64"), computePinHash(pin, salt)));
+  // PIN 자체는 출력하지 않는다. 자릿수(비밀 아님)만 알려서 PIN_LENGTH 를 맞추게 한다.
+  console.log(formatOutput(salt.toString("base64"), computePinHash(pin, salt), pin.length));
 }
 
 if (import.meta.main) {

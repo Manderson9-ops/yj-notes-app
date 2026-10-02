@@ -8,6 +8,8 @@ export interface Env {
   PIN_HASH: string;
   /** base64 salt for PIN_HASH. */
   PIN_SALT: string;
+  /** 선택. PIN 자릿수("4"~"12" 정수 문자열). 유효하면 GET /api/session 이 pinLength 로 알려 자동 전송에 쓴다. 그 밖 값은 무시. */
+  PIN_LENGTH?: string;
   /** HMAC key for the `yjs` session cookie. */
   SESSION_SECRET: string;
   /** HMAC key used to hash client IPs before they are stored in auth_attempt. */

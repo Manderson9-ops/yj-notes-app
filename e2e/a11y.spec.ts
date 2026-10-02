@@ -20,7 +20,6 @@ async function seriousViolations(page: Page) {
 async function login(page: Page) {
   await page.goto("/");
   for (const d of "0000") await page.getByRole("button", { name: d, exact: true }).click();
-  await page.getByRole("button", { name: "확인" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "홈" })).toBeVisible();
 }
 
@@ -32,6 +31,7 @@ for (const theme of THEMES) {
       test("PIN, home, settings and preview have no serious a11y violations", async ({
         page,
       }, info) => {
+        test.slow(); // 알림장 화면까지 돌아서 webkit 에서 30초를 넘길 수 있다
         await page.addInitScript((t) => {
           localStorage.setItem("yj.theme", t);
         }, theme);
@@ -45,13 +45,28 @@ for (const theme of THEMES) {
         };
 
         await page.goto("/");
-        await expect(page.getByRole("button", { name: "확인" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "모두 지우기" })).toBeVisible();
         await check();
         await shot("pin");
 
         await login(page);
         await check();
         await shot("home");
+
+        // S30 알림장 목록·검색, S31 상세 (합성 mock 자료)
+        await page.getByRole("link", { name: "알림장", exact: true }).click();
+        await expect(page.getByRole("heading", { level: 1, name: "알림장" })).toBeVisible();
+        await expect(page.locator(".note-row").first()).toBeVisible();
+        await check();
+        await shot("notes");
+        await page.getByRole("searchbox", { name: "알림장 검색" }).fill("그림책");
+        await expect(page.locator(".note-row mark").first()).toBeVisible();
+        await check();
+        await shot("notes-search");
+        await page.goto("/notes/2020-03-05?q=낮잠");
+        await expect(page.locator(".note-report mark").first()).toBeVisible();
+        await check();
+        await shot("note-detail", true);
 
         await page.getByRole("link", { name: "설정", exact: true }).click();
         await expect(page.getByRole("heading", { level: 1, name: "설정" })).toBeVisible();
@@ -69,7 +84,6 @@ for (const theme of THEMES) {
         await page.getByRole("link", { name: "설정", exact: true }).click();
         await page.getByRole("button", { name: "이 기기 로그아웃" }).click();
         for (const d of "9999") await page.getByRole("button", { name: d, exact: true }).click();
-        await page.getByRole("button", { name: "확인" }).click();
         await expect(page.getByText("PIN 이 맞지 않아요.")).toBeVisible();
         await check();
       });

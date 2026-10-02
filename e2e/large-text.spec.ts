@@ -6,7 +6,16 @@ import { settle, stableShot } from "./helpers";
 // in round keys, small text scales. Screenshots (mobile-chromium only): e2e/__screenshots__/<screen>-<theme>-large-<scheme>.png
 
 const THEMES = ["basic", "crayon", "forest"] as const;
-const TARGETS = [".key", ".chip", ".btn", ".btn-primary", ".tab", ".theme-option"] as const;
+const TARGETS = [
+  ".key",
+  ".chip",
+  ".btn",
+  ".btn-primary",
+  ".tab",
+  ".theme-option",
+  ".note-row",
+  ".search-clear",
+] as const;
 
 async function seriousViolations(page: Page) {
   const results = await new AxeBuilder({ page })
@@ -53,6 +62,7 @@ for (const { theme, large, scheme } of COMBOS) {
     test("PIN, settings and preview: axe 0, touch targets, text scale, no overflow", async ({
       page,
     }, info) => {
+      test.slow(); // 화면이 늘어 webkit 에서 30초를 넘길 수 있다
       await page.addInitScript(
         ([t, l]) => {
           localStorage.setItem("yj.theme", t ?? "basic");
@@ -73,13 +83,12 @@ for (const { theme, large, scheme } of COMBOS) {
       const smallText = large ? /^16\.4/ : /^14(\.\d+)?px$/;
 
       await page.goto("/");
-      await expect(page.getByRole("button", { name: "확인" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "모두 지우기" })).toBeVisible();
       await check();
       await expectNoKeyOverflow(page);
       await shot("pin");
 
       for (const d of "0000") await page.getByRole("button", { name: d, exact: true }).click();
-      await page.getByRole("button", { name: "확인" }).click();
       await expect(page.getByRole("heading", { level: 1, name: "홈" })).toBeVisible();
       await expect(page.locator(".tab span").first()).toHaveCSS("font-size", smallText);
       if (large) {
@@ -88,6 +97,21 @@ for (const { theme, large, scheme } of COMBOS) {
         );
         expect(px).toBeGreaterThan(14);
       }
+
+      await expect(page.locator(".note-row").first()).toBeVisible();
+      await check();
+      await shot("home");
+
+      await page.getByRole("link", { name: "알림장", exact: true }).click();
+      await expect(page.getByRole("heading", { level: 1, name: "알림장" })).toBeVisible();
+      await page.getByRole("searchbox", { name: "알림장 검색" }).fill("낮잠");
+      await expect(page.locator(".note-row mark").first()).toBeVisible();
+      await check();
+      await shot("notes");
+      await page.goto("/notes/2020-03-05?q=낮잠");
+      await expect(page.locator(".note-report mark").first()).toBeVisible();
+      await check();
+      await shot("note-detail", true);
 
       await page.getByRole("link", { name: "설정", exact: true }).click();
       await expect(page.getByRole("heading", { level: 1, name: "설정" })).toBeVisible();

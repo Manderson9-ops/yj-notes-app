@@ -36,6 +36,8 @@
   payload = `{v:1, epoch, iat, exp(30일), dev}`. 서버는 `app_setting.session_epoch` 와 같을 때만 수락.
 - **전체 로그아웃**: epoch 증가(관리자 명령 또는 PIN 변경 시 자동).
 - **시도 기록**: `auth_attempt` 에 IP 의 **솔트 해시**만 저장(원 IP 저장 안 함), 30일 후 삭제.
+- **서버 설정 오류는 시도로 세지 않는다**: PIN_HASH/PIN_SALT 없음·형식 오류로 대조 자체를 못 한 요청은 `auth_attempt` 에 남기지 않고(없으면 기록 전 500, 형식 오류면 기록을 되돌린 뒤 500) 잠금 계산에서 뺀다. 실제로 틀린 PIN 만 실패 1회다.
+- **자릿수 노출(`PIN_LENGTH`)**: `GET /api/session` 이 `pinLength`(4~12)를 알려 입력이 그 자리에서 자동 전송된다. 무차별 대입 공간을 줄이지 않는다 — 자릿수는 화면 점 개수로 원래 관찰 가능한 수준이고, 주 방어는 시도 제한(IP 5회/15분·전역 30회/시간)이다. 자동 전송 때문에 시도가 늘지 않게 클라이언트는 정확히 그 자리에서 1회만 전송하고 전송 중엔 입력을 막는다.
 - **PIN 강도 권고**: 현재 PIN(생일 4자리)은 추측하기 쉽다. 시도 제한으로 무차별 대입은 막지만,
   **생일이 아닌 6자리 이상**으로 바꾸기를 권고한다(D-02 후속, 관리자 결정).
 
@@ -53,7 +55,13 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 Cache-Control: private, no-store        (모든 /api/*)
 ```
 
-- 기존 보고서 HTML 은 인라인 스크립트를 쓰므로 **`/api/reports/:slug/raw` 를 `sandbox="allow-scripts"`(allow-same-origin 없음) iframe** 으로만 띄운다. 그 응답에만 별도 CSP(`script-src 'unsafe-inline'`, `connect-src 'none'`)를 준다.
+- 기존 보고서 HTML 은 인라인 스크립트를 쓰므로 **`/api/reports/:slug/raw` 를 `sandbox="allow-scripts"`(allow-same-origin 없음) iframe** 으로만 띄운다. 그 응답에만 별도 CSP(`script-src 'unsafe-inline'`, `connect-src 'none'`)를 준다. 응답 CSP 에도 `sandbox allow-scripts`·`form-action 'none'`·`base-uri 'none'` 을 넣어, 주소를 새 탭으로 직접 열어도 앱 origin 이 아닌 고유 origin 에서 실행된다(보안 검토 2026-10-02 P1).
+
+### 4-1. 오프라인 대기열·서비스 워커 (F2-6)
+- **서비스 워커(`public/sw.js`)는 앱 껍데기만 캐시한다**: 화면 HTML 과 해시가 붙은 빌드 파일(`/assets/`, `/fonts/`). **`/api/*` 는 건드리지 않는다**(항상 네트워크, 저장 안 함). 이유: 가족 기록·알림장은 S1 이라 기기 캐시에 오래 남으면 안 된다. 껍데기에는 자료가 없다(ADR-0002).
+- **기록 대기열**은 IndexedDB(`yj-queue`)에 **아직 못 보낸 기록만** 두고, 보내면 지운다. 로그아웃해도 못 보낸 기록은 유실하지 않으려고 남기므로, 기기를 넘길 때는 먼저 연결해서 비우거나 브라우저 사이트 데이터를 지운다.
+- 대기열·서비스 워커 모두 같은 출처 스크립트(`script-src 'self'`)만 쓴다. 인라인 스크립트 없음.
+- 질문 정의(`log_type`)는 개인 자료가 아니라 `localStorage` 에 한 벌 기억해 오프라인에서도 입력 화면이 열린다.
 
 ## 5. 자료 분리 규칙 (공개 저장소 결정 D-01 의 구현)
 

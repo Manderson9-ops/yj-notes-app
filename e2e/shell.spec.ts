@@ -6,7 +6,6 @@ async function enterPin(page: Page, pin: string) {
   for (const d of pin) {
     await page.getByRole("button", { name: d, exact: true }).click();
   }
-  await page.getByRole("button", { name: "확인" }).click();
 }
 
 async function login(page: Page) {
@@ -46,7 +45,8 @@ test("tab navigation", async ({ page }) => {
     await nav.getByRole("link", { name }).click();
     await expect(page).toHaveURL(path);
     await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
-    await expect(page.getByText("준비 중")).toBeVisible();
+    // 네 탭 모두 실제 화면이다(준비 중 문구 없음)
+    await expect(page.getByText("준비 중")).toHaveCount(0);
   }
 });
 
@@ -67,7 +67,7 @@ test("logout returns to the PIN screen", async ({ page }) => {
   await login(page);
   await page.getByRole("link", { name: "설정" }).click();
   await page.getByRole("button", { name: "이 기기 로그아웃" }).click();
-  await expect(page.getByRole("button", { name: "확인" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "모두 지우기" })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("button", { name: "확인" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "모두 지우기" })).toBeVisible();
 });

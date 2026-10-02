@@ -5,11 +5,15 @@ import { expect, type Locator, type Page } from "@playwright/test";
  * 끝나는 전환·등장 모션이 지난 뒤로 기다린다(문자열 실행: e2e 의 tsconfig 에는 DOM 타입이 없다).
  * 실행 중(running)인 유한 모션만 기다리고, 최대 3초에서 끊는다: CI(linux) webkit 에서 `finished` 가
  * 끝내 풀리지 않는 애니메이션이 있어 테스트가 30초 제한에 걸렸다(PR #2 최초 CI).
+ * 페이지 안 타이머가 멈춘 듯 응답이 안 오는 경우도 있어(PR #3 CI webkit), Node 쪽에서도 3.5초에서 끊는다.
  */
 export async function settle(page: Page) {
-  await page.evaluate(
-    "Promise.race([Promise.all(document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))), new Promise((r) => setTimeout(r, 3000))])",
-  );
+  const wait = page
+    .evaluate(
+      "Promise.race([Promise.all(document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))), new Promise((r) => setTimeout(r, 3000))])",
+    )
+    .catch(() => undefined);
+  await Promise.race([wait, new Promise((r) => setTimeout(r, 3500))]);
 }
 
 /**
@@ -29,7 +33,7 @@ async function preloadCssImages(page: Page) {
     const scan = (rules) => {
       for (const r of rules) {
         if (r.cssRules) scan(r.cssRules);
-        for (const m of (r.cssText || "").matchAll(/url\("(data:image[^"]+)"\)/g)) urls.add(m[1]);
+        for (const m of (r.cssText || "").matchAll(/url\("(data:image[^"]+|\/icons\/tex-[^"]+)"\)/g)) urls.add(m[1]);
       }
     };
     for (const s of document.styleSheets) {

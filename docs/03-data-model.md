@@ -102,12 +102,16 @@ CREATE TABLE family_log (
 );
 CREATE INDEX idx_log_type_date ON family_log(type, occurred_on);
 
--- 보고서 메타 (본문은 R2)
+-- 보고서 메타. 본문은 D1 body 칸(R2 활성화 전, 0004_report_doc_body.sql). body 가 NULL 이면 r2_key 로 R2 에서 읽는다
 CREATE TABLE report_doc (
   slug TEXT PRIMARY KEY, title TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('html','markdown')),
   r2_key TEXT NOT NULL, generated_at TEXT NOT NULL, source_commit TEXT NOT NULL,
-  verify_ok INTEGER NOT NULL, sha256 TEXT NOT NULL
+  verify_ok INTEGER NOT NULL, sha256 TEXT NOT NULL,
+  body TEXT                             -- 0004: 문서 원문(행당 2MB 미만). body 가 있으면 r2_key = ''
 );
+-- 묶음(보고서·가이드·위키)은 열이 아니라 slug 규칙: `-`/`_` 로 나눈 **첫 마디**가 guide 또는 wiki 면 그 묶음, 아니면 보고서. 적재 도구가 slug 를 `<폴더>-<번호|영문 이름>` 으로 만든다(`guide/05-제목.md` → `guide-05`, 한글만 있는 이름은 해시 6자, 겹치면 `-2`). 앱 링크 `/library/doc/guide-05#3-1`.
+-- app_setting 키(성장 곡선): child_birth_date(YYYY-MM-DD, 만 개월 계산), child_sex('F'|'M', 기준표 선택. 기본 F).
+-- measurement.measure 'head_circ_cm' 은 API 에서 'head_cm' 으로 노출한다.
 
 -- 보안
 CREATE TABLE auth_attempt (ip_hash TEXT NOT NULL, at TEXT NOT NULL, ok INTEGER NOT NULL);
@@ -117,6 +121,8 @@ CREATE TABLE app_setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);  -- sessio
 ```
 
 ### 설계 메모
+- **적재 대응(T-B1)**: 원본 → 테이블 칸 대응은 `07` §4 표. 스키마가 원본을 담지 못했던 곳은 두 가지뿐이다. (1) `report_doc.body` — R2 가 없어 문서 원문을 둘 곳이 없었다(마이그레이션 0004). (2) `note_comment.id` — 원본에 댓글 id 가 없어 `report_id*1000 + 순번` 으로 만든다(스키마 변경 없음, 댓글은 알림장당 999개까지). `growth_ref` 는 L·M·S·p3·p50·p97 만 담고 다른 백분위(p5~p95)·단위는 담지 않는다.
+- **긴 본문**: D1 문장 한도(100KB)를 넘는 문자열 칸은 적재가 나눠 붙이므로(`07` §4) 앱은 신경 쓰지 않는다.
 - **교사·다른 보호자 실명은 적재하지 않는다**(`author_role` 만). 알림장 본문 속 다른 아이 이름은 원문이라 그대로 두되 S1 로 취급한다.
 - 검색(F4)은 1차에서 `LIKE` 로 충분하다(483행, 행 크기 작음, D1 `LIKE` 패턴 50바이트 제한 → 입력 길이 제한 40자). 한국어 부분 일치용 FTS5 trigram 은 M3 스파이크로 검증 후 도입 여부 결정(D-05).
 - 날짜: 알림장 `date` 는 원 날짜, 시각은 KST 문자열(기존 `EXTRACTION.md` §4 와 동일).
@@ -131,6 +137,14 @@ CREATE TABLE app_setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);  -- sessio
 | `bandage_step` | step(0~5), result(성공/한 칸 내림/중단), helper | 상처 밴드 연습 사다리 |
 
 경고 규칙(F2-5)은 코드에 하드코딩하지 않고 `log_type.schema_json.alerts` 로 둔다. 예: `{"field":"tantrum_min","op":">=","value":25,"guide":"guide/05#3-1"}`.
+
+**`schema_json` 모양** (`server/logs/definition.ts` 가 zod 로 읽는다. 마이그레이션 `0005_log_schema_and_history` 에서 화면용 항목을 더했다):
+- `fields[]`: `{key, label_ko, type:"enum"|"int"|"text", required, …}` — enum: `options[]`, int: `min`·`max`·`unit?`·`presets?`(화면 칩 값), text: `max?`.
+- `alerts[]`: `{field, op, value, guide, message_ko?}` — `message_ko` 는 저장 직후·목록에 보이는 사실 문구.
+- `summary?`: `{highlight?: 키[], crosstabs?: [{rows, cols}]}` — 주차 비교·목록 요약에 쓸 필드와 교차표(`05` summary 정의).
+- 종류를 더하려면 `log_type` 에 행만 넣는다(코드 변경 없음). 단 새 종류의 `code` 아이콘은 없으면 점 하나로 보인다.
+
+**`family_log_history`** (`0005_log_schema_and_history`): 수정·삭제 때 바뀌기 전 모습을 남긴다(F2-3, `04` "기록 변조·삭제"). `(id, log_id, changed_at, change['update'|'delete'], before_json)`. 앱 화면에는 노출하지 않고 복구용이다.
 
 ## 4. R2 객체
 

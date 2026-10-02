@@ -12,5 +12,5 @@ export default defineConfig({
   plugins: [react(), ...(process.env.VITE_MOCK_API === "1" ? [mockApi()] : [])],
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   build: { sourcemap: false },
-  server: { host: "127.0.0.1", port: 5173, strictPort: true },
+  server: { host: "127.0.0.1", port: Number(process.env.E2E_PORT ?? 5173), strictPort: true },
 });

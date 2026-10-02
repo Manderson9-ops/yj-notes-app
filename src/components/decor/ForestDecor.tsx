@@ -4,45 +4,51 @@ import { Svg } from "./CrayonDecor";
 // 정령·동물·사람·탈것·특정 건물·장면 구도 없음. 둥근 적운, 겹친 언덕, 잎.
 
 /** 언덕 3겹: 뒤로 갈수록 연하고(공기 원근), 맨 앞이 가장 어둡다(라이트·다크 모두).
- *  채움에 정적 feTurbulence 농담(수채 번짐 같은 결)을 곱하고, 각 언덕 윗가장자리에 옅은 빛줄기를 얹는다. */
+ *  채움 위에 미리 만든 농담 패턴(<pattern>, 가로로 긴 연한 얼룩: 수채 번짐 같은 결)을 깔고(실시간 SVG 필터 없음), 각 언덕 윗가장자리에 옅은 빛줄기를 얹는다. */
 export function HillLayers() {
   return (
     <Svg viewBox="0 0 360 96" preserveAspectRatio="none">
       <defs>
-        <filter id="yj-hill-tone" filterUnits="userSpaceOnUse" x="0" y="0" width="360" height="96">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.018 0.06"
-            numOctaves="3"
-            seed="7"
-            result="n"
-          />
-          <feColorMatrix
-            in="n"
-            type="matrix"
-            values="0.3 0 0 0 0.72  0 0.3 0 0 0.72  0 0 0.3 0 0.72  0 0 0 0 1"
-            result="tone"
-          />
-          <feBlend in="SourceGraphic" in2="tone" mode="multiply" result="m" />
-          <feComposite in="m" in2="SourceGraphic" operator="in" />
-        </filter>
+        <pattern id="yj-hill-tone" width="240" height="32" patternUnits="userSpaceOnUse">
+          <radialGradient id="yj-hill-tone-g">
+            <stop offset="0" stopColor="#000" stopOpacity="0.13" />
+            <stop offset="1" stopColor="#000" stopOpacity="0" />
+          </radialGradient>
+          <rect width="240" height="32" fill="#000" fillOpacity="0.04" />
+          <g fill="url(#yj-hill-tone-g)">
+            <ellipse cx="40" cy="8" rx="36" ry="7" />
+            <ellipse cx="120" cy="14" rx="44" ry="9" />
+            <ellipse cx="200" cy="8" rx="32" ry="6" />
+            <ellipse cx="70" cy="24" rx="40" ry="7" />
+            <ellipse cx="170" cy="25" rx="42" ry="6" />
+          </g>
+        </pattern>
       </defs>
       {/* 농담(multiply)은 불투명 채움에만 걸고, 뒤 언덕의 옅기(opacity)는 바깥 그룹이 맡는다 */}
       <g className="d-soft">
         <path
           className="d-f1"
-          filter="url(#yj-hill-tone)"
+          d="M0 52 C34 30 78 26 126 38 C176 51 226 62 276 40 C312 25 340 28 360 36 L360 96 L0 96 Z"
+        />
+        <path
+          fill="url(#yj-hill-tone)"
           d="M0 52 C34 30 78 26 126 38 C176 51 226 62 276 40 C312 25 340 28 360 36 L360 96 L0 96 Z"
         />
       </g>
       <path
         className="d-f2"
-        filter="url(#yj-hill-tone)"
+        d="M0 70 C40 52 92 54 148 66 C206 78 262 74 306 60 C330 53 348 54 360 58 L360 96 L0 96 Z"
+      />
+      <path
+        fill="url(#yj-hill-tone)"
         d="M0 70 C40 52 92 54 148 66 C206 78 262 74 306 60 C330 53 348 54 360 58 L360 96 L0 96 Z"
       />
       <path
         className="d-hill-front"
-        filter="url(#yj-hill-tone)"
+        d="M0 86 C60 78 120 84 200 88 C260 90 320 82 360 84 L360 96 L0 96 Z"
+      />
+      <path
+        fill="url(#yj-hill-tone)"
         d="M0 86 C60 78 120 84 200 88 C260 90 320 82 360 84 L360 96 L0 96 Z"
       />{" "}
       <g className="d-ridge">
