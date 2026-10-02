@@ -51,7 +51,7 @@ npm run ingest:verify                     # 통과해야 다음으로
 npm run ingest:upload -- --remote --yes
 npm run ingest:status -- --remote         # matches_manifest: true
 ```
-- 새 마이그레이션이 있으면 먼저 `npm run db:migrate:prod`. 이번 배포에는 `0004_b1_report_doc_body.sql`(문서 원문 `body` 칸)이 포함된다.
+- 새 마이그레이션이 있으면 먼저 `npm run db:migrate:prod`. 이번 배포에는 `0004_report_doc_body.sql`(문서 원문 `body` 칸)이 포함된다.
 - 출력은 `%LOCALAPPDATA%\yj-notes\ingest\<run-id>\`(저장소 밖, S1·S2 포함). 적재가 끝나면 오래된 run 폴더는 지워도 된다.
 - `--remote` 는 `--yes` 없이는 동작하지 않는다. 개발·검증은 `--local` 로(`npm run db:migrate:local` 이 선행).
 - Python 3.11+ 가 필요하다(런타임 패키지 없음). 없으면 `INGEST_PYTHON` 에 경로를 지정한다.

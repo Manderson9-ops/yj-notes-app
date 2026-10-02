@@ -48,7 +48,7 @@ npm run ingest:status -- --remote          # 원격 건수 vs manifest 건수, �
 - **upload 순서**: `verify.json` 이 통과이고 manifest·SQL 해시가 그대로인지 재확인 → 모든 문장을 화이트리스트 검사(허용 형태: `DELETE FROM t;`, `INSERT INTO t (정의된 칸) VALUES (…);`, 위의 `UPDATE`; 허용 테이블 9개) → `ingest_run(status='running')` → `00_delete.sql`(자식 테이블부터 전체 삭제) → 테이블별 `INSERT` → 건수·글자 수 재확인(I7) → `report_doc.verify_ok = 1`(I4 통과 표시) → `ingest_run(status='ok', finished_at)`(= `/api/health` 의 `lastIngestAt`). 어느 단계든 실패하면 `failed` 로 남기고 멈춘다. 같은 입력으로 다시 실행하면 대상 테이블 전체 교체라 **멱등**(결과 동일, `ingest_run` 행만 늘어남). D1 은 SQL 파일 안 `BEGIN/COMMIT` 을 받지 않으므로 단일 트랜잭션이 아니다: 삭제 이후 실패하면 대상 테이블이 비거나 일부일 수 있다 → 재실행 또는 D1 Time Travel(`09` R-02).
 - **가족 기록(`family_log`)은 적재 대상이 아니다.** 앱이 정본이며 적재가 절대 지우지 않는다. 화이트리스트(`tools/ingest/sqlgen.py` 의 `TABLES`)에 없는 테이블(`family_log`·`auth_attempt`·`app_setting`·`log_type`·`ingest_run`)을 건드리는 문장은 export·verify·upload 세 곳에서 거부된다(테스트: 적재 중 실행된 모든 SQL 에 이 이름이 없음, 적재 전후 행 동일).
 - 검진(S2)은 `records/영유아검진/*.xlsx`(같은 열의 csv 도 가능)의 시트 `검진결과` 를 읽어 `checkup`·`measurement` 로 적재한다(`source_image_key` = NULL). **원본 사진(jpg)과 `_source/media` 는 이번 범위에서 적재하지 않는다**(R2 `s2/` 는 M4).
-- 문서 원문(`guide/`·`wiki/`·`tracking/` 의 `*.md`, `report/` 의 `*.html`·`*.md`; 빌드 입력 `report/base.html` 제외)은 `report_doc.body` 에 넣는다(마이그레이션 `0004_b1_report_doc_body.sql`, R2 활성화 전 임시 위치). `r2_key` 는 `''`. `sha256` 은 원본 바이트의 해시다.
+- 문서 원문(`guide/`·`wiki/`·`tracking/` 의 `*.md`, `report/` 의 `*.html`·`*.md`; 빌드 입력 `report/base.html` 제외)은 `report_doc.body` 에 넣는다(마이그레이션 `0004_report_doc_body.sql`, R2 활성화 전 임시 위치). `r2_key` 는 `''`. `sha256` 은 원본 바이트의 해시다.
 
 ### 원본 → 테이블 대응
 
@@ -84,7 +84,7 @@ npm run ingest:status -- --remote          # 원격 건수 vs manifest 건수, �
 
 | # | 명령 | 확인 |
 |---|---|---|
-| 1 | `npm run db:migrate:prod` (새 마이그레이션이 있을 때만. 최초에는 `0004_b1_report_doc_body.sql` 포함) | 출력에 적용 목록 |
+| 1 | `npm run db:migrate:prod` (새 마이그레이션이 있을 때만. 최초에는 `0004_report_doc_body.sql` 포함) | 출력에 적용 목록 |
 | 2 | `npm run ingest:export` | 건수·날짜 범위가 원본(알림장 일수·알림장 건수·댓글 수)와 같은지 |
 | 3 | `npm run ingest:verify` | `verify 통과`. 실패면 여기서 멈춘다(다음 단계 금지) |
 | 4 | `npm run ingest:upload -- --local` (선택, 최초 1회 권장) | 로컬 D1 에서 건수 일치 |

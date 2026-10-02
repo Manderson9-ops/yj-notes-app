@@ -34,3 +34,8 @@
 - 파일은 손으로 고치지 않는다: `python -m tools.ingest.tests.gen_fixture` 로 다시 만든다(테스트가 저장된 파일과 바이트 단위로 비교). 일자 md 는 실제 빌더 형식을 따르되 원본 URL 줄은 뾀다(가드 G3).
 
 파일: `seed/fixtures.sql`(알림장 30일·댓글 37개 등) + `seed/notes-edge.sql`(알림장 경계값 보충: 빈 본문, 아주 긴 본문(생성식), `% _ \` 특수문자, 가정 메모 방향, 댓글 3개 → 합계 40개). 두 파일을 순서대로 실행한다(`server/routes/notes.test.ts` 가 함께 쓴다). 500일 성능 시험용 자료는 파일이 아니라 그 테스트 안에서 생성한다. mock API(`dev:mock`) 는 별도로 합성 62일을 코드로 만든다(`vite-plugins/mock/notesData.ts`).
+
+## 자료실·검진·성장 (T-C2)
+
+`seed/library_health.sql`: 문서 3개(마크다운 2·HTML 1, slug `lh-*`), 검진 2건(`UNCERTAIN` 포함), 측정 12개, 여아 기준표(합성 LMS → p3·p50·97), 이정표 10개, `app_setting` 생일·성별.
+`0004_report_doc_body` 마이그레이션 적용 후 실행(`wrangler d1 execute DB --local --file fixtures/seed/library_health.sql`). 시드 값은 새로 쓴 가상 값이고 기준표는 실제 기준표가 아니다.

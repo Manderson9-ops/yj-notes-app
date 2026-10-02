@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useSession } from "../lib/session";
 import { DesignPreview } from "../pages/DesignPreview";
@@ -12,7 +12,13 @@ const HomePage = lazy(() => import("../pages/HomePage"));
 const NotesPage = lazy(() => import("../pages/NotesPage"));
 const NoteDetailPage = lazy(() => import("../pages/NoteDetailPage"));
 
-function Lazy({ children }: { children: React.ReactNode }) {
+// 자료 화면(S40~S43)은 처음 열 때만 내려받는다(초기 번들 예산, docs/08 Q-PERF).
+const LibraryPage = lazy(() => import("../features/library/LibraryPage"));
+const DocPage = lazy(() => import("../features/library/DocPage"));
+const CheckupsPage = lazy(() => import("../features/library/CheckupsPage"));
+const GrowthPage = lazy(() => import("../features/library/GrowthPage"));
+
+function Lazy({ children }: { children: ReactNode }) {
   return (
     <Suspense
       fallback={
@@ -65,7 +71,38 @@ function AuthGate() {
             </Lazy>
           }
         />
-        <Route path="library" element={<Placeholder title="자료" variant="library" />} />
+        <Route
+          path="library"
+          element={
+            <Lazy>
+              <LibraryPage />
+            </Lazy>
+          }
+        />
+        <Route
+          path="library/doc/:slug"
+          element={
+            <Lazy>
+              <DocPage />
+            </Lazy>
+          }
+        />
+        <Route
+          path="library/checkups"
+          element={
+            <Lazy>
+              <CheckupsPage />
+            </Lazy>
+          }
+        />
+        <Route
+          path="library/growth"
+          element={
+            <Lazy>
+              <GrowthPage />
+            </Lazy>
+          }
+        />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="settings/design" element={<DesignPreview />} />
         <Route path="*" element={<Placeholder title="홈" />} />

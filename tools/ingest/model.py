@@ -5,7 +5,7 @@
 - milestone <- evidence/milestones.csv, observation <- tracking/observations.csv
 - growth_ref <- evidence/growth.csv (스키마에 있는 칸만)
 - checkup/measurement <- 검진 결과 표(xlsx 또는 같은 열의 csv) (사진은 적재하지 않음)
-- report_doc <- guide·wiki·tracking·report 문서 원문(body 칸, 마이그레이션 0004_b1)
+- report_doc <- guide·wiki·tracking·report 문서 원문(body 칸, 마이그레이션 0004_report_doc_body)
 """
 
 from __future__ import annotations

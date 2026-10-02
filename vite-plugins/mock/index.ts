@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { notesMock } from "./notes.ts";
 import { overviewMock } from "./overview.ts";
+import { checkupsMock, growthMock } from "./health.ts";
+import { libraryMock } from "./library.ts";
 
 /**
  * FAKE API modules for `npm run dev:mock` (local UI work and e2e only, never in a build).
@@ -22,4 +24,4 @@ export interface MockContext {
   readJson: () => Promise<unknown>;
 }
 
-export const MOCK_MODULES: MockModule[] = [notesMock, overviewMock];
+export const MOCK_MODULES: MockModule[] = [notesMock, overviewMock, libraryMock, checkupsMock, growthMock];
