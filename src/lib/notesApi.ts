@@ -14,14 +14,18 @@ export function useOverview() {
   });
 }
 
+/** 「더 보기」 한 번에 가져오는 날 수. 480일 기준 16번이면 끝까지 본다. */
+export const NOTES_PAGE_SIZE = 30;
+
 export interface NotesFilter {
   q: string;
   from: string | null;
+  to?: string | null;
 }
 
 export function useNotesList(filter: NotesFilter, enabled: boolean) {
   return useInfiniteQuery({
-    queryKey: ["notes", "list", filter.q, filter.from],
+    queryKey: ["notes", "list", filter.q, filter.from, filter.to ?? null],
     enabled,
     staleTime: STALE_MS,
     initialPageParam: null as string | null,
@@ -29,6 +33,8 @@ export function useNotesList(filter: NotesFilter, enabled: boolean) {
       const sp = new URLSearchParams();
       if (filter.q !== "") sp.set("q", filter.q);
       if (filter.from) sp.set("from", filter.from);
+      if (filter.to) sp.set("to", filter.to);
+      sp.set("limit", String(NOTES_PAGE_SIZE));
       if (pageParam) sp.set("cursor", pageParam);
       const qs = sp.toString();
       return api("GET", `/notes${qs ? `?${qs}` : ""}`, { schema: notesListSchema });

@@ -47,6 +47,11 @@
   color: var(--c-muted);
 }
 
+/* ---- 월로 바로 가기 ---- */
+.month-jump {
+  margin-top: var(--space-2);
+}
+
 /* ---- 일치 강조: 색 + 굵기 + 밑줄 ---- */
 mark {
   padding: 0 2px;
@@ -229,7 +234,7 @@ mark {
 
 /* ---- 홈 ---- */
 .home-actions {
-  margin-bottom: var(--space-4);
+  margin: var(--space-4) 0;
 }
 .home-facts {
   margin-top: var(--space-4);

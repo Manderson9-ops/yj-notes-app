@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { QueryError } from "../components/QueryError";
 import { ArrowLeftIcon } from "../components/notesIcons";
-import { ageLabel, formatDateKo, formatShortKo, timeOf } from "../lib/dateFormat";
+import { ageLabel, formatDateKo, formatShortKo, timeKo } from "../lib/dateFormat";
 import { segmentsByTerm } from "../lib/highlight";
 import { useNoteDay } from "../lib/notesApi";
 import type { NoteReport } from "../lib/notesSchemas";
@@ -25,9 +25,19 @@ const countHits = (text: string, term: string): number =>
 
 const WHO = { teacher: "교사", parent: "보호자" } as const;
 
-function Report({ report, term }: { report: NoteReport; term: string }) {
-  const title = report.direction === "to_home" ? "알림장" : "집에서 보낸 글";
-  const meta = [timeOf(report.postedAt), report.authorRole, report.weather ?? ""]
+function Report({
+  report,
+  term,
+  order,
+}: {
+  report: NoteReport;
+  term: string;
+  /** 같은 날 알림장이 여러 건일 때 몇 번째인지(한 건이면 null) */
+  order: number | null;
+}) {
+  const base = report.direction === "to_home" ? "알림장" : "집에서 보낸 글";
+  const title = order === null ? base : `${base} ${String(order)}`;
+  const meta = [timeKo(report.postedAt), report.authorRole, report.weather ?? ""]
     .filter((s) => s !== "")
     .join(" · ");
   return (
@@ -49,7 +59,7 @@ function Report({ report, term }: { report: NoteReport; term: string }) {
               <li key={c.id} className="note-comment" data-who={c.who}>
                 <p className="note-comment-head">
                   <span className="note-who">{WHO[c.who]}</span>
-                  <span className="meta">{timeOf(c.postedAt)}</span>
+                  <span className="meta">{timeKo(c.postedAt)}</span>
                 </p>
                 <p className="note-text">
                   <Text text={c.body} term={term} />
@@ -167,9 +177,11 @@ export default function NoteDetailPage() {
         </p>
       )}
       {nav("이전·다음 날 (위)")}
-      {day.items.map((r) => (
-        <Report key={r.reportId} report={r} term={term} />
-      ))}
+      {day.items.map((r) => {
+        const same = day.items.filter((x) => x.direction === r.direction);
+        const order = same.length > 1 ? same.indexOf(r) + 1 : null;
+        return <Report key={r.reportId} report={r} term={term} order={order} />;
+      })}
       {nav("이전·다음 날 (아래)")}
     </>
   );

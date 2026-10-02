@@ -4,7 +4,11 @@ import {
   formatDateKo,
   formatShortKo,
   minusMonths,
+  monthEnd,
   monthLabelKo,
+  monthLabelOf,
+  monthsDesc,
+  timeKo,
   timeOf,
 } from "./dateFormat";
 import { segmentsByRanges, segmentsByTerm } from "./highlight";
@@ -19,6 +23,26 @@ describe("dateFormat", () => {
   it("minusMonths clamps to month end and crosses years", () => {
     expect(minusMonths("2020-03-31", 1)).toBe("2020-02-29");
     expect(minusMonths("2020-02-10", 3)).toBe("2019-11-10");
+  });
+  it("monthEnd / monthsDesc / monthLabelOf", () => {
+    expect(monthEnd("2020-02")).toBe("2020-02-29");
+    expect(monthEnd("2021-12")).toBe("2021-12-31");
+    expect(monthsDesc("2020-03-05", "2020-05-01")).toEqual(["2020-05", "2020-04", "2020-03"]);
+    expect(monthsDesc("2019-11-30", "2020-02-01")).toEqual([
+      "2020-02",
+      "2020-01",
+      "2019-12",
+      "2019-11",
+    ]);
+    expect(monthsDesc("2020-03-01", "2020-03-31")).toEqual(["2020-03"]);
+    expect(monthLabelOf("2020-03")).toBe("2020년 3월");
+  });
+  it("timeKo uses a 12-hour clock with 오전/오후", () => {
+    expect(timeKo("2020-03-02 16:10")).toBe("오후 4:10");
+    expect(timeKo("2020-03-02 00:05")).toBe("오전 12:05");
+    expect(timeKo("2020-03-02 12:00")).toBe("오후 12:00");
+    expect(timeKo("2020-03-02 09:49")).toBe("오전 9:49");
+    expect(timeKo("x")).toBe("");
   });
   it("timeOf / daysSince", () => {
     expect(timeOf("2020-03-02 16:10")).toBe("16:10");

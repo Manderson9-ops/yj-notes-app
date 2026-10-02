@@ -5,12 +5,19 @@ import { QueryError } from "../components/QueryError";
 import { NoteRow } from "../components/NoteRow";
 import { ClearIcon, SearchIcon } from "../components/notesIcons";
 import { ThemeDecor } from "../components/decor/ThemeDecor";
-import { minusMonths, monthLabelKo } from "../lib/dateFormat";
+import {
+  MONTH_RE,
+  minusMonths,
+  monthEnd,
+  monthLabelKo,
+  monthLabelOf,
+  monthsDesc,
+} from "../lib/dateFormat";
 import { useNotesList, useOverview } from "../lib/notesApi";
 import { NOTES_QUERY_MAX, type NoteListItem } from "../lib/notesSchemas";
 import "../styles/notes.css";
 
-// S30 알림장 검색. 검색어·기간은 주소(?q=&p=)에 둔다: 상세에서 뒤로 오면 같은 목록이 돌아온다.
+// S30 알림장 검색. 검색어·기간·월은 주소(?q=&p=&m=)에 둔다: 상세에서 뒤로 오면 같은 목록이 돌아온다.
 // 「더 보기」 단추를 쓴다(무한 스크롤 아님): 조부모가 끝까지 내려가도 갑자기 길이가 바뀌지 않고, 탭바에 닿는다.
 
 const PERIODS = [
@@ -23,6 +30,7 @@ type PeriodId = (typeof PERIODS)[number]["id"];
 const SCROLL_KEY = "yj.notes.scroll";
 const DEBOUNCE_MS = 300;
 
+const parseMonth = (v: string | null): string => (v !== null && MONTH_RE.test(v) ? v : "");
 const parsePeriod = (v: string | null): PeriodId => PERIODS.find((p) => p.id === v)?.id ?? "all";
 
 function groupByMonth(items: NoteListItem[]): { label: string; items: NoteListItem[] }[] {
@@ -39,11 +47,12 @@ function groupByMonth(items: NoteListItem[]): { label: string; items: NoteListIt
 export default function NotesPage() {
   const [sp, setSp] = useSearchParams();
   const q = sp.get("q") ?? "";
-  const period = parsePeriod(sp.get("p"));
+  const month = parseMonth(sp.get("m"));
+  const period = month !== "" ? "all" : parsePeriod(sp.get("p"));
   const [input, setInput] = useState(q);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const update = (changes: { q?: string; p?: PeriodId }) => {
+  const update = (changes: { q?: string; p?: PeriodId; m?: string }) => {
     setSp(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -54,6 +63,14 @@ export default function NotesPage() {
         if (changes.p !== undefined) {
           if (changes.p === "all") next.delete("p");
           else next.set("p", changes.p);
+          next.delete("m");
+        }
+        if (changes.m !== undefined) {
+          if (changes.m === "") next.delete("m");
+          else {
+            next.set("m", changes.m);
+            next.delete("p");
+          }
         }
         return next;
       },
@@ -87,7 +104,10 @@ export default function NotesPage() {
   const anchor = overview.data?.range?.to ?? null;
   const from = months > 0 && anchor ? minusMonths(anchor, months) : null;
   const ready = months === 0 || !overview.isPending;
-  const list = useNotesList({ q, from }, ready);
+  const to = month !== "" ? monthEnd(month) : null;
+  const list = useNotesList({ q, from, to }, ready);
+  const range = overview.data?.range ?? null;
+  const monthOptions = useMemo(() => (range ? monthsDesc(range.from, range.to) : []), [range]);
 
   const nextFailed = list.isFetchNextPageError;
   const listError: unknown = list.error;
@@ -184,6 +204,29 @@ export default function NotesPage() {
         ))}
       </div>
 
+      {monthOptions.length > 1 && (
+        <div className="month-jump">
+          <label className="sr-only" htmlFor="notes-month">
+            월로 바로 가기
+          </label>
+          <select
+            id="notes-month"
+            className="field"
+            value={month}
+            onChange={(e) => {
+              update({ m: e.target.value });
+            }}
+          >
+            <option value="">월 골라서 보기</option>
+            {monthOptions.map((m) => (
+              <option key={m} value={m}>
+                {monthLabelOf(m)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {list.isPending ? (
         <p className="loading" role="status">
           불러오는 중
@@ -201,9 +244,13 @@ export default function NotesPage() {
           {q !== "" ? (
             <p>「{q}」가 들어간 알림장이 없어요.</p>
           ) : (
-            <p>이 기간에는 알림장이 없어요.</p>
+            <p>
+              {month !== ""
+                ? `${monthLabelOf(month)} 이전에는 알림장이 없어요.`
+                : "이 기간에는 알림장이 없어요."}
+            </p>
           )}
-          {period !== "all" ? (
+          {period !== "all" || month !== "" ? (
             <button
               type="button"
               className="btn"
@@ -211,7 +258,7 @@ export default function NotesPage() {
                 update({ p: "all" });
               }}
             >
-              기간을 전체로 바꿔 보세요
+              전체 기간으로 볼게요
             </button>
           ) : (
             q !== "" && <p>다른 낱말로 찾아 보세요.</p>
@@ -221,6 +268,7 @@ export default function NotesPage() {
         <>
           <p className="status-line" role="status">
             {q !== "" ? `「${q}」 ` : ""}
+            {month !== "" ? `${monthLabelOf(month)}부터 ` : ""}
             {String(items.length)}일{list.hasNextPage ? " 보는 중" : ""}
           </p>
           {groups.map((g) => (

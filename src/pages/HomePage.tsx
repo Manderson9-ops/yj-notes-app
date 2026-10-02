@@ -8,11 +8,22 @@ import { daysSince, formatDateKo } from "../lib/dateFormat";
 import { useOverview } from "../lib/notesApi";
 import "../styles/notes.css";
 
-// S10 홈. 맨 위는 「오늘 기록하기」(화면은 기록 카드가 만든다), 아래는 사실 숫자만: 판정 문구 없음(P1).
+// S10 홈. 맨 위는 가장 최근 알림장(조부모의 첫 질문 「오늘 뭐 했나」), 그 바로 아래 「오늘 기록하기」, 이어서 지난 알림장,
+// 맨 아래는 사실 숫자만: 판정 문구 없음(P1).
 // 14일 넘게 동기화가 없으면 주의색 안내(docs/06 §4).
 const STALE_DAYS = 14;
 
 const num = (n: number): string => n.toLocaleString("ko-KR");
+
+function RecordButton() {
+  return (
+    <div className="home-actions">
+      <Link to="/logs/new" className="btn-primary btn-lg">
+        오늘 기록하기
+      </Link>
+    </div>
+  );
+}
 
 export default function HomePage() {
   const overview = useOverview();
@@ -20,23 +31,23 @@ export default function HomePage() {
   return (
     <>
       <h1>홈</h1>
-      <div className="home-actions">
-        <Link to="/logs/new" className="btn-primary btn-lg">
-          오늘 기록하기
-        </Link>
-      </div>
-
       {overview.isPending ? (
-        <p className="loading" role="status">
-          불러오는 중
-        </p>
+        <>
+          <p className="loading" role="status">
+            불러오는 중
+          </p>
+          <RecordButton />
+        </>
       ) : overview.isError ? (
-        <QueryError
-          error={overview.error}
-          onRetry={() => {
-            void overview.refetch();
-          }}
-        />
+        <>
+          <QueryError
+            error={overview.error}
+            onRetry={() => {
+              void overview.refetch();
+            }}
+          />
+          <RecordButton />
+        </>
       ) : (
         <HomeBody data={overview.data} />
       )}
@@ -54,14 +65,25 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
       <section aria-labelledby="home-notes">
         <h2 id="home-notes">최근 알림장</h2>
         {data.recentNotes.length === 0 ? (
-          <div className="empty">
-            <ThemeDecor slot="empty" variant="home" />
-            <p>아직 알림장이 없어요.</p>
-          </div>
+          <>
+            <div className="empty">
+              <ThemeDecor slot="empty" variant="home" />
+              <p>아직 알림장이 없어요.</p>
+            </div>
+            <RecordButton />
+          </>
         ) : (
           <>
             <div className="card-stack">
-              {data.recentNotes.map((n) => (
+              {data.recentNotes.slice(0, 1).map((n) => (
+                <div className="card" key={n.date}>
+                  <NoteRow item={n} />
+                </div>
+              ))}
+            </div>
+            <RecordButton />
+            <div className="card-stack">
+              {data.recentNotes.slice(1).map((n) => (
                 <div className="card" key={n.date}>
                   <NoteRow item={n} />
                 </div>
