@@ -26,3 +26,8 @@
 - 경계값: 하루 2건 알림장, 댓글 0건, 빈 본문, 이모지, 아주 긴 본문(2MB 미만), UNCERTAIN 계측
 
 현재는 규칙 문서만 있고 자료 파일은 아직 없다.
+
+## 자료실·검진·성장 (T-C2)
+
+`seed/library_health.sql`: 문서 3개(마크다운 2·HTML 1, slug `lh-*`), 검진 2건(`UNCERTAIN` 포함), 측정 12개, 여아 기준표(합성 LMS → p3·p50·97), 이정표 10개, `app_setting` 생일·성별.
+`0004_c2_report_body` 마이그레이션 적용 후 실행(`wrangler d1 execute DB --local --file fixtures/seed/library_health.sql`). 시드 값은 새로 쓴 가상 값이고 기준표는 실제 기준표가 아니다.

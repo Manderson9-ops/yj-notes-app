@@ -102,12 +102,16 @@ CREATE TABLE family_log (
 );
 CREATE INDEX idx_log_type_date ON family_log(type, occurred_on);
 
--- 보고서 메타 (본문은 R2)
+-- 보고서 메타. 본문은 body(D1, R2 미사용 단계) 또는 NULL 이면 R2(r2_key)
 CREATE TABLE report_doc (
   slug TEXT PRIMARY KEY, title TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('html','markdown')),
   r2_key TEXT NOT NULL, generated_at TEXT NOT NULL, source_commit TEXT NOT NULL,
-  verify_ok INTEGER NOT NULL, sha256 TEXT NOT NULL
+  verify_ok INTEGER NOT NULL, sha256 TEXT NOT NULL,
+  body TEXT                                             -- 0004_c2. 행당 2MB 미만
 );
+-- 묶음(보고서·가이드·위키)은 열이 아니라 slug 규칙: `-`/`_` 로 나눈 마디에 guide, wiki 가 있으면 그 묶음, 아니면 보고서.
+-- app_setting 키(성장 곡선): child_birth_date(YYYY-MM-DD, 만 개월 계산), child_sex('F'|'M', 기준표 선택. 기본 F).
+-- measurement.measure 'head_circ_cm' 은 API 에서 'head_cm' 으로 노출한다.
 
 -- 보안
 CREATE TABLE auth_attempt (ip_hash TEXT NOT NULL, at TEXT NOT NULL, ok INTEGER NOT NULL);
