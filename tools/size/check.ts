@@ -1,7 +1,7 @@
 // TH-6: 기본 테마 번들(JS+CSS, gzip) 합계가 기준을 넘으면 실패한다.
 //   npm run build && npm run size:check
 // 기준 = 테마 도입 전 main 의 합계(119.50 KB) + 15 KB. 폰트(woff2)는 별도 파일이라 합계에 없다.
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 
@@ -30,4 +30,19 @@ console.log(
 if (total > limit) {
   console.error("TH-6 실패: 기본 테마 번들 증가가 한도를 넘었습니다.");
   process.exit(1);
+}
+
+// TH-6(폰트): 장식 폰트 woff2 는 파일마다 80 KB(= 81920 B) 이하여야 한다.
+const FONT_MAX_BYTES = 80 * 1024;
+const fonts = join(DIST, "fonts");
+if (existsSync(fonts)) {
+  for (const name of readdirSync(fonts)) {
+    if (!name.endsWith(".woff2")) continue;
+    const bytes = statSync(join(fonts, name)).size;
+    console.log(`${name}  ${bytes} B (한도 ${FONT_MAX_BYTES} B)`);
+    if (bytes > FONT_MAX_BYTES) {
+      console.error(`TH-6 실패: ${name} 이(가) 80 KB 를 넘었습니다.`);
+      process.exit(1);
+    }
+  }
 }

@@ -61,11 +61,7 @@ for (const { theme, large, scheme } of COMBOS) {
       );
       const shot = async (name: string, fullPage = false) => {
         if (!large || info.project.name !== "mobile-chromium") return;
-        await stableShot(
-          page,
-          `e2e/__screenshots__/${name}-${theme}-large-${scheme}.png`,
-          fullPage,
-        );
+        await stableShot(page, `${name}-${theme}-large-${scheme}`, fullPage);
       };
       const check = async () => {
         await settle(page);

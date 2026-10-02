@@ -37,7 +37,7 @@ for (const theme of THEMES) {
         }, theme);
         const shot = async (name: string, fullPage = false) => {
           if (info.project.name !== "mobile-chromium") return;
-          await stableShot(page, `e2e/__screenshots__/${name}-${theme}-${scheme}.png`, fullPage);
+          await stableShot(page, `${name}-${theme}-${scheme}`, fullPage);
         };
         const check = async () => {
           await settle(page);

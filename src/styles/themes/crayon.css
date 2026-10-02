@@ -28,6 +28,11 @@
   --c-deco-2: #ffd4da;
   --c-deco-3: #ffe600;
   --c-cloud: #ffffff;
+  --c-shadow: #2a1f1c; /* 오프셋 그림자 색(먹선과 같은 색) */
+  /* 손그림 외곽선(border-image 9-slice 용 정적 SVG). 색은 data URI 안에 고정이라 라이트/다크가 따로 있다(먹선 #2a1f1c / #cbbfb3 = --c-border) */
+  --bi-rect: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath d='M17 2.4C28 1.6 40 3.2 47 2.2C55 1.8 61.8 6 61.6 16.5C62.4 28 60.8 40 61.9 47.5C62.2 56.5 56 62.2 46.8 61.6C38 62.4 26 60.9 17.6 62C8.2 62.3 1.8 56.4 2.3 47C1.5 38 3.4 26 2.2 17.5C1.9 8 8.5 1.9 17 2.4Z' fill='none' stroke='%232a1f1c' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --bi-pill: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='48' viewBox='0 0 80 48'%3E%3Cpath d='M24 2.4C34 1.8 46 3 56 2.3C69 2 78 11 77.6 24.4C77.8 37 69 46.2 56 45.6C46 46.4 34 45.2 24 45.8C11 46.2 2.2 37 2.4 23.8C2 11 11.2 2.2 24 2.4Z' fill='none' stroke='%232a1f1c' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --bi-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M36 2.5C52 1.8 70 18 69.6 36.5C70.2 54 53 70 35.8 69.5C18 70.4 2 54 2.5 35.6C1.8 18 19 2.2 36 2.5Z' fill='none' stroke='%232a1f1c' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   /* 크레용 전용(계약 밖): 형광펜 띠, 카드 띠 하늘색 */
   --c-hl: #ffd4da;
   --c-on-hl: #2a1f1c;
@@ -43,9 +48,9 @@
 
   --font-display: "YJ Crayon Display", var(--font-body);
   --radius: 14px;
-  --radius-lg: 18px;
+  --radius-lg: 16px;
   --bw: 3px;
-  --shadow: 3px 3px 0 var(--c-border);
+  --shadow: 3px 3px 0 var(--c-shadow);
   --shadow-press: 0 0 0 transparent;
   --tex-bg: none;
   --tex-surface: none;
@@ -74,6 +79,10 @@
     --c-deco-2: #e8a9b4;
     --c-deco-3: #ffe45c;
     --c-cloud: #3a302c;
+    --c-shadow: #0d0a09; /* 다크: 밝은 베이지 그림자 대신 바탕보다 어두운 색 */
+    --bi-rect: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath d='M17 2.4C28 1.6 40 3.2 47 2.2C55 1.8 61.8 6 61.6 16.5C62.4 28 60.8 40 61.9 47.5C62.2 56.5 56 62.2 46.8 61.6C38 62.4 26 60.9 17.6 62C8.2 62.3 1.8 56.4 2.3 47C1.5 38 3.4 26 2.2 17.5C1.9 8 8.5 1.9 17 2.4Z' fill='none' stroke='%23cbbfb3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --bi-pill: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='48' viewBox='0 0 80 48'%3E%3Cpath d='M24 2.4C34 1.8 46 3 56 2.3C69 2 78 11 77.6 24.4C77.8 37 69 46.2 56 45.6C46 46.4 34 45.2 24 45.8C11 46.2 2.2 37 2.4 23.8C2 11 11.2 2.2 24 2.4Z' fill='none' stroke='%23cbbfb3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --bi-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M36 2.5C52 1.8 70 18 69.6 36.5C70.2 54 53 70 35.8 69.5C18 70.4 2 54 2.5 35.6C1.8 18 19 2.2 36 2.5Z' fill='none' stroke='%23cbbfb3' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     --c-hl: #e8a9b4;
     --c-on-hl: #1e1a18;
     --c-band-sky: #8fcbee;
@@ -226,14 +235,14 @@
 
 /* ---- 카드: 먹선 + 위쪽 12px 파스텔 띠(하늘→분홍→노랑, 장식) ---- */
 :root[data-theme="crayon"] .card {
-  padding-top: calc(var(--space-4) + 12px);
+  padding-top: calc(var(--space-4) + 13px);
   border-width: var(--bw);
 }
 
 :root[data-theme="crayon"] .card::before {
   content: "";
   position: absolute;
-  inset: 0 0 auto;
+  inset: 4px 4px auto; /* 손그림 외곽선 안쪽에서 시작 */
   height: 12px;
   background: var(--c-band-sky);
 }
@@ -282,9 +291,29 @@
 :root[data-theme="crayon"] h2 {
   display: block;
   width: fit-content; /* 띠는 글자 폭만큼, 다음 줄 요소는 아래로 */
-  padding: 0 10px;
-  border-radius: 6px;
+  padding: 0 12px;
   background: var(--c-hl);
+  /* 가장자리가 거친 형광펜 자국(글자는 안쪽 padding 에 있어 잘리지 않음) */
+  clip-path: polygon(
+    0 14%,
+    2% 0,
+    17% 6%,
+    34% 1%,
+    51% 5%,
+    69% 0,
+    87% 5%,
+    100% 2%,
+    99% 38%,
+    100% 70%,
+    97% 100%,
+    81% 94%,
+    63% 100%,
+    46% 95%,
+    29% 100%,
+    11% 94%,
+    1% 98%,
+    0 62%
+  );
   color: var(--c-on-hl);
   transform: rotate(-0.6deg);
 }
@@ -337,6 +366,48 @@
 :root[data-theme="crayon"] .setting-row input[type="checkbox"]:checked::before {
   transform: translateY(-2px) rotate(-45deg) scale(1);
 }
+/* ---- 손그림 외곽선: 완전한 기하 도형 대신 살짝 흔들린 선(border-image). 배경·그림자·focus outline 은 그대로 둥근 기하 도형.
+   border-image 는 border-radius 를 무시하지만 배경 clip 은 border-radius 를 따르므로 면이 모서리 밖으로 삐져나오지 않는다 ---- */
+:root[data-theme="crayon"] :is(.btn, .btn-primary, .card, .field, .theme-option) {
+  border-image-source: var(--bi-rect);
+  border-image-slice: 20;
+  border-image-width: 20px;
+  border-image-repeat: stretch;
+}
+
+:root[data-theme="crayon"] .chip {
+  border-image-source: var(--bi-pill);
+  border-image-slice: 24;
+  border-image-width: 24px;
+  border-image-repeat: stretch;
+}
+
+:root[data-theme="crayon"] .key {
+  border-image-source: var(--bi-circle);
+  border-image-slice: 36;
+  border-image-width: 36px;
+  border-image-repeat: stretch;
+}
+
+/* 비활성 키: 흐린 면 대신 점선 테두리 + muted 글자(대비 유지) */
+:root[data-theme="crayon"] .key:disabled,
+:root[data-theme="crayon"] .key-primary:disabled {
+  border-image: none;
+  border: var(--bw) dashed var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-muted);
+  opacity: 1;
+}
+
+/* 진지한 영역(카드): 띠를 숨길 때 위 여백도 뺀다 */
+:root[data-theme="crayon"] .card[data-tone="serious"],
+:root[data-theme="crayon"] [data-tone="serious"] .card {
+  padding-top: var(--space-4);
+}
+:root[data-theme="crayon"] .decor-pin-ground {
+  height: 56px;
+}
+
 /* 스와치(설정·미리보기의 테마 고르기) */
 .swatch[data-swatch="crayon"] i:nth-child(1) {
   background: #d7edf8;

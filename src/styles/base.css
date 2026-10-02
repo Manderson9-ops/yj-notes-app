@@ -248,8 +248,11 @@ h2 {
   font-size: var(--fs-lg);
 }
 
+/* 비활성: 흐린 면(opacity) 대신 평평한 면 + 점선 테두리 + muted 글자 */
 .key:disabled {
-  opacity: 0.55;
+  border: var(--bw) dashed var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-muted);
   cursor: default;
 }
 

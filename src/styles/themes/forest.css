@@ -29,8 +29,10 @@
   --c-deco-2: #66a063;
   --c-deco-3: #28533d;
   --c-cloud: #fffdf6;
+  --c-shadow: #28495f; /* 푸른 기 그림자 */
   --c-hill-front: #28533d; /* 숲 전용(계약 밖): 맨 앞 언덕은 항상 뒤 언덕보다 어둡게 */
-  --blob-alpha: 0.14; /* 숲 전용: 헤더·빈 상태 수채 번짐의 진하기(contrast.test.ts 가 읽어 대비 확인) */
+  --blob-alpha: 0.18; /* 숲 전용: 하늘 번짐의 진하기(contrast.test.ts 가 읽어 대비 확인) */
+  --blob-alpha-2: 0.1; /* 숲 전용: 숲색 번짐 */
   --c-warn: #7a4a00;
   --c-warn-bg: #f7e8c4;
   --c-alert: #7a2a1f;
@@ -44,8 +46,8 @@
   --radius: 14px;
   --radius-lg: 16px;
   --bw: 1px;
-  --shadow: 0 2px 10px rgba(40, 73, 95, 0.12);
-  --shadow-press: 0 1px 4px rgba(40, 73, 95, 0.12);
+  --shadow: 0 2px 12px color-mix(in srgb, var(--c-shadow) 16%, transparent);
+  --shadow-press: 0 1px 5px color-mix(in srgb, var(--c-shadow) 16%, transparent);
   /* 하늘(위)·숲(아래) 워시. 글자 뒤 카드·입력은 --c-surface 단색이라 대비에 영향 없음 */
   --tex-bg:
     radial-gradient(150% 46% at 50% -4%, #dceaf0 0%, #dceaf0 38%, rgba(220, 234, 240, 0) 100%),
@@ -76,8 +78,10 @@
     --c-deco-2: #28533d;
     --c-deco-3: #f2d58a;
     --c-cloud: #3a4f55;
+    --c-shadow: #000000;
     --c-hill-front: #0f1f1a;
-    --blob-alpha: 0.2;
+    --blob-alpha: 0.28;
+    --blob-alpha-2: 0.2;
     --c-warn: #f2c46d;
     --c-warn-bg: #2e2614;
     --c-alert: #f09a84;
@@ -307,26 +311,46 @@
   display: none;
 }
 
-/* ---- 수채 번짐: 헤더·빈 상태의 장식 층에만. 젖은 종이에 물감을 떨어뜨린 듯 가장자리가 사라지게:
-   마스크 SVG 안에서 feTurbulence + feDisplacementMap 으로 번진 모양을 만들고 feGaussianBlur 로 경계를 풀고,
-   거기에 radial-gradient 페이드를 곱한다(mask-composite: intersect). 색은 토큰, 진하기는 --blob-alpha.
-   글자 면에는 올리지 않고, 가장 진한 합성색은 contrast.test.ts 가 --blob-alpha 로 계산해 대비를 막는다 ---- */
-:root[data-theme="forest"] .shell-header::before,
-:root[data-theme="forest"] .empty::before {
+/* ---- 수채 번짐: 헤더·빈 상태·PIN 하늘의 장식 층에만. 젖은 종이에 물감을 떨어뜨린 듯:
+   하늘색(--c-deco-1)과 숲색(--c-deco-2) 두 번짐을 겹치고, 각 번짐은 마스크 SVG 안에서
+   feTurbulence + feDisplacementMap 으로 모양을 만들고 feGaussianBlur 로 풀되, 안쪽은 옅고(.5) 가장자리 고리(stroke)는
+   더 진하게 남겨 수채 특유의 "번짐 테두리"를 만든다. 거기에 radial-gradient 페이드를 곱한다(mask-composite: intersect).
+   글자 면에는 올리지 않고, 가장 진한 합성색은 contrast.test.ts 가 --blob-alpha(-2) 로 계산해 대비를 막는다 ---- */
+:root[data-theme="forest"] {
+  --blob-mask-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-40%25' y='-60%25' width='180%25' height='220%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.014 .026' numOctaves='3' seed='4' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='46' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='3'/%3E%3C/filter%3E%3Cg filter='url(%23w)'%3E%3Cellipse cx='150' cy='60' rx='96' ry='26' fill='%23000' fill-opacity='.5'/%3E%3Cellipse cx='150' cy='60' rx='96' ry='26' fill='none' stroke='%23000' stroke-width='6'/%3E%3C/g%3E%3C/svg%3E");
+  --blob-mask-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-40%25' y='-60%25' width='180%25' height='220%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02 .03' numOctaves='3' seed='9' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='46' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='3'/%3E%3C/filter%3E%3Cg filter='url(%23w)'%3E%3Cellipse cx='140' cy='56' rx='90' ry='30' fill='%23000' fill-opacity='.5'/%3E%3Cellipse cx='140' cy='56' rx='90' ry='30' fill='none' stroke='%23000' stroke-width='6'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+:root[data-theme="forest"] :is(.shell-header, .empty, .pin-screen)::before,
+:root[data-theme="forest"] :is(.shell-header, .empty)::after {
   content: "";
   position: absolute;
+  pointer-events: none;
+}
+
+:root[data-theme="forest"] :is(.shell-header, .empty, .pin-screen)::before {
   background: var(--c-deco-1);
   opacity: var(--blob-alpha);
-  pointer-events: none;
   -webkit-mask:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-40%25' y='-60%25' width='180%25' height='220%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.014 .026' numOctaves='3' seed='4' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='46'/%3E%3CfeGaussianBlur stdDeviation='9'/%3E%3C/filter%3E%3Cellipse cx='150' cy='60' rx='100' ry='28' fill='%23000' fill-opacity='.85' filter='url(%23w)'/%3E%3C/svg%3E")
-      center / 100% 100% no-repeat,
-    radial-gradient(closest-side, #000 30%, rgba(0, 0, 0, 0) 100%);
+    var(--blob-mask-a) center / 100% 100% no-repeat,
+    radial-gradient(closest-side, #000 70%, rgba(0, 0, 0, 0) 100%);
   -webkit-mask-composite: source-in;
   mask:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-40%25' y='-60%25' width='180%25' height='220%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.014 .026' numOctaves='3' seed='4' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='46'/%3E%3CfeGaussianBlur stdDeviation='9'/%3E%3C/filter%3E%3Cellipse cx='150' cy='60' rx='100' ry='28' fill='%23000' fill-opacity='.85' filter='url(%23w)'/%3E%3C/svg%3E")
-      center / 100% 100% no-repeat,
-    radial-gradient(closest-side, #000 30%, rgba(0, 0, 0, 0) 100%);
+    var(--blob-mask-a) center / 100% 100% no-repeat,
+    radial-gradient(closest-side, #000 70%, rgba(0, 0, 0, 0) 100%);
+  mask-composite: intersect;
+}
+
+:root[data-theme="forest"] :is(.shell-header, .empty)::after {
+  background: var(--c-deco-2);
+  opacity: var(--blob-alpha-2);
+  -webkit-mask:
+    var(--blob-mask-b) center / 100% 100% no-repeat,
+    radial-gradient(closest-side, #000 70%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-composite: source-in;
+  mask:
+    var(--blob-mask-b) center / 100% 100% no-repeat,
+    radial-gradient(closest-side, #000 70%, rgba(0, 0, 0, 0) 100%);
   mask-composite: intersect;
 }
 
@@ -338,30 +362,56 @@
   width: 150px;
 }
 
+:root[data-theme="forest"] .shell-header::after {
+  top: 0;
+  right: 100px;
+  bottom: 0;
+  width: 110px;
+}
+
 /* 빈 상태: 하늘 영역 위쪽에 넓고 옅게 */
+:root[data-theme="forest"] .empty {
+  position: relative;
+}
+
 :root[data-theme="forest"] .empty::before {
   top: 0;
   left: 0;
   width: 100%;
   height: 52%;
 }
-:root[data-theme="forest"] .empty {
-  position: relative;
-}
 
-:root[data-theme="forest"] .empty::before {
-  right: auto;
-  left: 0;
-  bottom: 45%;
-  width: 100%;
+:root[data-theme="forest"] .empty::after {
+  top: 6%;
+  left: 34%;
+  width: 66%;
+  height: 40%;
 }
 
 :root[data-theme="forest"] .empty > p {
   position: relative;
 }
 
+/* PIN: 하늘 번짐 1개(화면 위, 글자 뒤 맨 아래 층) */
+:root[data-theme="forest"] .pin-screen::before {
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 190px;
+}
+
 :root[data-theme="forest"] :is(.app-title, .icon-btn) {
   position: relative;
+}
+
+/* 비활성 키: 흐린 면 대신 평평한 면 + 점선 테두리 + muted 글자 */
+:root[data-theme="forest"] .key:disabled,
+:root[data-theme="forest"] .key-primary:disabled {
+  border: 1px dashed var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-muted);
 }
 /* ---- 종이 결: 정적 feTurbulence(회색조) data URI, 아주 옅게. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없다 ---- */
 :root[data-theme="forest"] body::before {
@@ -371,12 +421,12 @@
   z-index: -1;
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity: 0.05; /* 연구 범위 .04~.06 안. 최악 지점 대비는 contrast.test.ts 가 계산 */
+  opacity: 0.055; /* 연구 범위 .04~.06 안. 최악 지점 대비는 contrast.test.ts 가 계산 */
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="forest"] body::before {
-    opacity: 0.04;
+    opacity: 0.05;
   }
 }
 

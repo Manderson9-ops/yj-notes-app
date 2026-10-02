@@ -86,6 +86,7 @@ const COLOR_TOKENS = [
   "--c-deco-2",
   "--c-deco-3",
   "--c-cloud",
+  "--c-shadow",
   "--c-warn",
   "--c-warn-bg",
   "--c-alert",
@@ -282,19 +283,32 @@ export function washFailures(
   return out;
 }
 
-/** 수채 번짐(--blob-alpha) 위 글자(fg·muted) 대비. 번짐이 없는 테마는 빈 목록. */
+/** 수채 번짐(하늘 `--blob-alpha` + 숲색 `--blob-alpha-2`, 마스크 최대 알파 1 가정) 위 글자(fg·muted) 대비.
+ *  번짐이 놓이는 바탕(--c-surface-2 헤더·빈 상태, --c-bg PIN)마다 단독/겹침을 모두 본다. 번짐이 없는 테마는 빈 목록. */
 export function blobFailures(tokens: Map<string, string>): string[] {
-  const alpha = Number(tokens.get("--blob-alpha"));
-  if (!alpha) return [];
-  const comp = toHex(
-    over(toRgb(hex(tokens, "--c-deco-1")), alpha, toRgb(hex(tokens, "--c-surface-2"))),
-  );
-  return ["--c-fg", "--c-muted"].flatMap((fg) => {
-    const r = ratio(hex(tokens, fg), comp);
-    return r >= 4.5 ? [] : [`${fg} on blob ${comp} = ${r.toFixed(2)} < 4.5`];
-  });
+  const a1 = Number(tokens.get("--blob-alpha"));
+  if (!a1) return [];
+  const a2 = Number(tokens.get("--blob-alpha-2") ?? 0);
+  const sky = toRgb(hex(tokens, "--c-deco-1"));
+  const green = toRgb(hex(tokens, "--c-deco-2"));
+  const out: string[] = [];
+  for (const baseKey of ["--c-surface-2", "--c-bg"]) {
+    const base = toRgb(hex(tokens, baseKey));
+    const skyOn = over(sky, a1, base);
+    const cases: [string, Rgb][] = [
+      ["sky", skyOn],
+      ["sky+green", over(green, a2, skyOn)],
+    ];
+    for (const [label, rgb] of cases) {
+      for (const fg of ["--c-fg", "--c-muted"]) {
+        const r = ratio(hex(tokens, fg), toHex(rgb));
+        if (r < 4.5)
+          out.push(`${fg} on blob(${label}) over ${baseKey} ${toHex(rgb)} = ${r.toFixed(2)} < 4.5`);
+      }
+    }
+  }
+  return out;
 }
-
 /** 테마 전용 쌍(예: 크레용 형광펜 띠 위 글자). */
 const THEME_PAIRS: Record<string, [string, string, number][]> = {
   crayon: [["--c-on-hl", "--c-hl", 4.5]],

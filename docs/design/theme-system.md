@@ -27,6 +27,7 @@
 | 색 | `--c-accent`, `--c-on-accent`, `--c-accent-soft`, `--c-on-accent-soft`, `--c-link` | 주 행동·선택 상태·링크 |
 | 색 | `--c-badge`, `--c-on-badge`, `--c-earth`(메타정보) | 배지·날짜 |
 | 색 | `--c-deco-1`, `--c-deco-2`, `--c-deco-3`, `--c-cloud` | 장식 SVG 전용(글자 금지, 대비 기준 밖). `--c-cloud` = 구름 몸통(다크에서도 하늘 면 위에서 보이게) |
+| 색 | `--c-shadow` | 그림자 색(오프셋 그림자 테마는 `--shadow` 에 이 색을 씀. 대비 기준 밖. 크레용 다크는 밝은 베이지 대신 바탕보다 어두운 `#0D0A09`) |
 | 색(숲 전용) | `--c-hill-front` | 맨 앞 언덕. 계약 밖(숲 CSS 에만 있고 다른 테마는 쓰지 않음). 항상 뒤 언덕보다 어둡게 |
 | 색 | `--c-warn`, `--c-alert`, `--c-ok`, `--c-info` + 각 `-bg` | 상태 배지(판정 아님, 상태 표시만) |
 | 글꼴 | `--font-body`, `--font-display` | 본문 / 정적 UI 문구 |
@@ -45,7 +46,7 @@
 | TH-3 | axe serious/critical 0 (6 조합 × PIN·홈·설정·미리보기) | `e2e/a11y.spec.ts` |
 | TH-4 | 터치 영역 ≥ 48px, 큰 글씨 설정 유지 | `e2e/large-text.spec.ts`: 3테마 × (보통·큰 글씨) 에서 `.key .chip .btn .btn-primary .tab .theme-option` 의 `boundingBox` 높이·너비 ≥ 48, 키 글자 넘침 없음, axe 0, 스크린샷 `*-<테마>-large-light.png` |
 | TH-5 | `prefers-reduced-motion` 에서 움직임 0 | CSS 규칙 + e2e |
-| TH-6 | 기본 테마 번들 증가 ≤ 15 KB gzip(JS+CSS), 폰트는 테마별 ≤ 80 KB, 기본 테마에선 폰트 요청 0 | `npm run build && npm run size:check`(JS+CSS gzip 합계가 main 119.50 KB + 15 KB 를 넘으면 실패; `check` 에는 넣지 않음) + `e2e/theme.spec.ts` 의 폰트 요청 수 확인 |
+| TH-6 | 기본 테마 번들 증가 ≤ 15 KB gzip(JS+CSS), 폰트는 테마별 ≤ 80 KB, 기본 테마에선 폰트 요청 0 | `npm run build && npm run size:check`(JS+CSS gzip 합계가 main 119.50 KB + 15 KB 를 넘거나 `dist/fonts/*.woff2` 가 80 KB 를 넘으면 실패; 로컬 `check` 에는 넣지 않고 CI check 잡이 build 직후 실행) + `e2e/theme.spec.ts` 의 폰트 요청 수 확인 |
 | TH-7 | 캐릭터·로고·원화·대사·상표명 UI 노출 0, 외부 이미지 0 | 리뷰 체크리스트 §5 |
 | TH-8 | 화면 코드에 테마 분기 없음 (`data-theme` 문자열은 `theme.ts`·CSS·decor 에만) | `grep` 리뷰 |
 | TH-9 | CSP 변경 없음 (`style-src 'self'`, 인라인 `<style>` 없음) | `server/http/headers.ts` 무변경 |
@@ -63,7 +64,7 @@
 | 새 화면 만들기 | 토큰·공용 클래스만 사용. 색 hex 직접 쓰기 금지. 미리보기 화면에 새 컴포넌트 상태 추가 |
 | 폰트 부분 집합 다시 만들기 | 정적 UI 문구를 바꿨으면 `npm run fonts:subset` 후 커밋. 빠진 글자는 시스템 글꼴로 보임(깨지지 않음) |
 | 번들 크기 확인 | 빌드 뒤 `npm run size:check`(CI check 잡에서도 build 직후 실행). 한도는 `tools/size/check.ts` 상단 상수. **기준값 측정법**: main 을 빌드한 `dist/` 에 같은 스크립트를 돌린다(`node tools/size/check.ts <main 의 dist>`) → 119.50 KB(zlib 기본 레벨, 1 KB = 1000 B). Vite 의 "gzip: N kB" 출력과는 약 1% 달라 섞어 비교하지 않는다 |
-| 스크린샷 갱신 | `npm run test:e2e` 가 `e2e/__screenshots__/<화면>-<테마>-<light|dark>.png` 로 저장 |
+| 스크린샷 갱신 | `npm run test:e2e` 가 `e2e/__screenshots__/<화면>-<테마>-<light|dark>.png` 로 저장. **로컬 Windows 에서는 커밋된 PNG 와 비교**(`toMatchSnapshot`, 픽셀 차이 1% 허용) — 디자인을 일부러 바꿨으면 `npx playwright test --update-snapshots` 후 PNG 를 커밋. CI(linux 컨테이너)는 렌더가 달라 비교하지 않고 저장만 |
 
 ## 5. 저작권·상표 체크리스트 (PR 마다)
 

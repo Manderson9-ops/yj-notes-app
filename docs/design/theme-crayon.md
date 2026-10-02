@@ -40,9 +40,10 @@
 | `--c-alert` / `-bg` | `#A3201A` / `#FDE7E4` | `#FF9A8F` / `#3A1A18` | 오류 |
 | `--c-info` / `-bg` | `#1F3A5F` / `#EEF3F8` | `#B9D3F0` / `#1C2633` | 안내 |
 | `--c-ok` / `-bg` | `#1B6E3A` / `#E3F4E8` | `#7DD69A` / `#18301F` | 완료(판정 아님) |
-| `--radius` / `--radius-lg` | 14px / 18px | 같음 | |
+| `--radius` / `--radius-lg` | 14px / 16px | 같음 | 라운드 16px: 손그림 외곽선(r≈15)과 면이 어긋나지 않게 18→16 |
 | `--bw` | 3px | 2.5px | |
-| `--shadow` / `--shadow-press` | `3px 3px 0 var(--c-border)` / `0 0 0 transparent` | 같음 | 누르면 그림자 0 + 2px 이동 |
+| `--c-shadow` | `#2A1F1C` | `#0D0A09` | 오프셋 그림자 색(다크는 밝은 베이지 대신 바탕보다 어두운 색) |
+| `--shadow` / `--shadow-press` | `3px 3px 0 var(--c-shadow)` / `0 0 0 transparent` | 같음 | 누르면 그림자 0 + 2px 이동 |
 | `--font-display` | `"YJ Crayon Display"`(Jua 부분 집합), 본문 폴백 | 같음 | 정적 UI 문구만 |
 | `--ease` / `--dur` | `cubic-bezier(.34,1.56,.64,1)` / 220ms | 같음 | overshoot |
 
@@ -56,7 +57,9 @@
 | 주 버튼 `.btn-primary` | 파랑 면·흰 글자·먹선 3px·오프셋 그림자, 높이 52px. 누르면 그림자 0 + `translate(2px,2px)` + overshoot |
 | 보조 버튼 `.btn` | 흰 면·먹선·글자 `--c-fg` |
 | 칩 `.chip` | 알약형. 선택: 노랑 면 + 체크 아이콘 + `aria-pressed` (색만으로 구분 금지) |
-| 카드 `.card` | 흰 면·먹선 2.5~3px·라운드 18px·오프셋 그림자. 위쪽 12px 파스텔 띠(`--c-band-sky`/`--c-deco-2`/`--c-deco-3`)가 카드 순서대로 하늘→분홍→노랑(장식, 의미 없음) |
+| 카드 `.card` | 흰 면·손그림 먹선·라운드 16px·오프셋 그림자. 위쪽 12px 파스텔 띠(`--c-band-sky`/`--c-deco-2`/`--c-deco-3`): 같은 부모 안 **형제 순서(`nth-child` 3n+1/3n+2/3n)** 로 하늘→분홍→노랑이 돌아가는 장식이며 의미 없음. 진지한 영역에서는 띠와 위 여백을 함께 뺌 |
+| 손그림 외곽선 | 카드·버튼·칩·입력·테마 선택지·PIN 키: 살짝 흔들린 둥근 선(**`border-image` 9-slice 정적 SVG data URI**, rect/pill/circle 3종 × 라이트·다크 색). 배경 clip·그림자·focus outline 은 기하 도형 그대로(접근성). 안내 상자·배지는 직선 테두리 유지 |
+| 크레용 결 | 낙서 SVG 는 정적 `feTurbulence` 필터로 채움·선 일부가 비치게(장식 안에서만). h2 형광펜은 `clip-path: polygon` 으로 거친 가장자리 |
 | 탭바 | 활성 탭: 굵은 라벨(Jua 는 굵기가 하나뿐이라 글자 둘레선 0.5px 로 굵게) + 라벨 아래 크레용 밑줄(SVG, `stroke-dashoffset` 250ms) |
 | PIN 키패드 | 원형 72px 키, 흰 면·먹선, 숫자는 **본문 글꼴** 28px(큰 글씨 땐 비례) tabular-nums. 확인 키 파랑 면 |
 | 배지 `.badge` | 노랑 면 + 먹선 1.5px + 글자 `--c-fg` |
@@ -75,6 +78,7 @@
 | `DoodleStar` / `DoodleCloud` / `DoodleSun` | PIN 화면 위, 빈 상태 | 비뚤어진 손그림 path, 먹선 2.5px + 원색 평면 채움 |
 | `CrayonStick` | 빈 상태, 미리보기 | 원통 + 뾰족 끝, 종이 띠 |
 | `DoodleHouse` | 빈 상태(홈·자료) | 삼각 지붕 + 네모 + 창 2개(일반 사물) |
+| `DoodleGround` | PIN 화면 아래 | 길게 흔들린 땅 선 1줄 + 풀 3포기(하단 고정, 키패드 뒤) |
 | `DoodleUmbrella` | 빈 상태(기록) | 기울어진 펼친 우산(생활 속 엉뚱한 순간) |
 | `DoodleBall` | 빈 상태(알림장·자료) | 튀는 공 + 땅 그림자 + 움직임 선 2줄 |
 | `DoodlePuddle` | 빈 상태(기록·자료) | 납작한 물웅덩이 + 물결 2줄 |

@@ -4,6 +4,7 @@ import {
   CrayonUnderline,
   DoodleBall,
   DoodleCloud,
+  DoodleGround,
   DoodleHouse,
   DoodlePuddle,
   DoodleStar,
@@ -81,11 +82,16 @@ export function ThemeDecor({
         return <CrayonUnderline variant="short" />;
       case "pin":
         return (
-          <div className="decor-pin-top" aria-hidden="true">
-            <DoodleStar />
-            <DoodleSun />
-            <DoodleCloud />
-          </div>
+          <>
+            <div className="decor-pin-top" aria-hidden="true">
+              <DoodleStar />
+              <DoodleSun />
+              <DoodleCloud />
+            </div>
+            <div className="decor-pin-bottom decor-pin-ground" aria-hidden="true">
+              <DoodleGround />
+            </div>
+          </>
         );
       case "empty":
         return (
