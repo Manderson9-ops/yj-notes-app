@@ -1,4 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { ThemePicker } from "../components/ThemePicker";
 import { api } from "../lib/api";
 import { useLargeText } from "../lib/largeText";
 import { handleUnauthorized } from "../lib/queryClient";
@@ -28,6 +30,15 @@ export function SettingsPage() {
           />
           <span>큰 글씨</span>
         </label>
+      </section>
+      <section className="settings-section" aria-labelledby="set-theme">
+        <h2 id="set-theme">화면 테마</h2>
+        <ThemePicker />
+        <p>
+          <Link className="link" to="/settings/design">
+            디자인 미리보기
+          </Link>
+        </p>
       </section>
       <section className="settings-section">
         <button

@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { HomeIcon, LibraryIcon, LogIcon, NoteIcon, SettingsIcon } from "../components/icons";
+import { ThemeDecor } from "../components/decor/ThemeDecor";
 import { OfflineBanner } from "../components/OfflineBanner";
 
 const TABS = [
@@ -15,6 +16,7 @@ export function AppShell() {
       <OfflineBanner />
       <header className="shell-header">
         <p className="app-title">가족 기록</p>
+        <ThemeDecor slot="header" />
         <NavLink to="/settings" className="icon-btn" aria-label="설정">
           <SettingsIcon />
         </NavLink>
@@ -27,6 +29,7 @@ export function AppShell() {
           <NavLink key={t.to} to={t.to} end={t.end} className="tab">
             {t.icon}
             <span>{t.label}</span>
+            <ThemeDecor slot="tab" />
           </NavLink>
         ))}
       </nav>

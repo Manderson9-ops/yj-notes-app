@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useSession } from "../lib/session";
+import { DesignPreview } from "../pages/DesignPreview";
 import { Placeholder } from "../pages/Placeholder";
 import { PinScreen } from "../pages/PinScreen";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -25,6 +26,7 @@ function AuthGate() {
         <Route path="notes" element={<Placeholder title="알림장" />} />
         <Route path="library" element={<Placeholder title="자료" />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings/design" element={<DesignPreview />} />
         <Route path="*" element={<Placeholder title="홈" />} />
       </Route>
     </Routes>

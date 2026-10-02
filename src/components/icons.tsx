@@ -73,3 +73,47 @@ export function BackspaceIcon() {
     </Icon>
   );
 }
+
+export function CheckIcon({ size = 18 }: { size?: number }) {
+  return (
+    <Icon width={size} height={size} strokeWidth="3" className="chip-check">
+      <path d="m5 12.5 4.5 4.5L19 7" />
+    </Icon>
+  );
+}
+
+export function InfoIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6M12 7.5h.01" />
+    </Icon>
+  );
+}
+
+export function WarnIcon() {
+  return (
+    <Icon>
+      <path d="M12 3.5 22 20H2z" />
+      <path d="M12 10v5M12 17.5h.01" />
+    </Icon>
+  );
+}
+
+export function AlertIcon() {
+  return (
+    <Icon>
+      <path d="M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3z" />
+      <path d="M12 8v5M12 16h.01" />
+    </Icon>
+  );
+}
+
+export function OkIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8 12.5 3 3 5-6" />
+    </Icon>
+  );
+}
