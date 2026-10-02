@@ -26,6 +26,18 @@ describe("pin-hash tool", () => {
   });
 });
 
+describe("pin-hash tool: PIN_LENGTH", () => {
+  it("prints the length (never the PIN) with the secret command and a mismatch warning", () => {
+    const out = formatOutput("S", "H", 6);
+    expect(out).toContain("PIN_LENGTH=6");
+    expect(out).toContain("npx wrangler pages secret put PIN_LENGTH --project-name yj-notes-app");
+    expect(out).toContain("실제 PIN 길이와 다르면 아무도 로그인할 수 없다");
+  });
+  it("without a length it prints no PIN_LENGTH lines", () => {
+    expect(formatOutput("S", "H")).not.toContain("PIN_LENGTH");
+  });
+});
+
 describe("session-revoke tool", () => {
   it("increments session_epoch", () => {
     expect(REVOKE_SQL).toBe(

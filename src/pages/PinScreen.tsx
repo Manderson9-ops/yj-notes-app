@@ -7,6 +7,8 @@ import { sessionQueryKey } from "../lib/session";
 
 const MIN_LEN = 4;
 const MAX_LEN = 12;
+/** 자릿수가 정해진 화면에서 PIN 이 연달아 이만큼 틀리면, 자릿수 설정 문제일 수 있다고 알린다. */
+const MISMATCH_HINT_AFTER = 3;
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 
 function lockMessage(sec: number): string {
@@ -30,10 +32,12 @@ export function PinScreen({ pinLength }: { pinLength?: number | undefined }) {
   // 동기 보호: 렌더 사이에 들어오는 키 입력도 중복 전송·초과 입력이 되지 않게 한다.
   const pinRef = useRef("");
   const sendingRef = useRef(false);
+  const wrongRef = useRef(0);
 
   const login = useMutation({
     mutationFn: (value: string) => api("POST", "/session", { body: { pin: value } }),
     onSuccess: async () => {
+      wrongRef.current = 0;
       setMessage("");
       await qc.invalidateQueries({ queryKey: sessionQueryKey });
     },
@@ -44,7 +48,12 @@ export function PinScreen({ pinLength }: { pinLength?: number | undefined }) {
         setLockedSec(error.retryAfterSec ?? 60);
         setMessage("");
       } else if (error instanceof ApiError && error.status === 401) {
-        setMessage("PIN 이 맞지 않아요.");
+        wrongRef.current += 1;
+        setMessage(
+          auto && wrongRef.current >= MISMATCH_HINT_AFTER
+            ? "PIN 이 계속 안 맞아요.\n자릿수 설정을 관리자에게 물어봐 주세요."
+            : "PIN 이 맞지 않아요.",
+        );
         setShakes((n) => n + 1);
       } else if (error instanceof ApiError && error.status === 0) {
         setMessage("연결이 안 돼요. 인터넷을 확인하고 다시 해 주세요.");

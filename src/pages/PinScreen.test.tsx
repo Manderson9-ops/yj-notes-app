@@ -72,6 +72,28 @@ describe("PinScreen with pinLength (auto submit)", () => {
     });
   });
 
+  it("3 wrong PINs in a row: asks to check the digit setting; not for non-auto screens", async () => {
+    fetchMock.mockResolvedValue(json(401, { error: "invalid_pin", message: "x" }));
+    const user = userEvent.setup();
+    const { unmount } = renderPin(4);
+    for (let i = 0; i < 2; i++) {
+      await user.keyboard("1111");
+      await screen.findByText("PIN 이 맞지 않아요.");
+    }
+    expect(screen.queryByText(/자릿수 설정/)).not.toBeInTheDocument();
+    await user.keyboard("1111");
+    expect(await screen.findByText(/자릿수 설정을 관리자에게/)).toBeInTheDocument();
+    unmount();
+    // 자릿수가 정해지지 않은 화면(확인 키 방식)은 안내하지 않는다
+    renderPin();
+    for (let i = 0; i < 3; i++) {
+      await user.keyboard("1111");
+      await user.click(screen.getByRole("button", { name: "확인" }));
+      await screen.findByText("PIN 이 맞지 않아요.");
+    }
+    expect(screen.queryByText(/자릿수 설정/)).not.toBeInTheDocument();
+  });
+
   it("two key events in one tick still send once", async () => {
     fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
     renderPin(4);

@@ -241,6 +241,7 @@ h2 {
   margin: var(--space-2) 0;
   text-align: center;
   font-weight: 600;
+  white-space: pre-line; /* 두 줄 안내(자릿수 설정 문의) */
 }
 
 .keypad {
