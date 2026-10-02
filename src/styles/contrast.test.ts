@@ -290,7 +290,7 @@ export function blobFailures(tokens: Map<string, string>): string[] {
   if (!a1) return [];
   const a2 = Number(tokens.get("--blob-alpha-2") ?? 0);
   const sky = toRgb(hex(tokens, "--c-deco-1"));
-  const green = toRgb(hex(tokens, "--c-deco-2"));
+  const green = sky; // 두 번째 번짐도 하늘색(진하기만 다름)
   const out: string[] = [];
   for (const baseKey of ["--c-surface-2", "--c-bg"]) {
     const base = toRgb(hex(tokens, baseKey));

@@ -13,8 +13,8 @@ export async function settle(page: Page) {
  * 정지시키고, 글꼴 로딩을 기다린 뒤 되돌린다. 모션 검사(theme.spec)와는 분리돼 있다.
  *
  * name: 확장자 없는 파일 이름(예: "pin-crayon-light"). 저장·기준 위치는 e2e/__screenshots__/<name>.png.
- * CSS 마스크·border-image 의 data URI 이미지는 비동기로 디코드되므로, 연속 두 장이 같아질 때까지 다시 찍는다.
- * - 로컬 Windows(CI 아님): 커밋된 PNG 와 비교한다(시각 회귀 게이트, 1% 픽셀 차이까지 허용).
+ * CSS 마스크·border-image 의 data URI 이미지는 비동기로 디코드되므로, 연속 세 장이 같아질 때까지 다시 찍는다.
+ * - 로컬 Windows(CI 아님): 커밋된 PNG 와 비교한다(시각 회귀 게이트, 픽셀 차이 비율 0.2% 이하, 픽셀별 색 차이 threshold 0.05 — playwright.config.ts).
  *   디자인을 일부러 바꿨다면 `npx playwright test --update-snapshots`.
  * - 그 밖(CI 의 linux 컨테이너 등): 렌더가 달라 비교하지 않고 파일로 저장만 한다.
  */
@@ -49,6 +49,8 @@ export async function stableShot(page: Page, name: string, fullPage = false) {
   );
   await preloadCssImages(page);
   if (fullPage) {
+    // sticky 탭바가 전체 페이지 캡처 중간에 찍히지 않게 흐름 안에 둔다(base.css .is-static-for-shot)
+    await page.evaluate("document.querySelector('.tabbar')?.classList.add('is-static-for-shot')");
     // 화면 밖 층(마스크·필터)이 늦게 래스터되지 않도록 한 번 끝까지 훑는다
     await page.evaluate(
       "(async () => { for (let y = 0; y <= document.documentElement.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 30)); } window.scrollTo(0, 0); })()",
@@ -67,6 +69,11 @@ export async function stableShot(page: Page, name: string, fullPage = false) {
     expect(shot).toMatchSnapshot(`${name}.png`);
   } else {
     await writeFile(`e2e/__screenshots__/${name}.png`, shot);
+  }
+  if (fullPage) {
+    await page.evaluate(
+      "document.querySelector('.tabbar')?.classList.remove('is-static-for-shot')",
+    );
   }
   await page.emulateMedia({ reducedMotion: null });
 }

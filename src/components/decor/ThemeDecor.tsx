@@ -83,6 +83,9 @@ export function ThemeDecor({
       case "pin":
         return (
           <>
+            <div className="decor-pin-sky" aria-hidden="true">
+              <CrayonUnderline variant="wide" />
+            </div>
             <div className="decor-pin-top" aria-hidden="true">
               <DoodleStar />
               <DoodleSun />

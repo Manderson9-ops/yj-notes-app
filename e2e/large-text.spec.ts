@@ -43,6 +43,7 @@ const COMBOS: { theme: (typeof THEMES)[number]; large: boolean; scheme: Scheme }
     { theme, large: true, scheme: "light" as const },
   ]),
   { theme: "forest", large: true, scheme: "dark" },
+  { theme: "crayon", large: true, scheme: "dark" },
 ];
 
 for (const { theme, large, scheme } of COMBOS) {

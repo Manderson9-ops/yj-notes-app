@@ -64,7 +64,8 @@
 | 새 화면 만들기 | 토큰·공용 클래스만 사용. 색 hex 직접 쓰기 금지. 미리보기 화면에 새 컴포넌트 상태 추가 |
 | 폰트 부분 집합 다시 만들기 | 정적 UI 문구를 바꿨으면 `npm run fonts:subset` 후 커밋. 빠진 글자는 시스템 글꼴로 보임(깨지지 않음) |
 | 번들 크기 확인 | 빌드 뒤 `npm run size:check`(CI check 잡에서도 build 직후 실행). 한도는 `tools/size/check.ts` 상단 상수. **기준값 측정법**: main 을 빌드한 `dist/` 에 같은 스크립트를 돌린다(`node tools/size/check.ts <main 의 dist>`) → 119.50 KB(zlib 기본 레벨, 1 KB = 1000 B). Vite 의 "gzip: N kB" 출력과는 약 1% 달라 섞어 비교하지 않는다 |
-| 스크린샷 갱신 | `npm run test:e2e` 가 `e2e/__screenshots__/<화면>-<테마>-<light|dark>.png` 로 저장. **로컬 Windows 에서는 커밋된 PNG 와 비교**(`toMatchSnapshot`, 픽셀 차이 1% 허용) — 디자인을 일부러 바꿨으면 `npx playwright test --update-snapshots` 후 PNG 를 커밋. CI(linux 컨테이너)는 렌더가 달라 비교하지 않고 저장만 |
+| 스크린샷 갱신 | `npm run test:e2e` 가 `e2e/__screenshots__/<화면>-<테마>-<light|dark>.png` 로 저장. **로컬 Windows 에서는 커밋된 PNG 와 비교**(`toMatchSnapshot`: 다른 픽셀 비율 `maxDiffPixelRatio` 0.002 이하, 픽셀별 색 차이 `threshold` 0.05 — `playwright.config.ts`) — 디자인을 일부러 바꿨으면 `npx playwright test --update-snapshots` 후 PNG 를 커밋. CI(linux 컨테이너)는 렌더가 달라 비교하지 않고 저장만. **민감도 변이 시험(2026-10-02)**: 숲 `--c-deco-2` `#66a063` → `#a06066`(밝기 비슷한 색상만 변경)은 `pin-forest-light` 에서 26,263 픽셀(비율 0.03) 차이로 **실패**(기본 threshold 0.2 에서는 통과해 놓쳤음), `#ff00ff` 같은 큰 변화는 당연히 실패, `#6c9d66`(미세 변화)은 통과. 같은 설정에서 e2e 연속 3회 통과(비결정성 없음) |
+| 전체 페이지 스크린샷 | `stableShot` 이 찍는 동안만 sticky 탭바에 `.is-static-for-shot`(base.css)를 달아 중간에 찍히지 않게 함 |
 
 ## 5. 저작권·상표 체크리스트 (PR 마다)
 

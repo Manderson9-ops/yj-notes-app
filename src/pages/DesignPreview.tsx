@@ -176,12 +176,12 @@ export function DesignPreview() {
             꺼진 버튼
           </button>
         </div>
-        <p>
-          <span className="badge">배지</span>{" "}
+        <div className="row-center">
+          <span className="badge">배지</span>
           <Link className="link" to="/settings">
             설정으로 가기
           </Link>
-        </p>
+        </div>
       </section>
     </>
   );

@@ -118,6 +118,11 @@ h2 {
   border-top: 1px solid var(--c-line);
 }
 
+/* 스크린샷 전용(e2e/helpers.ts): 전체 페이지 캡처에서 sticky 탭바가 중간에 찍히지 않게 한다 */
+.tabbar.is-static-for-shot {
+  position: static;
+}
+
 .tab {
   display: flex;
   flex-direction: column;
