@@ -95,6 +95,14 @@ async function lockRetryAfterSec(db: D1Database, ipHash: string, nowMs: number):
   return Math.max(1, Math.ceil((untilMs - nowMs) / 1000));
 }
 
+/**
+ * 서버 설정 오류로 PIN 을 대조하지 못한 시도는 '틀린 PIN' 이 아니므로 기록을 지운다(잠금 계산에서 제외).
+ * ok=0 인 해당 행만 지운다.
+ */
+export async function voidAttempt(db: D1Database, attemptId: number): Promise<void> {
+  await db.prepare("DELETE FROM auth_attempt WHERE rowid = ?1 AND ok = 0").bind(attemptId).run();
+}
+
 /** PIN 이 맞았을 때 해당 시도 행을 ok=1 로 바꾼다(실패 집계에서 빠진다). */
 export async function markSuccess(db: D1Database, attemptId: number): Promise<void> {
   await db.prepare("UPDATE auth_attempt SET ok = 1 WHERE rowid = ?1").bind(attemptId).run();

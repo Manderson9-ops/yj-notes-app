@@ -10,6 +10,26 @@ const PIN_PATTERN = /^[0-9]{4,12}$/;
 /** 형식이 틀린 입력에도 같은 양의 PBKDF2 작업을 하기 위한 자리표시 값. */
 const DUMMY_PIN = "000000";
 
+/**
+ * 환경 변수 PIN_LENGTH 해석: "4"~"12" 정수 문자열만 유효, 그 밖(없음·공백·소수·범위 밖)은 undefined.
+ * 로그인 화면이 점 개수·자동 전송 시점을 정하는 데만 쓴다. 검증 규칙(4~12자리)은 바꾸지 않는다.
+ */
+export function parsePinLength(raw: string | undefined): number | undefined {
+  if (raw === undefined || !/^[0-9]{1,2}$/.test(raw)) return undefined;
+  const n = Number(raw);
+  return n >= 4 && n <= 12 ? n : undefined;
+}
+
+/** PIN_HASH/PIN_SALT 가 설정돼 있는지(비어 있지 않은 문자열). 형식(base64) 오류는 verifyPin 이 예외로 알린다. */
+export function isPinConfigured(env: { PIN_HASH?: unknown; PIN_SALT?: unknown }): boolean {
+  return (
+    typeof env.PIN_HASH === "string" &&
+    env.PIN_HASH !== "" &&
+    typeof env.PIN_SALT === "string" &&
+    env.PIN_SALT !== ""
+  );
+}
+
 export function isValidPinFormat(pin: string): boolean {
   return PIN_PATTERN.test(pin);
 }

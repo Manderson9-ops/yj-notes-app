@@ -73,13 +73,12 @@ for (const { theme, large, scheme } of COMBOS) {
       const smallText = large ? /^16\.4/ : /^14(\.\d+)?px$/;
 
       await page.goto("/");
-      await expect(page.getByRole("button", { name: "확인" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "모두 지우기" })).toBeVisible();
       await check();
       await expectNoKeyOverflow(page);
       await shot("pin");
 
       for (const d of "0000") await page.getByRole("button", { name: d, exact: true }).click();
-      await page.getByRole("button", { name: "확인" }).click();
       await expect(page.getByRole("heading", { level: 1, name: "홈" })).toBeVisible();
       await expect(page.locator(".tab span").first()).toHaveCSS("font-size", smallText);
       if (large) {

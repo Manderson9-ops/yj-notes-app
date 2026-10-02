@@ -114,6 +114,8 @@ const OTHER_TOKENS = [
   "--tex-surface",
   "--ease",
   "--dur",
+  "--shake-dist",
+  "--shake-dur",
   "--tap",
   "--space-1",
   "--space-2",

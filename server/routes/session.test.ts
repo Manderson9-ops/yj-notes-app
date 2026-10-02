@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hashPin } from "../auth/pin";
 import { CSP } from "../http/headers";
 import { countRows } from "../test-utils/fake-d1";
 import {
   ORIGIN,
   START_MS,
   TEST_PIN,
+  TEST_SALT_B64,
   cookieFrom,
   createHarness,
   type Harness,
@@ -232,6 +234,39 @@ describe("POST /api/session", () => {
       expect((await h.login(TEST_PIN)).status).toBe(500);
     });
 
+    it("server config errors are never counted as failures: 10 tries without PIN secrets, then no lockout", async () => {
+      const { PIN_HASH, PIN_SALT } = h.env;
+      h.env.PIN_HASH = "";
+      for (let i = 0; i < 10; i++) expect((await h.login(WRONG)).status).toBe(500);
+      expect(rows()).toBe(0);
+      h.env.PIN_HASH = PIN_HASH;
+      h.env.PIN_SALT = undefined as unknown as string; // binding absent
+      for (let i = 0; i < 10; i++) expect((await h.login(TEST_PIN)).status).toBe(500);
+      expect(rows()).toBe(0);
+      h.env.PIN_SALT = PIN_SALT;
+      expect((await h.login(TEST_PIN)).status).toBe(204);
+    });
+
+    it("malformed base64 secrets: attempt is rolled back, so no lockout after fixing them", async () => {
+      const { PIN_SALT } = h.env;
+      h.env.PIN_SALT = "FAKE_PLACEHOLDER_pin_salt";
+      for (let i = 0; i < 10; i++) expect((await h.login(WRONG)).status).toBe(500);
+      expect(rows()).toBe(0);
+      h.env.PIN_SALT = PIN_SALT;
+      expect((await h.login(TEST_PIN)).status).toBe(204);
+      expect(rows("ok=0")).toBe(0);
+    });
+
+    it("real wrong PINs still count after config errors (5 -> locked, 400ms delay kept)", async () => {
+      h.env.PIN_HASH = "";
+      await h.login(WRONG);
+      h.env.PIN_HASH = await hashPin(TEST_PIN, TEST_SALT_B64);
+      h.sleeps.length = 0;
+      for (let i = 0; i < 5; i++) expect((await h.login(WRONG)).status).toBe(401);
+      expect(h.sleeps).toEqual([400, 400, 400, 400, 400]);
+      expect((await h.login(TEST_PIN)).status).toBe(429);
+    });
+
     it("missing session_epoch -> 500 even with the right PIN, and no cookie", async () => {
       h.fake.sqlite.exec("DELETE FROM app_setting WHERE key='session_epoch'");
       const res = await h.login(TEST_PIN);
@@ -242,6 +277,25 @@ describe("POST /api/session", () => {
 });
 
 describe("GET/DELETE /api/session", () => {
+  it("includes pinLength only for a valid PIN_LENGTH, with or without a session", async () => {
+    const get = async (cookie?: string) =>
+      json(
+        await h.handle(
+          new Request(`${ORIGIN}/api/session`, cookie ? { headers: { Cookie: cookie } } : {}),
+        ),
+      );
+    h.env.PIN_LENGTH = "6";
+    expect(await get()).toEqual({ authenticated: false, pinLength: 6 });
+    const cookie = cookieFrom(await h.login(TEST_PIN));
+    expect(await get(cookie)).toEqual({ authenticated: true, pinLength: 6 });
+    for (const bad of ["3", "13", "abc", "4.5", " 4", "", "04x", "-5"]) {
+      h.env.PIN_LENGTH = bad;
+      expect(await get(), bad).toEqual({ authenticated: false });
+    }
+    delete h.env.PIN_LENGTH;
+    expect(await get()).toEqual({ authenticated: false });
+  });
+
   it("GET without cookie -> {authenticated:false}; with a fresh login cookie -> true", async () => {
     const anon = await h.handle(new Request(`${ORIGIN}/api/session`));
     expect(anon.status).toBe(200);

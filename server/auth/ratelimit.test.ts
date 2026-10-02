@@ -8,6 +8,7 @@ import {
   beginAttempt,
   hashIp,
   markSuccess,
+  voidAttempt,
 } from "./ratelimit";
 
 describe("hashIp", () => {
@@ -105,5 +106,19 @@ describe("markSuccess", () => {
     expect(countRows(sqlite, "ok=1")).toBe(1);
     expect(countRows(sqlite, "ok=0")).toBe(1);
     expect(a.attemptId).not.toBe(b.attemptId);
+  });
+});
+
+describe("voidAttempt", () => {
+  it("removes only the given failed attempt (a success row stays)", async () => {
+    const { db, sqlite } = createFakeD1();
+    const a = await beginAttempt(db, "ip1", START_MS);
+    const b = await beginAttempt(db, "ip1", START_MS + 1);
+    if (!a.allowed || !b.allowed) throw new Error("expected allowed");
+    await markSuccess(db, b.attemptId);
+    await voidAttempt(db, b.attemptId);
+    expect(countRows(sqlite)).toBe(2);
+    await voidAttempt(db, a.attemptId);
+    expect(countRows(sqlite)).toBe(1);
   });
 });

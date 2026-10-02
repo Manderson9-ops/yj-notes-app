@@ -1,7 +1,13 @@
 import { z } from "zod";
 
-/** GET /api/session (docs/05). Client-side copy; to be shared with server/schemas later. */
-export const sessionSchema = z.object({ authenticated: z.boolean() });
+/**
+ * GET /api/session (docs/05). Client-side copy; to be shared with server/schemas later.
+ * pinLength: 서버 PIN_LENGTH 가 유효할 때만 옴(4~12). 이상한 값은 없는 것으로 본다(기존 4~12 + 확인 방식).
+ */
+export const sessionSchema = z.object({
+  authenticated: z.boolean(),
+  pinLength: z.number().int().min(4).max(12).optional().catch(undefined),
+});
 export type Session = z.infer<typeof sessionSchema>;
 
 /** POST /api/session request body. */

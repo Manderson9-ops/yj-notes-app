@@ -2,6 +2,8 @@
 # PIN_HASH / PIN_SALT: `npm run pin:hash` 로 생성 (PBKDF2-SHA256 100000회, base64). 운영은 Pages secret 으로 등록.
 PIN_HASH=FAKE_PLACEHOLDER_pin_hash
 PIN_SALT=FAKE_PLACEHOLDER_pin_salt
+# PIN_LENGTH (선택): PIN 자릿수 4~12. 있으면 로그인 화면이 그 자리에서 자동 전송한다. 아래 4 는 예시 값이다. 운영 값은 pages secret 으로 등록(docs/09).
+PIN_LENGTH=4
 # SESSION_SECRET: 세션 쿠키 HMAC 키. 32바이트 이상 무작위 값 (예: node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")
 SESSION_SECRET=FAKE_PLACEHOLDER_session_secret_change_me
 # IP_HASH_SALT: auth_attempt 에 저장하는 IP 해시용 솔트. 무작위 값, SESSION_SECRET 과 다르게.

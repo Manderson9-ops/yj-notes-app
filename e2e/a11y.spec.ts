@@ -20,7 +20,6 @@ async function seriousViolations(page: Page) {
 async function login(page: Page) {
   await page.goto("/");
   for (const d of "0000") await page.getByRole("button", { name: d, exact: true }).click();
-  await page.getByRole("button", { name: "확인" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "홈" })).toBeVisible();
 }
 
@@ -45,7 +44,7 @@ for (const theme of THEMES) {
         };
 
         await page.goto("/");
-        await expect(page.getByRole("button", { name: "확인" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "모두 지우기" })).toBeVisible();
         await check();
         await shot("pin");
 
@@ -69,7 +68,6 @@ for (const theme of THEMES) {
         await page.getByRole("link", { name: "설정", exact: true }).click();
         await page.getByRole("button", { name: "이 기기 로그아웃" }).click();
         for (const d of "9999") await page.getByRole("button", { name: d, exact: true }).click();
-        await page.getByRole("button", { name: "확인" }).click();
         await expect(page.getByText("PIN 이 맞지 않아요.")).toBeVisible();
         await check();
       });

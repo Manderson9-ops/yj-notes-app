@@ -10,7 +10,8 @@ import { MOCK_MODULES, type MockContext } from "./mock/index.ts";
  * Behaviour (stateless, so parallel e2e workers do not interfere):
  *  - POST /api/session {pin}: "0000" -> 204 + cookie; "1111" -> 429 locked (retryAfterSec 120);
  *    anything else -> 401 invalid_pin.
- *  - GET  /api/session: {authenticated} by cookie presence.
+ *  - GET  /api/session: {authenticated, pinLength: 4} by cookie presence. MOCK_NO_PIN_LENGTH=1 omits pinLength
+ *    (the old 4~12 digits + "확인" flow).
  *  - DELETE /api/session: 204, cookie cleared.
  */
 const COOKIE = "yj_mock_session";
@@ -79,7 +80,12 @@ export function mockApi(): Plugin {
         };
         const authed = (req.headers.cookie ?? "").includes(`${COOKIE}=1`);
         if (req.method === "GET") {
-          send(200, { authenticated: authed });
+          send(
+            200,
+            process.env.MOCK_NO_PIN_LENGTH === "1"
+              ? { authenticated: authed }
+              : { authenticated: authed, pinLength: 4 },
+          );
         } else if (req.method === "DELETE") {
           send(204, undefined, { "Set-Cookie": `${COOKIE}=; Path=/; Max-Age=0` });
         } else if (req.method === "POST") {

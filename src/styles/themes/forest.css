@@ -55,6 +55,8 @@
   --tex-surface: none;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --dur: 260ms;
+  --shake-dist: 6px; /* 숲: 바람에 나뭇잎이 흔들리듯 작고 느린 흔들림 */
+  --shake-dur: 600ms;
 }
 
 @media (prefers-color-scheme: dark) {
