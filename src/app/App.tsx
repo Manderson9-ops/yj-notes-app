@@ -1,16 +1,13 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { QuietBoundary } from "../components/QuietBoundary";
 import { ApiError } from "../lib/api";
 import { useSession } from "../lib/session";
 import { Placeholder } from "../pages/Placeholder";
 import { PinScreen } from "../pages/PinScreen";
 import { AppShell } from "./AppShell";
+import { QueueSyncGate } from "./QueueSyncGate";
 
 // 화면은 필요할 때 내려받는다(첫 화면 크기를 지킨다. 초기 번들 예산: docs/08 Q-PERF).
-const QueueSync = lazy(() =>
-  import("../components/QueueSync").then((m) => ({ default: m.QueueSync })),
-);
 const SettingsPage = lazy(() =>
   import("../pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
@@ -94,11 +91,7 @@ function AuthGate() {
   }
   return (
     <>
-      <QuietBoundary>
-        <Suspense fallback={null}>
-          <QueueSync />
-        </Suspense>
-      </QuietBoundary>
+      <QueueSyncGate />
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route element={<AppShell />}>

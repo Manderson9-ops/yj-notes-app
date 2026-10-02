@@ -5,13 +5,17 @@ import { Component, type ReactNode } from "react";
  * 실패하면 fallback(기본: 아무것도 안 보임)을 보인다.
  */
 export class QuietBoundary extends Component<
-  { children: ReactNode; fallback?: ReactNode },
+  { children: ReactNode; fallback?: ReactNode; onError?: () => void },
   { failed: boolean }
 > {
   override state = { failed: false };
 
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true };
+  }
+
+  override componentDidCatch(): void {
+    this.props.onError?.();
   }
 
   override render(): ReactNode {
