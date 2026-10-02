@@ -46,7 +46,8 @@ test("tab navigation", async ({ page }) => {
     await nav.getByRole("link", { name }).click();
     await expect(page).toHaveURL(path);
     await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
-    await expect(page.getByText("준비 중")).toBeVisible();
+    // 자료 탭은 T-C2 에서 실제 화면이 됐다(나머지는 아직 자리표시자)
+    if (path !== "/library") await expect(page.getByText("준비 중")).toBeVisible();
   }
 });
 
