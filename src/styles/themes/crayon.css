@@ -280,7 +280,8 @@
 
 /* ---- 섹션 제목: 파스텔 형광펜 띠(장식). 글자색은 --c-on-hl 로 대비 유지 ---- */
 :root[data-theme="crayon"] h2 {
-  display: inline-block;
+  display: block;
+  width: fit-content; /* 띠는 글자 폭만큼, 다음 줄 요소는 아래로 */
   padding: 0 10px;
   border-radius: 6px;
   background: var(--c-hl);

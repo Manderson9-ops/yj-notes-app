@@ -50,7 +50,7 @@
 
 | 컴포넌트 | 규칙 |
 |---|---|
-| 앱 헤더 | 하늘 워시 위 앱 이름(display), 아래 장식선 1px. 헤더 오른쪽에 경계가 번진 수채 얼룩(`--blob-alpha`, 마스크는 feTurbulence + feDisplacementMap data URI) 위로 작은 구름(다크는 달·별) |
+| 앱 헤더 | 하늘 워시 위 앱 이름(display), 아래 장식선 1px. 헤더 오른쪽에 설정 아이콘 왼쪽 위 구석에 작고 옅은 수채 번짐(`--blob-alpha` 라이트 .14 / 다크 .2; 마스크 SVG 안에서 feTurbulence + feDisplacementMap 으로 모양을 만들고 feGaussianBlur 로 경계를 풀고 radial-gradient 페이드와 `mask-composite: intersect`) 위로 작은 구름(다크는 달·별). 빈 상태는 하늘 영역 위쪽에 넓고 옅게 |
 | 주 버튼 | 숲 초록 면, 흰 글자, 라운드 14px, 푸른 기 그림자, 누르면 1px 내려감 |
 | 보조 버튼 | surface 면 + `--c-border` 1px + 초록 글자 |
 | 라디오(테마 고르기) | `appearance:none` `--c-border` 원 + 선택 시 초록 점 |
