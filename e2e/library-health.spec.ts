@@ -22,12 +22,13 @@ test("자료 목록 → 마크다운 문서 열기 → 목차 점프", async ({ 
   }
   await expect(page.getByRole("link", { name: /검진 결과/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /성장 곡선/ })).toBeVisible();
-  // 검증 배지는 데이터가 있는 문서에만, 값에 따라 문구가 다르다
+  // 검증 배지는 통과가 아닐 때만 보인다(통과는 모든 문서가 같아 소음). 카드에는 설명 한 줄이 있다.
   await expect(page.getByRole("link", { name: /합성 용어 모음/ })).toContainText("검증 미통과");
-  await expect(page.getByRole("link", { name: /합성 생활 가이드/ })).toContainText("검증 통과");
+  await expect(page.getByRole("link", { name: /합성 생활 가이드/ })).not.toContainText("검증");
   await expect(page.getByRole("link", { name: /합성 생활 가이드/ })).toContainText(
-    "2020년 9월 2일 (수)",
+    "이 문서는 화면 시안용 합성 글이다.",
   );
+  await expect(page.getByText("자료를 마지막으로 갱신한 날: 2020년 9월 3일 (목)")).toBeVisible();
   if (info.project.name === "mobile-chromium")
     await stableShot(page, "flow-library-list-basic-light");
 
@@ -209,4 +210,49 @@ test("성장 곡선: 360px 에서 가로로 넘치지 않는다", async ({ page 
     "document.documentElement.scrollWidth - document.documentElement.clientWidth",
   );
   expect(over2).toBeLessThanOrEqual(0); // 표는 자기 안에서 가로 스크롤
+});
+
+test("문서: 열이 셋 이상인 표는 줄 카드로, 목록·접는 칸·체크박스·맨 위로", async ({
+  page,
+}, info) => {
+  await openLibrary(page);
+  await page.getByRole("link", { name: /합성 생활 가이드/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "합성 생활 가이드" })).toBeVisible();
+
+  // 맨 위로 단추는 처음엔 보이지 않는다
+  await expect(page.getByRole("button", { name: /맨 위로/ })).toHaveCount(0);
+
+  // 3열 표(항목·기록 방법·예시)는 가로 스크롤 없이 읽히는 줄 카드, 2열 표는 그대로 표
+  const rows = page.locator(".md-row");
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText("식사");
+  await expect(rows.first()).toContainText("기록 방법");
+  await expect(rows.first()).toContainText("먹은 양을 칩으로 고른다");
+  await expect(page.getByRole("table")).toHaveCount(1);
+  expect(
+    await page.evaluate(
+      "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+    ),
+  ).toBe(true);
+
+  // 체크박스는 소리로도 상태가 전해지고, 중첩 목록·취소선·접는 칸이 그려진다
+  await expect(page.getByText("완료:")).toBeAttached();
+  await expect(page.getByText("아직:")).toBeAttached();
+  await expect(page.locator(".doc-body li li")).toHaveCount(2);
+  await expect(page.locator(".doc-body del")).toHaveText("지난 방식");
+  const details = page.locator("details.md-details");
+  await expect(details.locator("summary")).toHaveText("자세히 보기");
+  await expect(details.getByText("접어 둔 설명이다.")).toBeHidden();
+  await details.locator("summary").click();
+  await expect(details.getByText("접어 둔 설명이다.")).toBeVisible();
+  await expect(details.locator("strong code")).toHaveText("코드");
+
+  // 맨 위로: 내려가면 나타나며, 누르면 맨 위로 간다
+  await page.evaluate("window.scrollTo(0, document.body.scrollHeight)");
+  const top = page.getByRole("button", { name: /맨 위로/ });
+  await expect(top).toBeVisible();
+  await top.click();
+  await expect.poll(() => page.evaluate("window.scrollY")).toBe(0);
+  await expect(page.getByRole("heading", { level: 1, name: "합성 생활 가이드" })).toBeFocused();
+  if (info.project.name === "mobile-chromium") await settle(page);
 });

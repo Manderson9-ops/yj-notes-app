@@ -20,12 +20,12 @@ const endsWithQuestion = (s: string): boolean =>
   /[?？][\s\p{Extended_Pictographic}\p{P}~^]*$/u.test(s);
 
 function isGreeting(line: string, singleLineParagraph: boolean): boolean {
-  if (/^안녕(하세요|하십니까)/.test(line) && [...line].length <= GREETING_MAX) return true;
-  return singleLineParagraph && endsWithQuestion(line) && [...line].length <= GREETING_MAX;
+  if (/^안녕(하세요|하십니까)/.test(line) && Array.from(line).length <= GREETING_MAX) return true;
+  return singleLineParagraph && endsWithQuestion(line) && Array.from(line).length <= GREETING_MAX;
 }
 
 function cut(line: string): string {
-  const chars = [...line];
+  const chars = Array.from(line);
   if (chars.length <= MAX_CHARS) return line;
   const head = chars.slice(0, MAX_CHARS).join("");
   const space = head.lastIndexOf(" ");

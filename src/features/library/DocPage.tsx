@@ -112,6 +112,10 @@ export default function DocPage() {
 
   // `#3-1` 처럼 절을 가리키는 주소(가족 기록 경고의 가이드 링크): 그 제목으로 이동. 없으면 처음부터 보여 주고 안내.
   const { hash } = useLocation();
+  // 목록에서 내려간 채로 문서를 열어도 맨 위부터 읽게 한다(절 주소가 있으면 그 절로 가므로 건드리지 않는다).
+  useEffect(() => {
+    if (hash === "") window.scrollTo(0, 0);
+  }, [slug, hash]);
   const anchorId = useMemo(() => (hash ? findHeadingId(blocks, hash) : null), [blocks, hash]);
   const anchorMissing = hash !== "" && blocks.length > 0 && anchorId === null;
   useEffect(() => {

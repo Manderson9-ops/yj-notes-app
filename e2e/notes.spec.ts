@@ -51,9 +51,9 @@ test("flow 4: search, list, detail, prev/next, back", async ({ page }) => {
 test("list: month headers, load more, scroll position restored after back", async ({ page }) => {
   await login(page);
   await page.goto("/notes");
-  await expect(rows(page)).toHaveCount(20);
+  await expect(rows(page)).toHaveCount(30);
   await page.getByRole("button", { name: "더 보기" }).click();
-  await expect(rows(page)).toHaveCount(40);
+  await expect(rows(page)).toHaveCount(60);
   await expect(page.getByRole("heading", { level: 2, name: "2020년 4월" })).toBeVisible();
   const target = rows(page).nth(35);
   await target.scrollIntoViewIfNeeded();
@@ -62,7 +62,7 @@ test("list: month headers, load more, scroll position restored after back", asyn
   await target.click();
   await expect(page.getByRole("heading", { level: 1 })).not.toHaveText("알림장");
   await page.getByRole("button", { name: "알림장 목록" }).click();
-  await expect(rows(page)).toHaveCount(40);
+  await expect(rows(page)).toHaveCount(60);
   await expect
     .poll(async () => Math.abs(Number(await page.evaluate("window.scrollY")) - Number(before)))
     .toBeLessThan(40);
@@ -88,7 +88,7 @@ test("search box: 40 char limit, clear button, period chip, empty states", async
 
   await box.fill("없는낱말");
   await expect(page.getByText("「없는낱말」가 들어간 알림장이 없어요.")).toBeVisible();
-  await page.getByRole("button", { name: "기간을 전체로 바꿔 보세요" }).click();
+  await page.getByRole("button", { name: "전체 기간으로 볼게요" }).click();
   await expect(page.getByRole("button", { name: "전체", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -96,6 +96,25 @@ test("search box: 40 char limit, clear button, period chip, empty states", async
   await expect(page.getByText("다른 낱말로 찾아 보세요.")).toBeVisible();
 });
 
+test("list: jump to a month, and the greeting line is skipped in the preview", async ({ page }) => {
+  await login(page);
+  await page.goto("/notes");
+  const month = page.getByRole("combobox", { name: "월로 바로 가기" });
+  await month.selectOption("2020-04");
+  await expect(page).toHaveURL(/[?&]m=2020-04/);
+  await expect(rows(page).first()).toContainText("4월 30일 (목)");
+  await expect(page.getByRole("status").filter({ hasText: "2020년 4월부터" })).toBeVisible();
+  // 기간 칩을 누르면 월 선택은 풀린다
+  await page.getByRole("button", { name: "최근 1달" }).click();
+  await expect(month).toHaveValue("");
+  await expect(rows(page).first()).toContainText("5월 2일");
+
+  // 인사말(안부 질문)로 시작하는 날: 첫 줄은 인사말 다음 줄, 겹친 공백은 하나
+  await month.selectOption("2020-03");
+  const day = rows(page).filter({ hasText: "3월 7일 (토)" });
+  await expect(day).toContainText("교사A가 이름을 부르면");
+  await expect(day).not.toContainText("보내셨나요");
+});
 test("list: server error shows reason and retry", async ({ page }) => {
   await login(page);
   await page.goto("/notes?q=오류시험");
@@ -178,4 +197,13 @@ test("home: 14+ days since sync shows the warning; empty data is not an error", 
   await page.reload();
   await expect(page.getByText("아직 알림장이 없어요.")).toBeVisible();
   await expect(page.getByText("아직 없어요")).toBeVisible();
+});
+
+test("detail: several reports on one day are numbered, times use 오전/오후", async ({ page }) => {
+  await login(page);
+  await page.goto("/notes/2020-04-01");
+  await expect(page.getByRole("heading", { level: 2, name: "알림장 1" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "알림장 2" })).toBeVisible();
+  await expect(page.getByText("오전 9:40 · 교사")).toBeVisible();
+  await expect(page.getByText("오후 4:10 · 교사")).toBeVisible();
 });

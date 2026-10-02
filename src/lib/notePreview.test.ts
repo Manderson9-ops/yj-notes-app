@@ -28,7 +28,7 @@ describe("previewOfBody", () => {
     const text = Array.from({ length: 40 }, () => "단어").join(" ");
     const out = previewOfBody(text);
     expect(out.endsWith("…")).toBe(true);
-    expect([...out].length).toBeLessThanOrEqual(91);
+    expect(Array.from(out).length).toBeLessThanOrEqual(91);
     expect(out.endsWith(" …")).toBe(false);
   });
   it("returns empty for blank text", () => {
