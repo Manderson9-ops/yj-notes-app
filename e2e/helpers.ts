@@ -1,10 +1,14 @@
 import { writeFile } from "node:fs/promises";
 import { expect, type Locator, type Page } from "@playwright/test";
 
-/** 끝나는 전환·등장 모션이 지난 뒤로 기다린다(문자열 실행: e2e 의 tsconfig 에는 DOM 타입이 없다). */
+/**
+ * 끝나는 전환·등장 모션이 지난 뒤로 기다린다(문자열 실행: e2e 의 tsconfig 에는 DOM 타입이 없다).
+ * 실행 중(running)인 유한 모션만 기다리고, 최대 3초에서 끊는다: CI(linux) webkit 에서 `finished` 가
+ * 끝내 풀리지 않는 애니메이션이 있어 테스트가 30초 제한에 걸렸다(PR #2 최초 CI).
+ */
 export async function settle(page: Page) {
   await page.evaluate(
-    "Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished))",
+    "Promise.race([Promise.all(document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))), new Promise((r) => setTimeout(r, 3000))])",
   );
 }
 
