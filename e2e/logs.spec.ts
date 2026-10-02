@@ -7,7 +7,6 @@ test.describe.configure({ timeout: 60_000 });
 async function login(page: Page) {
   await page.goto("/");
   for (const d of "0000") await page.getByRole("button", { name: d, exact: true }).click();
-  await page.getByRole("button", { name: "확인" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "홈" })).toBeVisible();
 }
 

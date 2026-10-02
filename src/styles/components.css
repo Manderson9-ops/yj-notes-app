@@ -586,38 +586,38 @@ mark {
   margin: 0 0 var(--space-2);
 }
 
-.data-table-wrap {
+.log-table-wrap {
   overflow-x: auto;
   margin-top: var(--space-3);
   border: 1px solid var(--c-line);
   border-radius: var(--radius);
 }
 
-.data-table {
+.log-table {
   width: 100%;
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
 }
 
-.data-table th,
-.data-table td {
+.log-table th,
+.log-table td {
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--c-line);
   text-align: left;
   vertical-align: top;
 }
 
-.data-table thead th {
+.log-table thead th {
   background: var(--c-surface);
   white-space: nowrap;
 }
 
-.data-table tbody th {
+.log-table tbody th {
   min-width: 5em;
   font-weight: 600;
 }
 
-.data-table[data-kind="weeks"] td {
+.log-table[data-kind="weeks"] td {
   min-width: 6em;
 }
 
@@ -625,7 +625,7 @@ mark {
   display: block;
 }
 
-.data-table tbody tr:last-child > * {
+.log-table tbody tr:last-child > * {
   border-bottom: 0;
 }
 

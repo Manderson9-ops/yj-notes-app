@@ -207,7 +207,7 @@ function AlertsSection({
 function ScrollRegion({ label, children }: { label: string; children: ReactNode }) {
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- 스크롤 영역은 키보드 접근이 필요하다
-    <div className="data-table-wrap" role="region" aria-label={label} tabIndex={0}>
+    <div className="log-table-wrap" role="region" aria-label={label} tabIndex={0}>
       {children}
     </div>
   );
@@ -271,7 +271,7 @@ function WeeksSection({
       <section aria-labelledby="lg-weeks">
         <h2 id="lg-weeks">주차 비교</h2>
         <ScrollRegion label={`${type.label} 주차 비교 표`}>
-          <table className="data-table" data-kind="weeks">
+          <table className="log-table" data-kind="weeks">
             <caption className="sr-only">{type.label} 주차별 기록</caption>
             <thead>
               <tr>
@@ -322,7 +322,7 @@ function WeeksSection({
             {x.rowLabel} × {x.colLabel}
           </h2>
           <ScrollRegion label={`${x.rowLabel}별 ${x.colLabel} 표`}>
-            <table className="data-table">
+            <table className="log-table">
               <caption className="sr-only">
                 {x.rowLabel}별 {x.colLabel} 기록 수
               </caption>
