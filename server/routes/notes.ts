@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { errorResponse, jsonResponse } from "../http/errors";
 import { buildHit } from "../../src/lib/noteHit";
+import { previewOfDay } from "../../src/lib/notePreview";
 import {
   DATE_RE,
   notesQuerySchema,
@@ -26,6 +27,9 @@ interface DayRow {
 interface TextRow {
   date: string;
   body: string;
+}
+interface ItemTextRow extends TextRow {
+  direction: string;
 }
 
 /** LIKE 와일드카드(%, _)와 이스케이프 문자(\)를 글자 그대로 찾게 한다. */
@@ -76,32 +80,40 @@ noteRoutes.get("/api/notes", async (c) => {
   const page = results.slice(0, limit);
   const nextCursor = results.length > limit ? (page[page.length - 1]?.date ?? null) : null;
 
-  // 일치 발췌: 이 페이지의 날짜들만 본문·댓글을 읽는다(최대 50일).
+  // 이 페이지의 날짜들만 본문을 읽는다(최대 50일): 미리보기 줄(인사말 건너뛰기)과 일치 발췌에 쓴다.
   const hits = new Map<string, NoteListItem["hit"]>();
-  if (term !== "" && page.length > 0) {
+  const byDay = new Map<string, ItemTextRow[]>();
+  if (page.length > 0) {
     const marks = page.map(() => "?").join(",");
     const dates = page.map((r) => r.date);
     const bodies = await c.env.DB.prepare(
-      `SELECT date, body FROM note_item WHERE date IN (${marks}) ORDER BY posted_at`,
+      `SELECT date, direction, body FROM note_item WHERE date IN (${marks}) ORDER BY posted_at`,
     )
       .bind(...dates)
-      .all<TextRow>();
-    const comments = await c.env.DB.prepare(
-      `SELECT i.date AS date, m.body AS body FROM note_comment m
-       JOIN note_item i ON i.report_id = m.report_id
-       WHERE i.date IN (${marks}) ORDER BY m.posted_at`,
-    )
-      .bind(...dates)
-      .all<TextRow>();
+      .all<ItemTextRow>();
     for (const row of bodies.results) {
-      if (hits.has(row.date)) continue;
-      const hit = buildHit(row.body, term, "body");
-      if (hit) hits.set(row.date, hit);
+      const list = byDay.get(row.date) ?? [];
+      list.push(row);
+      byDay.set(row.date, list);
     }
-    for (const row of comments.results) {
-      if (hits.has(row.date)) continue;
-      const hit = buildHit(row.body, term, "comment");
-      if (hit) hits.set(row.date, hit);
+    if (term !== "") {
+      const comments = await c.env.DB.prepare(
+        `SELECT i.date AS date, m.body AS body FROM note_comment m
+         JOIN note_item i ON i.report_id = m.report_id
+         WHERE i.date IN (${marks}) ORDER BY m.posted_at`,
+      )
+        .bind(...dates)
+        .all<TextRow>();
+      for (const row of bodies.results) {
+        if (hits.has(row.date)) continue;
+        const hit = buildHit(row.body, term, "body");
+        if (hit) hits.set(row.date, hit);
+      }
+      for (const row of comments.results) {
+        if (hits.has(row.date)) continue;
+        const hit = buildHit(row.body, term, "comment");
+        if (hit) hits.set(row.date, hit);
+      }
     }
   }
 
@@ -113,7 +125,7 @@ noteRoutes.get("/api/notes", async (c) => {
       ageMonths: r.age_months,
       nReports: r.n_reports,
       nComments: r.n_comments,
-      firstLine: r.first_line,
+      firstLine: previewOfDay(byDay.get(r.date) ?? [], r.first_line),
       ...(hit ? { hit } : {}),
     };
   });

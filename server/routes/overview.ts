@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { jsonResponse } from "../http/errors";
+import { previewOfDay } from "../../src/lib/notePreview";
 import type { Overview } from "../../src/lib/notesSchemas";
 
 export const overviewRoutes = new Hono<AppEnv>();
@@ -36,6 +37,16 @@ overviewRoutes.get("/api/overview", async (c) => {
       `SELECT date, age_months, first_line, n_comments FROM note_day ORDER BY date DESC LIMIT 3`,
     )
     .all<{ date: string; age_months: number; first_line: string; n_comments: number }>();
+  const recentDates = recentNotes.results.map((r) => r.date);
+  const recentItems = recentDates.length
+    ? await db
+        .prepare(
+          `SELECT date, direction, body FROM note_item
+           WHERE date IN (${recentDates.map(() => "?").join(",")}) ORDER BY posted_at`,
+        )
+        .bind(...recentDates)
+        .all<{ date: string; direction: string; body: string }>()
+    : { results: [] };
   const recentLogs = await db
     .prepare(
       `SELECT l.id, l.type, COALESCE(t.label_ko, l.type) AS type_label, l.occurred_on, l.recorder, l.note
@@ -65,7 +76,10 @@ overviewRoutes.get("/api/overview", async (c) => {
     recentNotes: recentNotes.results.map((r) => ({
       date: r.date,
       ageMonths: r.age_months,
-      firstLine: r.first_line,
+      firstLine: previewOfDay(
+        recentItems.results.filter((i) => i.date === r.date),
+        r.first_line,
+      ),
       nComments: r.n_comments,
     })),
     recentLogs: recentLogs.results.map((r) => ({

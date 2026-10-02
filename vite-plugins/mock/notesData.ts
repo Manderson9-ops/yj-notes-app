@@ -1,4 +1,5 @@
 // FAKE 알림장 자료(합성). mock API 전용이며 빌드에 들어가지 않는다. 이름은 테스트아이·교사A·친구A/B 만 쓴다.
+import { previewOfDay } from "../../src/lib/notePreview.ts";
 import type { NoteComment, NoteDay, NoteReport } from "../../src/lib/notesSchemas.ts";
 
 const PIECES = [
@@ -82,6 +83,25 @@ function build(i: number): NoteDay {
       comments: [],
     });
   }
+  // 인사말(안부 질문)로 시작하는 글: 목록 첫 줄은 인사말을 건너뛴 다음 줄이어야 한다. 공백이 겹친 줄도 섞는다.
+  if (i === 5) {
+    items[0] = {
+      ...items[0],
+      body: `테스트아이와  즐거운 주말 보내셨나요?\n\n${pick(1)}\n${pick(2)}`,
+    } as NoteReport;
+  }
+  // 하루 두 건(앞은 짧은 안내, 뒤는 활동 글): 목록은 더 긴 글의 줄을 보인다.
+  if (i === 30) {
+    items.unshift({
+      reportId: 8_000_000 + i * 10 + 1,
+      authorRole: "교사",
+      direction: "to_home",
+      weather: null,
+      postedAt: `${date} 09:40`,
+      body: "준비물을 내일까지 보내 주세요.",
+      comments: [],
+    });
+  }
   if (i === 20) items[0] = { ...items[0], body: "", comments: [] } as NoteReport;
   if (i === 22)
     items[0] = { ...items[0], body: `오늘은 기분이 좋아 보였어요 😊 ${pick(1)}` } as NoteReport;
@@ -95,9 +115,6 @@ function build(i: number): NoteDay {
 /** 날짜 오름차순 전체 자료 */
 export const MOCK_DAYS: NoteDay[] = Array.from({ length: DAYS }, (_, i) => build(i));
 
-export const firstLineOf = (d: NoteDay): string => {
-  const text = d.items.find((r) => r.body !== "")?.body ?? "";
-  return (text.split("\n")[0] ?? "").slice(0, 80);
-};
+export const firstLineOf = (d: NoteDay): string => previewOfDay(d.items);
 export const commentCount = (d: NoteDay): number =>
   d.items.reduce((n, r) => n + r.comments.length, 0);

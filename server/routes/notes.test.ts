@@ -245,3 +245,41 @@ describe("500 synthetic days (performance)", () => {
     expect(ms).toBeLessThan(1000);
   });
 });
+
+describe("list preview line (greeting skipped, best report of the day)", () => {
+  const addDay = (date: string, bodies: [number, string, string][]) => {
+    h.fake.sqlite
+      .prepare(
+        "INSERT INTO note_day (date, class_name, age_months, n_reports, n_images, n_comments, first_line) VALUES (?, '합성반', 1, ?, 0, 0, ?)",
+      )
+      .run(date, bodies.length, "저장된 첫 줄");
+    for (const [id, dir, body] of bodies) {
+      h.fake.sqlite
+        .prepare(
+          "INSERT INTO note_item (report_id, date, author_role, direction, weather, posted_at, body) VALUES (?, ?, '교사', ?, NULL, ?, ?)",
+        )
+        .run(id, date, dir, `${date} 1${String(id % 10)}:00`, body);
+    }
+  };
+
+  it("skips a greeting question, and picks the longer to_home report on two-report days", async () => {
+    addDay("2021-05-01", [[9001, "to_home", "아이와 즐거운 주말 보내셨나요?\n\n블록을 쌓았어요."]]);
+    addDay("2021-05-02", [
+      [9002, "to_home", "준비물 안내."],
+      [9003, "to_home", "모래놀이를 오래 했어요.\n물도 마셨어요."],
+    ]);
+    const r = await list("?limit=2");
+    expect(r.items.map((i) => [i.date, i.firstLine])).toEqual([
+      ["2021-05-02", "모래놀이를 오래 했어요."],
+      ["2021-05-01", "블록을 쌓았어요."],
+    ]);
+    const o = overviewSchema.parse(await (await get("/api/overview")).json());
+    expect(o.recentNotes[0]?.firstLine).toBe("모래놀이를 오래 했어요.");
+  });
+
+  it("falls back to the stored first line when a day has no report body", async () => {
+    addDay("2021-05-03", []);
+    const r = await list("?limit=1");
+    expect(r.items[0]?.firstLine).toBe("저장된 첫 줄");
+  });
+});
