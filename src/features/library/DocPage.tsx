@@ -81,7 +81,7 @@ export default function DocPage() {
             <>
               {anchorMissing ? (
                 <p className="meta doc-note" role="status">
-                  가리킨 절을 찾지 못했어요. 문서 처음부터 보여 드려요.
+                  가리킨 절이 없어요. 처음부터 보여요.
                 </p>
               ) : null}
               {toc.length >= 2 ? (

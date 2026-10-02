@@ -93,13 +93,11 @@ test("가이드 링크 주소(guide-05#3-1): 해당 절로 이동, 없는 절은
   const target = page.getByRole("heading", { level: 3, name: /^3-1\./ });
   await expect(target).toBeInViewport();
   await expect(target).toBeFocused();
-  await expect(page.getByText("가리킨 절을 찾지 못했어요")).toHaveCount(0);
+  await expect(page.getByText("가리킨 절이 없어요")).toHaveCount(0);
 
   await page.goto("/library/doc/guide-05#9-9");
   await expect(page.getByRole("heading", { level: 1, name: "합성 대응 가이드" })).toBeVisible();
-  await expect(
-    page.getByText("가리킨 절을 찾지 못했어요. 문서 처음부터 보여 드려요."),
-  ).toBeVisible();
+  await expect(page.getByText("가리킨 절이 없어요. 처음부터 보여요.")).toBeVisible();
 });
 
 test("검진: 결과지 문구 그대로, 판독 불확실 배지 설명", async ({ page }, info) => {
