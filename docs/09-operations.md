@@ -20,7 +20,9 @@
 | `CLOUDFLARE_API_TOKEN` (배포용, Pages 편집만) | GitHub Actions secret | 1년 |
 | `CLOUDFLARE_API_TOKEN` (적재용, D1·R2 편집) | 관리자 PC 환경변수만 | 1년 |
 
+- `PIN_LENGTH`(선택, 4~12): 로그인 화면이 이 자릿수에서 자동 전송한다. 비밀은 아니지만 운영 값은 Pages secret 으로 둔다(저장소·`wrangler.toml` 에 쓰지 않음). 그 밖의 값·미설정이면 4~12자리 + '확인' 방식.
 - 배포 토큰과 적재 토큰을 **분리**한다. GitHub 에는 D1·R2 권한이 없는 토큰만 둔다.
+- **PIN 자릿수 설정(관리자)**: PIN 을 바꾸거나 처음 정할 때 자릿수도 맞춘다. `npx wrangler pages secret put PIN_LENGTH --project-name yj-notes-app` (예: 6 입력) 후 **재배포**해야 반영된다. 자릿수와 실제 PIN 길이가 다르면 로그인할 수 없으니 `PIN_HASH`·`PIN_SALT` 와 같은 순서로 함께 바꾼다.
 - PIN 해시 생성: `npm run pin:hash` (로컬에서 입력, 화면 출력만, 파일 저장 안 함).
 
 ## 3. 배포

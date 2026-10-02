@@ -59,6 +59,8 @@
   /* 동작(prefers-reduced-motion 에서는 base.css 가 전부 끈다) */
   --ease: ease;
   --dur: 150ms;
+  --shake-dist: 8px; /* 틀린 PIN 점 흔들림 */
+  --shake-dur: 400ms;
 
   /* 간격 — 테마 무관 */
   --tap: 48px;

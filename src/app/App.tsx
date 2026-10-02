@@ -15,9 +15,8 @@ function AuthGate() {
       </p>
     );
   }
-  if (session.isError || !session.data.authenticated) {
-    return <PinScreen />;
-  }
+  if (session.isError) return <PinScreen />;
+  if (!session.data.authenticated) return <PinScreen pinLength={session.data.pinLength} />;
   return (
     <Routes>
       <Route element={<AppShell />}>

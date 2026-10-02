@@ -11,7 +11,7 @@
 | 메서드 | 경로 | 요청 | 응답 |
 |---|---|---|---|
 | POST | `/session` | `{pin}` | `204` + 쿠키 / `401 invalid_pin` / `429 locked {retryAfterSec}` |
-| GET | `/session` | — | `{authenticated: bool}` |
+| GET | `/session` | — | `{authenticated: bool, pinLength?: 4~12}` — `pinLength` 는 서버 `PIN_LENGTH` 가 유효할 때만, 세션 유무와 무관하게 포함(로그인 화면이 점 개수·자동 전송 시점에 사용). 없으면 클라이언트는 4~12자리 + '확인' 방식 |
 | DELETE | `/session` | — | `204` (이 기기 로그아웃) |
 | GET | `/health` | — | `{ok, version, lastIngestAt}` — 자료 없음 |
 

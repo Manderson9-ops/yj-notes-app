@@ -16,7 +16,6 @@ for (const theme of ["crayon", "forest"] as const) {
         }, theme);
         await page.goto("/");
         for (const d of "0000") await page.getByRole("button", { name: d, exact: true }).click();
-        await page.getByRole("button", { name: "확인" }).click();
         await expect(page.getByRole("heading", { level: 1, name: "홈" })).toBeVisible();
         await page.goto("/settings/design");
         await expect(
