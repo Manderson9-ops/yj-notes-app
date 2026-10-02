@@ -75,6 +75,37 @@ describe("GET /api/log-types", () => {
     expect(list[0]?.schema.fields).toHaveLength(8);
   });
 
+  it("skin_pick shows 「이상 없음」 for the stored value 「정상」 (0006); the stored value and old records stay valid", async () => {
+    const list = await (
+      await call("GET", "/api/log-types")
+    ).json<
+      {
+        code: string;
+        schema: { fields: { key: string; options?: string[]; labels?: Record<string, string> }[] };
+      }[]
+    >();
+    const hand = list
+      .find((t) => t.code === "skin_pick")
+      ?.schema.fields.find((f) => f.key === "hand_state");
+    expect(hand?.options).toEqual(["거스러미", "건조", "상처", "정상"]); // 저장 값은 그대로
+    expect(hand?.labels).toEqual({ 정상: "이상 없음" }); // 화면 말만 다르다
+    // 0006 이전에 쌓인 기록(저장 값 「정상」)과 새 기록 모두 같은 값으로 저장·조회된다
+    const payload = { when: "차", mood: "피곤", hand_state: "정상" };
+    const res = await put(ID1, body({ type: "skin_pick", payload }));
+    expect(res.status).toBe(200);
+    expect((await res.json<PutResult>()).item.payload.hand_state).toBe("정상");
+    const got = await (
+      await call("GET", `/api/logs/${ID1}`)
+    ).json<{ item: { payload: { hand_state: string } } }>();
+    expect(got.item.payload.hand_state).toBe("정상");
+    // 화면 말(「이상 없음」)은 저장 값이 아니므로 거부된다
+    const bad = await put(
+      ID2,
+      body({ type: "skin_pick", payload: { ...payload, hand_state: "이상 없음" } }),
+    );
+    expect(bad.status).toBe(422);
+  });
+
   it("hides inactive types and skips broken definitions", async () => {
     h.fake.sqlite.exec("UPDATE log_type SET active = 0 WHERE code = 'cry'");
     h.fake.sqlite.exec("UPDATE log_type SET schema_json = '{broken' WHERE code = 'skin_pick'");

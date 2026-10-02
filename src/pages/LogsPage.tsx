@@ -12,6 +12,7 @@ import {
   formatDateShort,
   formatMonthDay,
   guideHref,
+  optionLabel,
   summarizePayload,
   todayKst,
 } from "../lib/logs/format";
@@ -213,7 +214,11 @@ function ScrollRegion({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-function statLines(stat: FieldStat | undefined, unit: string): string[] {
+function statLines(
+  stat: FieldStat | undefined,
+  field: LogType["schema"]["fields"][number],
+): string[] {
+  const unit = field.type === "int" ? (field.unit ?? "") : "";
   if (!stat) return ["-"];
   if (stat.kind === "int") {
     return stat.n === 0 || stat.avg === null || stat.max === null
@@ -222,7 +227,7 @@ function statLines(stat: FieldStat | undefined, unit: string): string[] {
   }
   const parts = Object.entries(stat.counts)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${k} ${String(n)}`);
+    .map(([k, n]) => `${optionLabel(field, k)} ${String(n)}`);
   return parts.length === 0 ? ["-"] : parts;
 }
 
@@ -301,13 +306,11 @@ function WeeksSection({
                   <th scope="row">{f.label_ko}</th>
                   {summary.weeks.map((w) => (
                     <td key={w.index}>
-                      {statLines(w.fields[f.key], f.type === "int" ? (f.unit ?? "") : "").map(
-                        (line) => (
-                          <span key={line} className="cell-line">
-                            {line}
-                          </span>
-                        ),
-                      )}
+                      {statLines(w.fields[f.key], f).map((line) => (
+                        <span key={line} className="cell-line">
+                          {line}
+                        </span>
+                      ))}
                     </td>
                   ))}
                 </tr>

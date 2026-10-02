@@ -4,7 +4,12 @@ import { z } from "zod";
 const base = { key: z.string(), label_ko: z.string(), required: z.boolean() };
 
 export const logFieldSchema = z.discriminatedUnion("type", [
-  z.object({ ...base, type: z.literal("enum"), options: z.array(z.string()) }),
+  z.object({
+    ...base,
+    type: z.literal("enum"),
+    options: z.array(z.string()),
+    labels: z.record(z.string(), z.string()).optional(),
+  }),
   z.object({
     ...base,
     type: z.literal("int"),

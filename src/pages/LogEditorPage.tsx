@@ -6,7 +6,14 @@ import { LogTypeIcon } from "../components/LogTypeIcon";
 import { Notice } from "../components/Notice";
 import { ApiError, api } from "../lib/api";
 import { useLogTypes } from "../lib/logs/hooks";
-import { formatDate, formatValue, guideHref, todayKst, addDays } from "../lib/logs/format";
+import {
+  formatDate,
+  formatValue,
+  guideHref,
+  optionLabel,
+  todayKst,
+  addDays,
+} from "../lib/logs/format";
 import {
   RECORDERS,
   deviceId,
@@ -518,7 +525,7 @@ function Question({
                 onAnswer(o);
               }}
             >
-              {o}
+              {optionLabel(field, o)}
             </Chip>
           ))}
         </div>

@@ -30,9 +30,15 @@ export function formatMonthDay(date: string): string {
   return `${String(d.getUTCMonth() + 1)}/${String(d.getUTCDate())}`;
 }
 
+/** 선택지의 화면 말: 정의의 labels 가 있으면 그것, 없으면 저장 값 그대로. 저장 값은 바꾸지 않는다. */
+export function optionLabel(field: LogField, value: string): string {
+  return (field.type === "enum" ? field.labels?.[value] : undefined) ?? value;
+}
+
 export function formatValue(field: LogField, value: unknown): string {
   if (value === undefined || value === null || value === "") return "-";
   const text = typeof value === "string" || typeof value === "number" ? String(value) : "";
+  if (field.type === "enum") return optionLabel(field, text);
   return field.type === "int" ? `${text}${field.unit ?? ""}` : text;
 }
 

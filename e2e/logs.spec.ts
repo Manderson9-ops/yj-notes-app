@@ -85,16 +85,24 @@ test("흐름 3: 오프라인에서 기록 2건 -> 온라인 복귀 -> 자동 전
   // 입력 화면 조각(lazy)이 내려온 뒤에 연결을 끊는다("저녁 식사" 칩은 기록 목록 화면에도 있다).
   await expect(page.getByRole("heading", { level: 2, name: "무엇을 기록할까요?" })).toBeVisible();
 
+  // 배너의 건수 부분(lazy)이 내려온 뒤에 연결을 끊는다(로그인 1.5초 뒤 미리 받아 둔다).
+  await expect
+    .poll(() =>
+      page.evaluate(
+        "performance.getEntriesByType('resource').some((e) => e.name.includes('QueueBanners'))",
+      ),
+    )
+    .toBe(true);
   await context.setOffline(true);
   await saveMeal(page, "5분");
   await expect(page.getByRole("heading", { level: 2, name: "기기에 저장했어요" })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "오프라인" })).toContainText(
-    "오프라인 — 기록은 저장해 두었다가 연결되면 보내요 (대기 1건)",
+    "오프라인이에요. 보내지 않은 기록 1건은 연결되면 보내요.",
   );
   await btn(page, "하나 더 기록하기").click();
   await saveMeal(page, "10분");
   await expect(page.getByRole("status").filter({ hasText: "오프라인" })).toContainText(
-    "(대기 2건)",
+    "보내지 않은 기록 2건은 연결되면 보내요.",
   );
   const stats = async () =>
     (await (await page.request.get("/api/logs/__stats")).json()) as { puts: number; rows: number };
@@ -215,4 +223,32 @@ test("홈의 오늘 기록하기 -> 기록 입력 화면(/logs/new)", async ({ p
   await page.getByRole("link", { name: "오늘 기록하기" }).click();
   await expect(page).toHaveURL(/\/logs\/new$/);
   await expect(btn(page, "저녁 식사")).toBeVisible();
+});
+
+test("손 뜯기: 손 상태 선택지는 「이상 없음」 으로 보이고 「정상」 은 어디에도 보이지 않는다", async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto("/logs/new");
+  await btn(page, "손 뜯기").click();
+  await btn(page, "영상").click();
+  await btn(page, "심심").click();
+  await expect(page.getByRole("heading", { level: 2, name: "손 상태" })).toBeVisible();
+  await expect(page.locator("main")).not.toContainText("정상");
+  await btn(page, "이상 없음").click();
+  await btn(page, "건너뛰기").click();
+  await expect(page.getByRole("heading", { level: 2, name: "손 뜯기 확인" })).toBeVisible();
+  await expect(page.locator("main")).toContainText("이상 없음");
+  await expect(page.locator("main")).not.toContainText("정상");
+  await btn(page, "엄마").click();
+  await btn(page, "저장").click();
+  await expect(page.getByRole("heading", { level: 2, name: "저장했어요" })).toBeVisible();
+  // 서버에는 저장 값 「정상」 으로 간다(기존 기록과 같은 값), 화면에는 「이상 없음」
+  const items = (await (await page.request.get("/api/logs")).json()) as {
+    items: { payload: Record<string, string> }[];
+  };
+  expect(items.items[0]?.payload.hand_state).toBe("정상");
+  await page.goto("/logs");
+  await expect(page.locator("article.log-card").first()).toContainText("손 상태 이상 없음");
+  await expect(page.locator("main")).not.toContainText("정상");
 });

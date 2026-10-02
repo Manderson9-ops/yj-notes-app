@@ -10,6 +10,8 @@ const enumField = z.object({
   label_ko: z.string().min(1),
   type: z.literal("enum"),
   options: z.array(z.string().min(1)).min(1),
+  /** 저장 값(options) -> 화면에 보일 말. 없으면 값 그대로. 이미 쌓인 기록을 건드리지 않고 말만 고칠 때 쓴다. */
+  labels: z.record(z.string(), z.string().min(1)).optional(),
   required: z.boolean(),
 });
 const intField = z.object({
