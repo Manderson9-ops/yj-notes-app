@@ -139,3 +139,32 @@ def test_finalize_statement_only_when_allowed():
     assert validate_sql("UPDATE report_doc SET verify_ok = 1;", allow_finalize=True) == [
         ("UPDATE", "report_doc")
     ]
+
+
+@pytest.mark.parametrize("token", ["BEGIN TRANSACTION", "COMMIT;"])
+def test_values_with_wrangler_stripped_tokens_stop_with_a_clear_error(token):
+    """로컬 wrangler 가 따옴표 안에서도 지우는 글자: 값에 있으면 조용히 바뀌지 않고 멈춘다."""
+    secret = f"앞글 {token} 뒷글"
+    with pytest.raises(SqlError) as e:
+        sql_literal(secret)
+    assert token in str(e.value)  # 어떤 글자 때문인지는 알린다
+    assert "앞글" not in str(e.value)  # 값 내용은 새지 않는다
+    spec = SPEC_BY_NAME["note_item"]
+    row = dict.fromkeys(spec.columns, 1)
+    row["body"] = secret
+    with pytest.raises(SqlError, match=r"note_item\.body"):
+        row_statements(spec, row)
+
+
+def test_tokens_split_across_chunks_or_other_case_are_not_false_positives():
+    # wrangler 는 대소문자를 가리고 파일 안 연속 글자만 지우므로, 아래는 안전하다
+    assert sql_literal("begin transaction commit") == "'begin transaction commit'"
+    assert sql_literal("COMMIT 하고; 끝") == "'COMMIT 하고; 끝'"
+
+
+def test_validate_rejects_files_that_contain_the_tokens():
+    ok = "DELETE FROM note_day;\n"
+    assert validate_sql(ok) == [("DELETE", "note_day")]
+    for token in ("BEGIN TRANSACTION", "COMMIT;"):
+        with pytest.raises(SqlError, match="SQL 파일"):
+            validate_sql(ok + f"-- {token}\n")

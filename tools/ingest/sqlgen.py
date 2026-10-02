@@ -126,6 +126,21 @@ class SqlError(ValueError):
     pass
 
 
+# 로컬 wrangler(`d1 execute --file`)는 파일 안에 `BEGIN TRANSACTION` 이 있으면 따옴표 안까지 훑어
+# `BEGIN TRANSACTION;`·`COMMIT;` 글자를 지운다(node_modules/wrangler src/d1/trimmer.ts). 자료 값이 이 글자를 담으면
+# 적재 결과가 조용히 달라지므로, 그런 값은 만들지 않고 멈춘다. 대소문자도 wrangler 와 같게 정확히 비교한다.
+WRANGLER_STRIPPED = ("BEGIN TRANSACTION", "COMMIT;")
+
+
+def _reject_wrangler_tokens(text: str, what: str) -> None:
+    for token in WRANGLER_STRIPPED:
+        if token in text:
+            raise SqlError(
+                f"{what}: wrangler 가 지우는 글자({token!r})가 있어 안전하게 적재할 수 없습니다. "
+                "원본에서 그 글자를 바꾸거나, 이 도구의 적재 방식을 바꾸세요(값 내용은 출력하지 않습니다)"
+            )
+
+
 def sql_literal(v: Value) -> str:
     if v is None:
         return "NULL"
@@ -139,6 +154,7 @@ def sql_literal(v: Value) -> str:
         return repr(v)
     if "\x00" in v:
         raise SqlError("NUL 문자가 있어 SQL 문자열로 만들 수 없습니다")
+    _reject_wrangler_tokens(v, "문자열 값")
     try:
         v.encode("utf-8")
     except UnicodeEncodeError as e:
@@ -173,6 +189,9 @@ def row_statements(spec: TableSpec, row: dict[str, Value]) -> list[str]:
     appends: list[tuple[str, str]] = []
     for col in spec.columns:
         v = row.get(col)
+        if isinstance(v, str):
+            # 이 칸이 어느 표·칸인지 알려 주려고 여기서 먼저 검사한다(값은 말하지 않는다)
+            _reject_wrangler_tokens(v, f"{spec.name}.{col}")
         if isinstance(v, str) and len(v.encode("utf-8")) > CHUNK_BYTES:
             chunks = split_text(v)
             first.append(sql_literal(chunks[0]))
@@ -260,6 +279,7 @@ _ALLOWED = set(INSERT_ORDER)
 
 def validate_sql(text: str, allow_finalize: bool = False) -> list[tuple[str, str]]:
     """허용된 문장 형태·테이블만 있는지 검사하고 (연산, 테이블) 목록을 돌려준다. 위반 시 SqlError."""
+    _reject_wrangler_tokens(text, "SQL 파일")
     out: list[tuple[str, str]] = []
     for st in split_statements(text):
         m = _RE_DELETE.fullmatch(st)
