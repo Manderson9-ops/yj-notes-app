@@ -41,6 +41,19 @@
 7. 확인: `https://yj-notes-app.pages.dev/api/health` 가 200, `/robots.txt` 가 `Disallow: /`, 로그인 전 `/api/*` 가 401.
 8. R2 는 M4 에서 대시보드 R2 활성화 후 `wrangler.toml` 의 `FILES` 주석 해제.
 
+### 3-1b. 자료 적재 (관리자, 매번 동일)
+`DATA_DIR` 설정 + 적재 토큰 환경에서(자세한 설명·표는 `07` §4-1):
+```
+npm run ingest:export
+npm run ingest:verify                     # 통과해야 다음으로
+npm run ingest:upload -- --remote --yes
+npm run ingest:status -- --remote         # matches_manifest: true
+```
+- 새 마이그레이션이 있으면 먼저 `npm run db:migrate:prod`. 이번 배포에는 `0004_b1_report_doc_body.sql`(문서 원문 `body` 칸)이 포함된다.
+- 출력은 `%LOCALAPPDATA%\yj-notes\ingest\<run-id>\`(저장소 밖, S1·S2 포함). 적재가 끝나면 오래된 run 폴더는 지워도 된다.
+- `--remote` 는 `--yes` 없이는 동작하지 않는다. 개발·검증은 `--local` 로(`npm run db:migrate:local` 이 선행).
+- Python 3.11+ 가 필요하다(런타임 패키지 없음). 없으면 `INGEST_PYTHON` 에 경로를 지정한다.
+
 ### 3-2. Functions 실행 범위와 무료 한도
 - 보안 헤더 미들웨어(`functions/_middleware.ts`)를 **모든 요청**(정적 파일 포함)에 적용하려고 `_routes.json` 을 두지 않는다. 따라서 Functions 가 모든 요청에서 실행된다.
 - Pages Functions 는 Workers 무료 한도(일 100,000 요청)를 **공유**한다. 정적 파일 요청도 포함되므로 O-04 에서 사용량을 본다.
@@ -62,7 +75,7 @@
 | ID | 증상 | 조치 |
 |---|---|---|
 | R-01 | 가족이 "PIN 이 안 돼요" | 잠금 여부 확인(`auth_attempt`) → 15분 대기 안내. 전역 잠금이면 공격 의심 → 로그 확인 후 PIN 교체 |
-| R-02 | 적재 실패(`ingest_run.status=failed`) | 오류 메시지 확인 → D1 Time Travel 로 적재 직전 시점 복원(`wrangler d1 time-travel restore`) → 원인 수정 후 재적재 |
+| R-02 | 적재 실패(`ingest_run.status=failed`) | 오류 메시지 확인(자료 내용은 출력되지 않음) → **같은 run 폴더로 `upload` 재실행**(대상 테이블 전체 교체라 멱등) → 그래도 안 되면 D1 Time Travel 로 적재 직전 시점 복원(`wrangler d1 time-travel restore`) → 원인 수정 후 재적재 |
 | R-03 | 503 quota_exceeded | 사용량 확인. 반복되면 원인(루프 요청 등) 수정. 유료 전환은 관리자 결정 |
 | R-04 | 기록이 사라졌다 | `deleted_at` 확인(소프트 삭제 복구) → 없으면 주간 백업에서 해당 id 복원 |
 | R-05 | 유출 의심 | `04` §6 절차 |

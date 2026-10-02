@@ -102,11 +102,12 @@ CREATE TABLE family_log (
 );
 CREATE INDEX idx_log_type_date ON family_log(type, occurred_on);
 
--- 보고서 메타 (본문은 R2)
+-- 보고서 메타 (본문은 R2 활성화 전까지 D1 body 칸, 마이그레이션 0004_b1_report_doc_body.sql)
 CREATE TABLE report_doc (
   slug TEXT PRIMARY KEY, title TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('html','markdown')),
   r2_key TEXT NOT NULL, generated_at TEXT NOT NULL, source_commit TEXT NOT NULL,
-  verify_ok INTEGER NOT NULL, sha256 TEXT NOT NULL
+  verify_ok INTEGER NOT NULL, sha256 TEXT NOT NULL,
+  body TEXT                             -- 0004: 문서 원문. body 가 있으면 r2_key = ''
 );
 
 -- 보안
@@ -117,6 +118,8 @@ CREATE TABLE app_setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);  -- sessio
 ```
 
 ### 설계 메모
+- **적재 대응(T-B1)**: 원본 → 테이블 칸 대응은 `07` §4 표. 스키마가 원본을 담지 못했던 곳은 두 가지뿐이다. (1) `report_doc.body` — R2 가 없어 문서 원문을 둘 곳이 없었다(마이그레이션 0004). (2) `note_comment.id` — 원본에 댓글 id 가 없어 `report_id*1000 + 순번` 으로 만든다(스키마 변경 없음, 댓글은 알림장당 999개까지). `growth_ref` 는 L·M·S·p3·p50·p97 만 담고 다른 백분위(p5~p95)·단위는 담지 않는다.
+- **긴 본문**: D1 문장 한도(100KB)를 넘는 문자열 칸은 적재가 나눠 붙이므로(`07` §4) 앱은 신경 쓰지 않는다.
 - **교사·다른 보호자 실명은 적재하지 않는다**(`author_role` 만). 알림장 본문 속 다른 아이 이름은 원문이라 그대로 두되 S1 로 취급한다.
 - 검색(F4)은 1차에서 `LIKE` 로 충분하다(483행, 행 크기 작음, D1 `LIKE` 패턴 50바이트 제한 → 입력 길이 제한 40자). 한국어 부분 일치용 FTS5 trigram 은 M3 스파이크로 검증 후 도입 여부 결정(D-05).
 - 날짜: 알림장 `date` 는 원 날짜, 시각은 KST 문자열(기존 `EXTRACTION.md` §4 와 동일).
