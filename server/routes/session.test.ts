@@ -311,7 +311,8 @@ describe("GET/DELETE /api/session", () => {
     const cookie = cookieFrom(await h.login(TEST_PIN));
     const token = cookie.slice("yjs=".length);
     const [payload, sig] = token.split(".") as [string, string];
-    const flip = (s: string) => s.slice(0, -1) + (s.endsWith("A") ? "B" : "A");
+    // 첫 글자를 바꾼다: base64url 마지막 글자는 남는 비트(패딩)만 다를 수 있어 디코딩 결과가 같아질 수 있다(간헐 실패 원인).
+    const flip = (s: string) => (s.startsWith("A") ? "B" : "A") + s.slice(1);
     for (const bad of [`${flip(payload)}.${sig}`, `${payload}.${flip(sig)}`, `${sig}.${payload}`]) {
       const c = `yjs=${bad}`;
       expect(await json(await h.authedGet("/api/session", c))).toEqual({ authenticated: false });

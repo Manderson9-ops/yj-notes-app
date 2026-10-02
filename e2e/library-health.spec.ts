@@ -70,7 +70,7 @@ test("HTML 문서는 sandbox iframe 안에서 열린다", async ({ page }) => {
   await page.getByRole("link", { name: /합성 발달 보고서/ }).click();
   const iframe = page.locator("iframe");
   await expect(iframe).toHaveAttribute("sandbox", "allow-scripts"); // allow-same-origin 없음
-  await expect(iframe).toHaveAttribute("src", "/api/reports/lh-report-summary/raw");
+  await expect(iframe).toHaveAttribute("src", "/api/reports/report-summary/raw");
   const body = page.frameLocator("iframe").locator("#out");
   await expect(body).toHaveText("스크립트 실행됨");
   // opaque origin: 쿠키·저장소에 닿으면 SecurityError (allow-same-origin 없음)
@@ -84,6 +84,23 @@ test("없는 문서는 이유와 함께 알려 준다", async ({ page }) => {
   await page.goto("/library/doc/nope");
   await expect(page.getByRole("alert")).toContainText("찾을 수 없는 자료예요.");
   await expect(page.getByRole("link", { name: "← 자료" })).toBeVisible();
+});
+
+test("가이드 링크 주소(guide-05#3-1): 해당 절로 이동, 없는 절은 처음부터 + 안내", async ({
+  page,
+}) => {
+  await login(page);
+  await page.goto("/library/doc/guide-05#3-1");
+  const target = page.getByRole("heading", { level: 3, name: /^3-1\./ });
+  await expect(target).toBeInViewport();
+  await expect(target).toBeFocused();
+  await expect(page.getByText("가리킨 절을 찾지 못했어요")).toHaveCount(0);
+
+  await page.goto("/library/doc/guide-05#9-9");
+  await expect(page.getByRole("heading", { level: 1, name: "합성 대응 가이드" })).toBeVisible();
+  await expect(
+    page.getByText("가리킨 절을 찾지 못했어요. 문서 처음부터 보여 드려요."),
+  ).toBeVisible();
 });
 
 test("검진: 결과지 문구 그대로, 판독 불확실 배지 설명", async ({ page }, info) => {

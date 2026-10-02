@@ -28,9 +28,9 @@ describe("GET /api/reports", () => {
     expect(res.status).toBe(200);
     const body = await res.json<{ items: Record<string, unknown>[] }>();
     expect(body.items.map((i) => i.slug)).toEqual([
-      "lh-wiki-terms",
-      "lh-guide-routine",
-      "lh-report-summary",
+      "wiki-terms",
+      "guide-routine",
+      "report-summary",
     ]);
     expect(body.items.map((i) => i.group)).toEqual(["wiki", "guide", "report"]);
     expect(body.items[0]).toMatchObject({ kind: "markdown", verifyOk: false });
@@ -38,9 +38,11 @@ describe("GET /api/reports", () => {
     for (const item of body.items) expect(item).not.toHaveProperty("body");
   });
 
-  it("reportGroup uses the guide/wiki segment of the slug", () => {
-    expect(reportGroup("fixture-guide")).toBe("guide");
-    expect(reportGroup("a_wiki_b")).toBe("wiki");
+  it("reportGroup uses the first segment of the slug (ingest: <folder>-<number|name>)", () => {
+    expect(reportGroup("guide-05")).toBe("guide");
+    expect(reportGroup("wiki_00")).toBe("wiki");
+    expect(reportGroup("report-behavior-guide")).toBe("report");
+    expect(reportGroup("tracking-index")).toBe("report");
     expect(reportGroup("dev-report-2")).toBe("report");
     expect(reportGroup("guidebook")).toBe("report");
   });
@@ -48,11 +50,11 @@ describe("GET /api/reports", () => {
 
 describe("GET /api/reports/:slug and /raw", () => {
   it("returns meta with rawPath", async () => {
-    const res = await get("/api/reports/lh-guide-routine");
+    const res = await get("/api/reports/guide-routine");
     expect(await res.json()).toMatchObject({
-      slug: "lh-guide-routine",
+      slug: "guide-routine",
       title: "합성 생활 가이드",
-      rawPath: "/api/reports/lh-guide-routine/raw",
+      rawPath: "/api/reports/guide-routine/raw",
     });
   });
 
@@ -63,7 +65,7 @@ describe("GET /api/reports/:slug and /raw", () => {
   });
 
   it("serves markdown as plain text with the default CSP", async () => {
-    const res = await get("/api/reports/lh-guide-routine/raw");
+    const res = await get("/api/reports/guide-routine/raw");
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("text/markdown");
     expect(res.headers.get("Content-Security-Policy")).toBe(CSP);
@@ -71,7 +73,7 @@ describe("GET /api/reports/:slug and /raw", () => {
   });
 
   it("serves HTML with the report-only CSP (sandbox iframe use)", async () => {
-    const res = await get("/api/reports/lh-report-summary/raw");
+    const res = await get("/api/reports/report-summary/raw");
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toContain("text/html");
     expect(res.headers.get("Content-Security-Policy")).toBe(reportCsp);
@@ -80,22 +82,22 @@ describe("GET /api/reports/:slug and /raw", () => {
   });
 
   it("404 when the body is missing and no R2 is bound", async () => {
-    h.fake.sqlite.exec("UPDATE report_doc SET body = NULL WHERE slug = 'lh-wiki-terms'");
-    const res = await get("/api/reports/lh-wiki-terms/raw");
+    h.fake.sqlite.exec("UPDATE report_doc SET body = NULL WHERE slug = 'wiki-terms'");
+    const res = await get("/api/reports/wiki-terms/raw");
     expect(res.status).toBe(404);
   });
 
   it("falls back to R2 when body is NULL and FILES exists", async () => {
-    h.fake.sqlite.exec("UPDATE report_doc SET body = NULL WHERE slug = 'lh-wiki-terms'");
+    h.fake.sqlite.exec("UPDATE report_doc SET body = NULL WHERE slug = 'wiki-terms'");
     h.env.FILES = {
       get: () => Promise.resolve({ text: () => Promise.resolve("# R2 본문") }),
     } as unknown as R2Bucket;
-    const res = await get("/api/reports/lh-wiki-terms/raw");
+    const res = await get("/api/reports/wiki-terms/raw");
     expect(await res.text()).toBe("# R2 본문");
     h.env.FILES = {
       get: () => Promise.resolve(null),
     } as unknown as R2Bucket;
-    expect((await get("/api/reports/lh-wiki-terms/raw")).status).toBe(404);
+    expect((await get("/api/reports/wiki-terms/raw")).status).toBe(404);
   });
 });
 

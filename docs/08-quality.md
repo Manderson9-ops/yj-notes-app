@@ -14,7 +14,7 @@
 | Q-BUNDLE | 빌드물 | `dist/` 검사 | fixture 외 한글 장문·S1 표지어 0, 소스맵 미배포 |
 | Q-E2E | 종단 | Playwright(모바일 360px, Chromium·WebKit) | 핵심 흐름 4개 통과 |
 | Q-A11Y | 접근성 | axe-core(Playwright) | serious/critical 0 |
-| Q-PERF | 성능 | Lighthouse CI(모바일) | Performance ≥ 90, LCP ≤ 2.5s, JS ≤ 200KB gzip |
+| Q-PERF | 성능 | Lighthouse CI(모바일) + `npm run size:check` | Performance ≥ 90, LCP ≤ 2.5s, **전체 JS ≤ 200KB gzip**(lazy 청크 포함), **초기 로드(index.html 이 부르는 JS+CSS) ≤ main 기준값 119.50KB + 20KB**, 폰트 파일당 ≤ 80KiB. 측정법·현재 수치: `docs/design/theme-system.md` §4 |
 | Q-INGEST | 적재 | `tools/ingest verify` (fixtures 로) | I1~I7 통과 |
 
 ## 2. 핵심 E2E 흐름

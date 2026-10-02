@@ -4,7 +4,7 @@ import type { MockModule } from "./index.ts";
 /** FAKE 자료실 API (합성 자료만). 응답 모양은 server/routes/reports.ts 와 같다. */
 const DOCS = [
   {
-    slug: "lh-wiki-terms",
+    slug: "wiki-terms",
     title: "합성 용어 모음",
     kind: "markdown",
     group: "wiki",
@@ -13,7 +13,7 @@ const DOCS = [
     verifyOk: false,
   },
   {
-    slug: "lh-guide-routine",
+    slug: "guide-routine",
     title: "합성 생활 가이드",
     kind: "markdown",
     group: "guide",
@@ -22,7 +22,7 @@ const DOCS = [
     verifyOk: true,
   },
   {
-    slug: "lh-report-summary",
+    slug: "report-summary",
     title: "합성 발달 보고서",
     kind: "html",
     group: "report",
@@ -31,6 +31,17 @@ const DOCS = [
     verifyOk: true,
   },
 ] as const;
+
+// 목록에는 없는 문서: 가족 기록 경고의 가이드 링크(guide/05#3-1 -> guide-05) 시험용
+const GUIDE_05 = {
+  slug: "guide-05",
+  title: "합성 대응 가이드",
+  kind: "markdown",
+  group: "guide",
+  generatedAt: "2020-09-04T00:00:00Z",
+  sourceCommit: "fixture0000",
+  verifyOk: true,
+} as const;
 
 const para = (n: number) =>
   `${String(n)}번째 문단. 긴 글을 읽을 때는 한 줄이 너무 길지 않아야 눈이 편하다. 큰 글씨로 바꿔도 줄바꿈이 자연스러워야 하고, 목차로 원하는 곳까지 바로 이동할 수 있어야 한다. 이 문장들은 화면 확인용으로 새로 쓴 합성 글이다.`;
@@ -77,6 +88,22 @@ const GUIDE_MD = [
   para(6),
 ].join("\n");
 
+const GUIDE_05_MD = [
+  "# 합성 대응 가이드",
+  "",
+  "## 3. 합성 상황별 안내",
+  "",
+  "### 3-1. 합성 상황 하나",
+  "",
+  para(9),
+  "",
+  "### 3-2. 합성 상황 둘",
+  "",
+  para(10),
+  para(11),
+  para(12),
+].join("\n");
+
 const WIKI_MD = [
   "# 합성 용어 모음",
   "",
@@ -111,7 +138,7 @@ export const libraryMock: MockModule = {
       return;
     }
     const m = /^\/([^/]+)(\/raw)?$/.exec(subPath);
-    const doc = DOCS.find((d) => d.slug === m?.[1]);
+    const doc = [...DOCS, GUIDE_05].find((d) => d.slug === m?.[1]);
     if (!m || !doc) {
       send(404, { error: "not_found", message: "찾을 수 없어요." });
       return;
@@ -129,6 +156,8 @@ export const libraryMock: MockModule = {
     }
     res.statusCode = 200;
     res.setHeader("Content-Type", "text/markdown; charset=utf-8");
-    res.end(doc.slug === "lh-guide-routine" ? GUIDE_MD : WIKI_MD);
+    res.end(
+      doc.slug === "guide-routine" ? GUIDE_MD : doc.slug === "guide-05" ? GUIDE_05_MD : WIKI_MD,
+    );
   },
 };

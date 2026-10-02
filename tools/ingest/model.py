@@ -478,6 +478,31 @@ def doc_title(kind: str, text: str, fallback: str) -> str:
     return fallback
 
 
+def _slug_part(text: str) -> str:
+    s = re.sub(r"[^a-z0-9_-]+", "-", text.lower()).strip("-_")
+    return s or hashlib.sha1(text.encode("utf-8")).hexdigest()[:6]
+
+
+def doc_slug(rel: str, used: set[str]) -> str:
+    """문서 주소 규칙: `<폴더>-<번호 또는 영문 이름>` (ASCII, 서버 slug 형식 ^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$).
+
+    폴더 이름이 묶음(guide/wiki/그 외=보고서)을 정한다(server/routes/reports.ts reportGroup).
+    파일 이름이 `05-제목.md` 처럼 숫자로 시작하면 숫자만 쓴다(`guide-05`, 가족 기록 경고 가이드의 `guide/05`
+    와 같은 주소). 그렇지 않으면 영문·숫자만 남기고(없으면 이름의 해시 6자). 겹치면 `-2`, `-3` 을 붙인다.
+    """
+    folder, _, name = rel.partition("/")
+    stem = name.rsplit(".", 1)[0] if name else folder
+    m = re.match(r"\d+", stem)
+    key = m.group(0) if m else _slug_part(stem)
+    base = f"{_slug_part(folder)}-{key}"[:76]
+    slug, n = base, 1
+    while slug.lower() in used:
+        n += 1
+        slug = f"{base}-{n}"
+    used.add(slug.lower())
+    return slug
+
+
 def git_commit(data_dir: Path) -> str:
     try:
         r = subprocess.run(
@@ -503,13 +528,11 @@ def build_docs(src: Sources, cfg: Config, commit: str) -> list[Row]:
                 continue
             picked.setdefault(rel, (p, rule.kind))
     rels = sorted(picked)
-    stems = [r.rsplit(".", 1)[0] for r in rels]
-    lower_counts: dict[str, int] = {}
-    for s in stems:
-        lower_counts[s.lower()] = lower_counts.get(s.lower(), 0) + 1
     rows: list[Row] = []
-    for rel, stem in zip(rels, stems, strict=True):
+    used: set[str] = set()
+    for rel in rels:
         p, kind = picked[rel]
+        slug = doc_slug(rel, used)
         raw = src.read(p)
         try:
             text = raw.decode("utf-8")
@@ -518,7 +541,7 @@ def build_docs(src: Sources, cfg: Config, commit: str) -> list[Row]:
         mtime = datetime.fromtimestamp(p.stat().st_mtime, UTC).strftime("%Y-%m-%d")
         rows.append(
             {
-                "slug": rel if lower_counts[stem.lower()] > 1 else stem,
+                "slug": slug,
                 "title": doc_title(kind, text, Path(rel).stem),
                 "kind": kind,
                 "r2_key": "",  # 본문은 D1 body 칸(이 값이 빈 문자열이면 R2 가 아님)

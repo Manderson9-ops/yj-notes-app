@@ -49,7 +49,7 @@
 
 ## 보고서·문서 (F1)
 
-| GET | `/reports` | `{items:[{slug, title, kind, group, generatedAt, sourceCommit, verifyOk}]}` 최신순. `group` = `report`/`guide`/`wiki`(slug 규칙, docs/03). 본문 없음 |
+| GET | `/reports` | `{items:[{slug, title, kind, group, generatedAt, sourceCommit, verifyOk}]}` 최신순. `group` = `report`/`guide`/`wiki`(slug 첫 마디 규칙, docs/03). 본문 없음 |
 | GET | `/reports/:slug` | 메타 + `rawPath`. 형식이 틀리거나 없으면 `404 not_found` |
 | GET | `/reports/:slug/raw` | 마크다운: `text/markdown` 원문(기본 CSP). HTML: `text/html` + 보고서 전용 CSP(`reportCsp`), `sandbox="allow-scripts"` iframe 으로만 연다. 본문은 `report_doc.body`, 없으면 R2(`FILES`), 둘 다 없으면 `404` |
 

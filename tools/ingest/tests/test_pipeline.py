@@ -162,9 +162,9 @@ def test_boundary_values(exported):
     )
     # 문서: 원문 보존, 제목, 빈 r2_key, verify_ok 는 export 단계에서 0
     docs = {r[0]: r for r in db.execute("SELECT slug, title, kind, r2_key, verify_ok, body FROM report_doc")}
-    assert set(docs) == {"guide/01-sample-guide", "wiki/01-sample-wiki", "reports/sample-report"}
-    assert docs["reports/sample-report"][1] == "합성 보고서 & 제목"
-    assert docs["reports/sample-report"][2] == "html"
+    assert set(docs) == {"guide-01", "wiki-01", "reports-sample-report"}
+    assert docs["reports-sample-report"][1] == "합성 보고서 & 제목"
+    assert docs["reports-sample-report"][2] == "html"
     assert all(d[3] == "" and d[4] == 0 for d in docs.values())
 
 

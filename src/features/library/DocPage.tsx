@@ -1,7 +1,8 @@
 // S41 문서 보기: 마크다운은 안전 렌더 + 목차(h2) 점프, HTML 은 sandbox iframe 으로 /raw 를 연다.
-import { useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
 import "./library.css";
+import { findHeadingId } from "./anchor";
 import { useReportMeta, useReportRaw } from "./api";
 import { formatKoDate } from "./format";
 import { LoadError } from "./LoadError";
@@ -32,6 +33,14 @@ export default function DocPage() {
       : all;
   }, [raw.data, meta.data?.title]);
   const toc = blocks.filter((b) => b.t === "h" && b.level <= 2);
+
+  // `#3-1` 처럼 절을 가리키는 주소(가족 기록 경고의 가이드 링크): 그 제목으로 이동. 없으면 처음부터 보여 주고 안내.
+  const { hash } = useLocation();
+  const anchorId = useMemo(() => (hash ? findHeadingId(blocks, hash) : null), [blocks, hash]);
+  const anchorMissing = hash !== "" && blocks.length > 0 && anchorId === null;
+  useEffect(() => {
+    if (anchorId) jumpTo(anchorId);
+  }, [anchorId]);
 
   return (
     <>
@@ -70,6 +79,11 @@ export default function DocPage() {
             <LoadError error={raw.error} onRetry={() => void raw.refetch()} />
           ) : (
             <>
+              {anchorMissing ? (
+                <p className="meta doc-note" role="status">
+                  가리킨 절을 찾지 못했어요. 문서 처음부터 보여 드려요.
+                </p>
+              ) : null}
               {toc.length >= 2 ? (
                 <details className="doc-toc">
                   <summary>목차 ({toc.length})</summary>

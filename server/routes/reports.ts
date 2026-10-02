@@ -19,11 +19,15 @@ interface ReportRow {
 
 export type ReportGroup = "report" | "guide" | "wiki";
 
-/** slug 에 `guide`/`wiki` 마디(-로 나눈)가 있으면 그 묶음, 아니면 보고서. 스키마를 바꾸지 않는 규칙(docs/05). */
+/**
+ * slug 의 첫 마디(-·_ 로 나눈)가 `guide`/`wiki` 면 그 묶음, 아니면 보고서. 스키마를 바꾸지 않는 규칙(docs/03·05).
+ * 적재 도구가 slug 를 `<폴더>-<번호|이름>` 으로 만든다(tools/ingest/model.py doc_slug). 가운데 마디는 보지 않는다
+ * (보고서 `report-behavior-guide` 가 가이드로 잘못 묶이지 않게).
+ */
 export function reportGroup(slug: string): ReportGroup {
-  const parts = slug.toLowerCase().split(/[-_]/);
-  if (parts.includes("guide")) return "guide";
-  if (parts.includes("wiki")) return "wiki";
+  const first = slug.toLowerCase().split(/[-_]/)[0];
+  if (first === "guide") return "guide";
+  if (first === "wiki") return "wiki";
   return "report";
 }
 

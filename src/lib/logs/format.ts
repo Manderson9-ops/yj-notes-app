@@ -50,7 +50,12 @@ export function summarizePayload(type: LogType, payload: Record<string, unknown>
   return parts.join(" · ");
 }
 
-/** 가이드 경로("guide/05#3-1")를 앱 안 링크로. 자료 화면(별도 작업)이 이 주소를 받는다. */
+/**
+ * 가이드 경로("guide/05#3-1")를 앱 안 링크로: `/library/doc/guide-05#3-1`.
+ * 문서 주소는 적재 도구 규칙(`<폴더>-<번호>`, tools/ingest/model.py doc_slug)과 같다. `#` 뒤는 절 번호다.
+ */
 export function guideHref(guide: string): string {
-  return `/library/${guide}`;
+  const [path = "", anchor] = guide.split("#");
+  const slug = path.split("/").filter(Boolean).join("-").toLowerCase();
+  return `/library/doc/${slug}${anchor ? `#${anchor}` : ""}`;
 }

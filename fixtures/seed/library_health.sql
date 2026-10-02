@@ -5,7 +5,7 @@
 INSERT OR REPLACE INTO app_setting (key, value) VALUES ('child_birth_date', '2020-01-15');
 INSERT OR REPLACE INTO app_setting (key, value) VALUES ('child_sex', 'F');
 
-INSERT INTO report_doc (slug, title, kind, r2_key, generated_at, source_commit, verify_ok, sha256, body) VALUES ('lh-report-summary', '합성 발달 보고서', 'html', 'reports/lh-report-summary/7777777777777777777777777777777777777777777777777777777777777777.html', '2020-09-01T00:00:00Z', 'fixture0000', 1, '7777777777777777777777777777777777777777777777777777777777777777', '<!doctype html>
+INSERT INTO report_doc (slug, title, kind, r2_key, generated_at, source_commit, verify_ok, sha256, body) VALUES ('report-summary', '합성 발달 보고서', 'html', 'reports/report-summary/7777777777777777777777777777777777777777777777777777777777777777.html', '2020-09-01T00:00:00Z', 'fixture0000', 1, '7777777777777777777777777777777777777777777777777777777777777777', '<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><title>합성 발달 보고서</title>
 <style>body{font-family:sans-serif;margin:16px;line-height:1.6}h1{font-size:1.3em}.box{border:1px solid #888;padding:8px;border-radius:8px}</style>
 </head><body>
@@ -14,7 +14,7 @@ INSERT INTO report_doc (slug, title, kind, r2_key, generated_at, source_commit, 
 <p>이 문서는 sandbox iframe 안에서만 열리는 합성 HTML 이다.</p>
 <script>document.getElementById("out").textContent = "스크립트 실행됨";</script>
 </body></html>');
-INSERT INTO report_doc (slug, title, kind, r2_key, generated_at, source_commit, verify_ok, sha256, body) VALUES ('lh-guide-routine', '합성 생활 가이드', 'markdown', 'reports/lh-guide-routine/6666666666666666666666666666666666666666666666666666666666666666.md', '2020-09-02T00:00:00Z', 'fixture0000', 1, '6666666666666666666666666666666666666666666666666666666666666666', '# 합성 생활 가이드
+INSERT INTO report_doc (slug, title, kind, r2_key, generated_at, source_commit, verify_ok, sha256, body) VALUES ('guide-routine', '합성 생활 가이드', 'markdown', 'reports/guide-routine/6666666666666666666666666666666666666666666666666666666666666666.md', '2020-09-02T00:00:00Z', 'fixture0000', 1, '6666666666666666666666666666666666666666666666666666666666666666', '# 합성 생활 가이드
 
 이 문서는 화면 시안용 합성 글이다. 실제 가정의 자료와 관계가 없다.
 
@@ -52,7 +52,7 @@ INSERT INTO report_doc (slug, title, kind, r2_key, generated_at, source_commit, 
 ```
 예시 코드 블록: 2020-03-02 / 기록 3건
 ```');
-INSERT INTO report_doc (slug, title, kind, r2_key, generated_at, source_commit, verify_ok, sha256, body) VALUES ('lh-wiki-terms', '합성 용어 모음', 'markdown', 'reports/lh-wiki-terms/3333333333333333333333333333333333333333333333333333333333333333.md', '2020-09-03T00:00:00Z', 'fixture0000', 0, '3333333333333333333333333333333333333333333333333333333333333333', '# 합성 용어 모음
+INSERT INTO report_doc (slug, title, kind, r2_key, generated_at, source_commit, verify_ok, sha256, body) VALUES ('wiki-terms', '합성 용어 모음', 'markdown', 'reports/wiki-terms/3333333333333333333333333333333333333333333333333333333333333333.md', '2020-09-03T00:00:00Z', 'fixture0000', 0, '3333333333333333333333333333333333333333333333333333333333333333', '# 합성 용어 모음
 
 화면에서 쓰는 낱말을 짧게 풀어 둔 합성 위키 문서다.
 

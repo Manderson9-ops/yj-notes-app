@@ -209,6 +209,12 @@
   color: var(--c-on-accent);
 }
 
+/* .btn 규칙(위)이 공용 .btn-danger 를 덮지 않게 같은 명시도로 다시 지정한다 */
+:root[data-theme="crayon"] .btn-danger {
+  background: transparent;
+  color: var(--c-alert);
+}
+
 :root[data-theme="crayon"] .chip[aria-pressed="true"] {
   border-color: var(--c-border);
 }

@@ -46,7 +46,7 @@ test("흐름 2: 저녁 식사를 30초 안에 입력 -> 목록·요약 반영 ->
   await expect(page.getByText("이번 주 1번째 기록")).toBeVisible();
   await expect(page.getByText("떼쓴 시간 25분 이상이 기록됐어요.")).toBeVisible();
   const guide = page.getByRole("link", { name: "도움 받을 때 기준 보기" });
-  await expect(guide).toHaveAttribute("href", "/library/guide/05#3-1");
+  await expect(guide).toHaveAttribute("href", "/library/doc/guide-05#3-1");
   await expect(page.locator("main")).not.toContainText(/잘했|훌륭|정상|지연|달성|미달/);
 
   await page.getByRole("link", { name: "기록 목록" }).click();
@@ -60,7 +60,7 @@ test("흐름 2: 저녁 식사를 30초 안에 입력 -> 목록·요약 반영 ->
   const alerts = page.getByRole("region", { name: /도움 받을 때 기준에 해당한 기록 1건/ });
   await expect(alerts.getByRole("link", { name: "도움 받을 때 기준 보기" })).toHaveAttribute(
     "href",
-    "/library/guide/05#3-1",
+    "/library/doc/guide-05#3-1",
   );
 
   // 종류를 고르면 주차 비교와 교차표
@@ -209,4 +209,11 @@ test("기본 기록자는 이 기기에 기억된다", async ({ page }) => {
   await btn(page, "하나 더 기록하기").click();
   await answerMeal(page);
   await expect(btn(page, "엄마")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("홈의 오늘 기록하기 -> 기록 입력 화면(/logs/new)", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: "오늘 기록하기" }).click();
+  await expect(page).toHaveURL(/\/logs\/new$/);
+  await expect(btn(page, "저녁 식사")).toBeVisible();
 });

@@ -56,6 +56,15 @@ npm run ingest:status -- --remote         # matches_manifest: true
 - `--remote` 는 `--yes` 없이는 동작하지 않는다. 개발·검증은 `--local` 로(`npm run db:migrate:local` 이 선행).
 - Python 3.11+ 가 필요하다(런타임 패키지 없음). 없으면 `INGEST_PYTHON` 에 경로를 지정한다.
 
+### 3-1c. 아이 설정값 (관리자, 1회)
+성장 곡선이 월령·기준표를 고르는 값은 저장소·마이그레이션에 **넣지 않는다**(공개 저장소). 관리자가 운영 DB 에 직접 넣는다. 값은 자리표시이며, 실제 값은 이 문서·커밋·로그에 적지 않는다.
+```
+wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (key, value) VALUES ('child_birth_date', '<YYYY-MM-DD>')"
+wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (key, value) VALUES ('child_sex', '<F 또는 M>')"
+```
+- 키가 없을 때: `child_birth_date` 가 없으면 측정 월령 대신 **검진 회차의 개월 수**로 대체한다. `child_sex` 가 없으면 기준표는 `F` 로 읽는다(`M` 일 때만 남아용 기준표). 그래서 성별이 `M` 이면 반드시 넣는다.
+- 로컬 개발은 `--remote` 대신 `--local`. 합성 값은 `fixtures/seed/library_health.sql` 에만 있다.
+
 ### 3-2. Functions 실행 범위와 무료 한도
 - 보안 헤더 미들웨어(`functions/_middleware.ts`)를 **모든 요청**(정적 파일 포함)에 적용하려고 `_routes.json` 을 두지 않는다. 따라서 Functions 가 모든 요청에서 실행된다.
 - Pages Functions 는 Workers 무료 한도(일 100,000 요청)를 **공유**한다. 정적 파일 요청도 포함되므로 O-04 에서 사용량을 본다.
