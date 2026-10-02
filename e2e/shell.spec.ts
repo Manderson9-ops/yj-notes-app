@@ -45,7 +45,8 @@ test("tab navigation", async ({ page }) => {
     await nav.getByRole("link", { name }).click();
     await expect(page).toHaveURL(path);
     await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
-    await expect(page.getByText("준비 중")).toBeVisible();
+    // 홈·알림장은 실제 화면(T-C1). 아직 준비 중인 탭만 자리표시 문구를 확인한다.
+    if (name === "기록" || name === "자료") await expect(page.getByText("준비 중")).toBeVisible();
   }
 });
 

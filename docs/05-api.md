@@ -17,14 +17,35 @@
 
 ## 대시보드
 
-| GET | `/overview` | `{noteDays, reports, range:{from,to}, lastIngest:{at,status,commit}, milestones:{observed,unobserved,undetectable}, recentLogs:[…5]}` — 모든 숫자는 쿼리로(P3) |
+| GET | `/overview` | 아래 「/overview 응답」 — 모든 숫자는 쿼리로(P3). 자료가 없으면 0·빈 배열·`null`(오류 아님) |
+
+### /overview 응답 (T-C1 구현, 정본 `src/lib/notesSchemas.ts` `overviewSchema`)
+
+```
+{ noteDays, reports, comments,
+  range: {from,to} | null,                       // 알림장 날짜 범위
+  lastIngest: {at, status:'ok', commit} | null,  // 마지막 성공 적재(finished_at, 없으면 started_at)
+  milestones: {observed, unobserved},            // observation 에 나온 이정표 수 / 나머지
+  recentNotes: [{date, ageMonths, firstLine, nComments}] ×3,   // 홈 카드용(문서 초안에 없던 필드)
+  recentLogs: [{id, type, typeLabel, occurredOn, recorder, note}] ×5  // family_log, 삭제 제외
+}
+```
+
+- 초안과 다른 점: `undetectable` 은 스키마에 근거 열이 없어 뺐다(꾸며낸 숫자 방지). `comments`·`recentNotes` 를 더했다.
 
 ## 알림장 (F4)
 
 | 메서드 | 경로 | 파라미터 | 응답 |
 |---|---|---|---|
-| GET | `/notes` | `q`(≤40자), `from`, `to`, `class`, `cursor`, `limit`(≤50) | `{items:[{date, class, nReports, nComments, firstLine, hit?}], nextCursor}` |
-| GET | `/notes/:date` | — | `{date, class, ageMonths, items:[{reportId, authorRole, direction, postedAt, body, comments:[…]}], sourceUrls}` |
+| GET | `/notes` | `q`(≤40자), `from`, `to`, `class`, `cursor`, `limit`(기본 20, ≤50) | `{items:[{date, class, ageMonths, nReports, nComments, firstLine, hit?}], nextCursor}` |
+| GET | `/notes/:date` | — | `{date, class, ageMonths, items:[{reportId, authorRole, direction, weather, postedAt, body, comments:[{id, who, postedAt, body}]}], prev, next}` |
+
+구현 메모 (T-C1, 정본 `src/lib/notesSchemas.ts`):
+- 목록은 날짜 내림차순. `cursor` 는 직전 페이지 마지막 `date`(그보다 오래된 날부터). `nextCursor` 가 `null` 이면 끝.
+- `q`: 본문과 댓글에서 부분 일치(D1 `LIKE ... ESCAPE '\'`, `%` `_` `\` 는 글자 그대로). 대소문자는 ASCII 만 무시. FTS5 는 D-05 스파이크 뒤로 미룸. 500일 합성 자료에서 검색 3회 합계 10ms 안팎(node:sqlite; 한도 1초는 테스트로 고정).
+- `hit`: `{source:'body'|'comment', text, ranges:[[start,end]], cutStart, cutEnd}` — `text` 는 일치 주변 발췌(앞 24자·뒤 48자), `ranges` 는 `text` 안의 일치 구간(UTF-16 코드 단위), `cutStart/cutEnd` 는 앞뒤가 잘렸는지. 본문 일치가 있으면 본문, 없으면 댓글.
+- 상세 `prev`(더 오래된 날)·`next`(더 최근 날)는 `note_day` 기준, 없으면 `null`. `ageMonths` 는 `note_day.age_months`(생일 설정 불필요, 마이그레이션 없음).
+- 초안과 다른 점: `sourceUrls` 는 저장된 값이 없어 뺐다. `direction`·`weather`·댓글 `who`(parent/teacher)를 응답에 포함. 잘못된 쿼리·날짜는 `400 bad_request`, 없는 날은 `404 not_found`.
 
 ## 보고서·문서 (F1)
 

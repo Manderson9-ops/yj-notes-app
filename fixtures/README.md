@@ -32,3 +32,5 @@
 - 알림장 30일(32건, 하루 2건 2일), 댓글 40개(0개인 알림장 다수), 빈 본문·이모지·CRLF·작은따옴표·아주 긴 본문(약 60KB, D1 문장 한도 초과 경로), 이정표 10개, 관측 11건, 성장 기준 12행, 검진 1건(UNCERTAIN 계측 포함), 문서 3개.
 - 실제 폴더 이름(`alrimjang`·`records`·`_source`)은 가드(G1)가 저장소 어디서나 막으므로 다른 이름(`notes`·`checkups`·`source`)을 쓰고 `ingest.config.json` 이 가리킨다. xlsx 는 바이너리라 둘 수 없어 같은 열의 csv 를 쓴다(xlsx 읽기는 테스트가 코드로 만들어 검증한다).
 - 파일은 손으로 고치지 않는다: `python -m tools.ingest.tests.gen_fixture` 로 다시 만든다(테스트가 저장된 파일과 바이트 단위로 비교). 일자 md 는 실제 빌더 형식을 따르되 원본 URL 줄은 뾀다(가드 G3).
+
+파일: `seed/fixtures.sql`(알림장 30일·댓글 37개 등) + `seed/notes-edge.sql`(알림장 경계값 보충: 빈 본문, 아주 긴 본문(생성식), `% _ \` 특수문자, 가정 메모 방향, 댓글 3개 → 합계 40개). 두 파일을 순서대로 실행한다(`server/routes/notes.test.ts` 가 함께 쓴다). 500일 성능 시험용 자료는 파일이 아니라 그 테스트 안에서 생성한다. mock API(`dev:mock`) 는 별도로 합성 62일을 코드로 만든다(`vite-plugins/mock/notesData.ts`).
