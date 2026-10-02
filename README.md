@@ -24,6 +24,7 @@ npm ci                 # 의존성 설치 (정확한 버전 고정)
 npm run dev            # 개발 서버 http://127.0.0.1:5173
 npm run check          # 타입 + 린트 + 포맷 + 단위 테스트 + 유출 방지 가드
 npm run guard          # 유출 방지 검사 (tools/guard/README.md)
+npm run fonts:subset   # 장식 폰트 부분 집합 woff2 다시 만들기 (UI 문구를 바꾼 뒤, public/fonts/)
 npm run build          # 프로덕션 빌드 (dist/)
 npx playwright install chromium webkit   # 최초 1회
 npm run test:e2e       # 모바일(360px) E2E

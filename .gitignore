@@ -65,3 +65,6 @@ desktop.ini
 
 # 로컬 functions 빌드 확인 산출물
 .tmp-fn/
+
+# 폰트 원본 TTF 캐시 (tools/fonts/subset.ts)
+.cache/
