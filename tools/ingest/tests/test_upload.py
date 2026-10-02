@@ -221,3 +221,29 @@ def test_sanitize_error_hides_sql_fragments():
     assert "too many terms in compound SELECT" in sanitize_error(json_err)
     leaky = '"text": "near \'secret body\': syntax error: SQLITE_ERROR"'
     assert "secret body" not in sanitize_error(leaky)
+
+
+def test_upload_stops_before_touching_db_when_migration_missing(verified: Path, tmp_path: Path):
+    """0004 가 d1_migrations 에 없으면 DB 를 건드리지 않고 안내와 함께 멈춘다(ingest_run 도 남기지 않는다)."""
+    r = SqliteRunner(tmp_path / "d1.sqlite")
+    r.run("DELETE FROM d1_migrations WHERE name LIKE '0004%'")
+    r.trace.clear()
+    with pytest.raises(UploadError, match=r"0004_report_doc_body\.sql.*db:migrate"):
+        upload(verified, r, log=lambda _: None)
+    assert r.query("SELECT COUNT(*) AS n FROM ingest_run")[0]["n"] == 0
+    assert not [s for s in r.trace if "INSERT INTO" in s or "DELETE FROM" in s]
+
+
+def test_upload_stops_when_migration_table_is_absent(verified: Path, tmp_path: Path):
+    r = SqliteRunner(tmp_path / "d1.sqlite", record_migrations=False)
+    with pytest.raises(UploadError, match=r"d1_migrations.*db:migrate"):
+        upload(verified, r, log=lambda _: None)
+
+
+def test_upload_stops_when_body_column_is_missing(verified: Path, tmp_path: Path):
+    """표시는 있는데 실제 칸이 없는 DB(수동 작업)도 막는다."""
+    r = SqliteRunner(tmp_path / "d1.sqlite")
+    r.run("ALTER TABLE report_doc DROP COLUMN body")
+    with pytest.raises(UploadError, match=r"report_doc\.body"):
+        upload(verified, r, log=lambda _: None)
+    assert r.query("SELECT COUNT(*) AS n FROM ingest_run")[0]["n"] == 0

@@ -10,6 +10,7 @@ from tools.ingest.config import load_config
 from tools.ingest.export import MANIFEST, REPO_ROOT, Generated, generate, write_output
 from tools.ingest.sqlgen import INSERT_ORDER
 from tools.ingest.verify import verify, write_report
+from tools.ingest.wrangler import RunnerError
 
 FIXTURE = REPO_ROOT / "fixtures" / "data_dir"
 MIGRATIONS = sorted((REPO_ROOT / "migrations").glob("*.sql"))
@@ -20,7 +21,7 @@ class SqliteRunner:
 
     label = "test:sqlite"
 
-    def __init__(self, path: Path, fail_on_call: int | None = None) -> None:
+    def __init__(self, path: Path, fail_on_call: int | None = None, record_migrations: bool = True) -> None:
         self.path = path
         self.fail_on_call = fail_on_call
         self.calls = 0
@@ -29,6 +30,13 @@ class SqliteRunner:
         conn = self._conn()
         for m in MIGRATIONS:
             conn.executescript(m.read_text(encoding="utf-8"))
+        if record_migrations:  # wrangler d1 migrations apply 가 남기는 표와 같은 모양
+            conn.execute(
+                "CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, "
+                "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)"
+            )
+            conn.executemany("INSERT INTO d1_migrations (name) VALUES (?)", [(m.name,) for m in MIGRATIONS])
+            conn.commit()
         conn.close()
 
     def _conn(self) -> sqlite3.Connection:
@@ -52,8 +60,12 @@ class SqliteRunner:
 
     def query(self, sql: str) -> list[dict]:
         conn = self._conn()
-        rows = [dict(r) for r in conn.execute(sql).fetchall()]
-        conn.close()
+        try:
+            rows = [dict(r) for r in conn.execute(sql).fetchall()]
+        except sqlite3.Error as e:  # 실제 WranglerRunner 처럼 실행 실패는 RunnerError
+            raise RunnerError(f"쿼리 실패: {type(e).__name__}") from e
+        finally:
+            conn.close()
         return rows
 
     def run(self, sql: str, *params: object) -> None:

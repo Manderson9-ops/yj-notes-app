@@ -23,6 +23,27 @@ class UploadError(RuntimeError):
     pass
 
 
+# 적재가 기대는 마이그레이션(문서 원문 body 칸). 더 새 마이그레이션은 이 이름이 적용된 뒤에만 있을 수 있다.
+REQUIRED_MIGRATION = "0004_report_doc_body.sql"
+
+
+def check_migrations(runner: Runner) -> None:
+    """적재 전에 대상 DB 에 필요한 마이그레이션이 적용됐는지 본다. 아니면 DB 를 건드리기 전에 멈춘다."""
+    hint = "먼저 `npm run db:migrate:local`(로컬) 또는 `npm run db:migrate:prod`(운영)을 실행하세요"
+    try:
+        applied = {str(r["name"]) for r in runner.query("SELECT name FROM d1_migrations")}
+    except (RunnerError, KeyError) as e:
+        raise UploadError(
+            f"대상 DB 에서 적용된 마이그레이션 목록(d1_migrations)을 읽지 못했습니다. {hint}"
+        ) from e
+    if REQUIRED_MIGRATION not in applied:
+        raise UploadError(f"마이그레이션 {REQUIRED_MIGRATION} 이(가) 대상 DB 에 적용되지 않았습니다. {hint}")
+    try:  # 표시만이 아니라 실제 칸이 있는지도 본다(수동으로 만든 DB 대비)
+        runner.query("SELECT body FROM report_doc LIMIT 0")
+    except RunnerError as e:
+        raise UploadError(f"report_doc.body 칸이 없습니다. {hint}") from e
+
+
 def _iso(now: datetime | None) -> str:
     return (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -86,6 +107,7 @@ def upload(
     log: Callable[[str], None] = print,
 ) -> dict:  # type: ignore[type-arg]
     manifest = load_checked(out_dir)
+    check_migrations(runner)
     rep = json.loads((out_dir / VERIFY).read_bytes())
     started = _iso(now)
     try:
