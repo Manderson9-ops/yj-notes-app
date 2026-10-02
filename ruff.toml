@@ -1,0 +1,14 @@
+# tools/ingest (Python) 전용. 저장소의 나머지는 TypeScript 라 ruff 대상이 아니다.
+line-length = 110
+target-version = "py311"
+src = ["."]
+include = ["tools/ingest/**/*.py"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = [
+  "E501", # 줄 길이는 ruff format 이 코드에 적용한다. 한국어 문자열·주석은 그대로 둔다
+  "RUF001", # 한국어 문자열의 전각 문자
+  "RUF002",
+  "RUF003",
+]

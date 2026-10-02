@@ -25,4 +25,10 @@
 - 가족 기록 각 종류 5건
 - 경계값: 하루 2건 알림장, 댓글 0건, 빈 본문, 이모지, 아주 긴 본문(2MB 미만), UNCERTAIN 계측
 
-현재는 규칙 문서만 있고 자료 파일은 아직 없다.
+## `data_dir/` (T-B1: ingest 용 합성 DATA_DIR)
+
+실제 `DATA_DIR` 과 같은 구조의 **합성** 폴더다. `tools/ingest` 테스트가 export → verify → 적용을 돌린다.
+
+- 알림장 30일(32건, 하루 2건 2일), 댓글 40개(0개인 알림장 다수), 빈 본문·이모지·CRLF·작은따옴표·아주 긴 본문(약 60KB, D1 문장 한도 초과 경로), 이정표 10개, 관측 11건, 성장 기준 12행, 검진 1건(UNCERTAIN 계측 포함), 문서 3개.
+- 실제 폴더 이름(`alrimjang`·`records`·`_source`)은 가드(G1)가 저장소 어디서나 막으므로 다른 이름(`notes`·`checkups`·`source`)을 쓰고 `ingest.config.json` 이 가리킨다. xlsx 는 바이너리라 둘 수 없어 같은 열의 csv 를 쓴다(xlsx 읽기는 테스트가 코드로 만들어 검증한다).
+- 파일은 손으로 고치지 않는다: `python -m tools.ingest.tests.gen_fixture` 로 다시 만든다(테스트가 저장된 파일과 바이트 단위로 비교). 일자 md 는 실제 빌더 형식을 따르되 원본 URL 줄은 뾀다(가드 G3).

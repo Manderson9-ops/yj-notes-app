@@ -1,0 +1,26 @@
+{
+  "reports_json": "source/synthetic_reports.json",
+  "notes_dir": "notes",
+  "observations_csv": "tracking/observations.csv",
+  "milestones_csv": "evidence/milestones.csv",
+  "growth_csv": "evidence/growth.csv",
+  "checkup_glob": "checkups/*.csv",
+  "docs": [
+    {
+      "dir": "guide",
+      "glob": "*.md",
+      "kind": "markdown"
+    },
+    {
+      "dir": "wiki",
+      "glob": "*.md",
+      "kind": "markdown"
+    },
+    {
+      "dir": "reports",
+      "glob": "*.html",
+      "kind": "html"
+    }
+  ],
+  "docs_exclude": []
+}
