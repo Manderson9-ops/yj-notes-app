@@ -18,7 +18,7 @@ import type { MockContext, MockModule } from "./index.ts";
  *
  * State is kept per browser session: the first request sets a `yj_mock_logs` cookie and every
  * request is served from that cookie's own store, so parallel e2e workers never see each other's logs.
- * Test hooks (mock only): GET /api/logs/__stats -> {puts, rows}; POST /api/logs/__fail {n} -> the next n PUTs get 503.
+ * Test hooks (mock only): GET /api/logs/__stats -> {puts, rows, putLog:[{id,at}]}; POST /api/logs/__fail {n} -> the next n PUTs get 503.
  */
 interface TypeInfo {
   code: string;
@@ -42,6 +42,8 @@ interface Row {
 interface Store {
   rows: Row[];
   puts: number;
+  /** PUT 한 번마다 {id, at(ms)} — 시험이 id 별 전송 횟수를 본다 */
+  putLog: { id: string; at: number }[];
   failNext: number;
 }
 
@@ -80,7 +82,7 @@ function scopeOf(req: IncomingMessage): { store: Store; setCookie?: string } {
   const known = m?.[1] !== undefined ? STORES.get(m[1]) : undefined;
   if (known) return { store: known };
   const id = m?.[1] ?? randomUUID();
-  const store: Store = { rows: [], puts: 0, failNext: 0 };
+  const store: Store = { rows: [], puts: 0, putLog: [], failNext: 0 };
   STORES.set(id, store);
   return { store, setCookie: `${COOKIE}=${id}; Path=/; SameSite=Strict` };
 }
@@ -115,7 +117,7 @@ async function handleLogs(req: IncomingMessage, ctx: MockContext): Promise<void>
   const live = () => store.rows.filter((r) => !r.deleted);
 
   if (sub === "__stats") {
-    ctx.send(200, { puts: store.puts, rows: live().length }, h);
+    ctx.send(200, { puts: store.puts, rows: live().length, putLog: store.putLog }, h);
     return;
   }
   if (sub === "__fail" && method === "POST") {
@@ -214,6 +216,7 @@ async function handleLogs(req: IncomingMessage, ctx: MockContext): Promise<void>
   }
   if (method === "PUT") {
     store.puts += 1;
+    store.putLog.push({ id, at: Date.now() });
     if (store.failNext > 0) {
       store.failNext -= 1;
       ctx.send(503, { error: "quota_exceeded", message: "잠시 후 다시 시도해 주세요." }, h);
