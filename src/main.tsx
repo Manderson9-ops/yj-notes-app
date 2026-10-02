@@ -18,6 +18,13 @@ if (!container) {
 
 initLargeText();
 initTheme();
+
+// 앱 껍데기만 캐시하는 서비스 워커(public/sw.js). 데이터(/api)는 캐시하지 않는다. 개발 서버에서는 켜지 않는다.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  });
+}
 const queryClient = createQueryClient();
 
 createRoot(container).render(

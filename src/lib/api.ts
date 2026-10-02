@@ -6,13 +6,22 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly retryAfterSec: number | undefined;
+  /** 422 validation_error: field name -> reason (docs/05). */
+  readonly fields: Record<string, string> | undefined;
 
-  constructor(status: number, code: string, message: string, retryAfterSec?: number) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    retryAfterSec?: number,
+    fields?: Record<string, string>,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.retryAfterSec = retryAfterSec;
+    this.fields = fields;
   }
 }
 
@@ -55,6 +64,7 @@ export async function api(
       body?.error ?? "unknown",
       body?.message ?? "",
       body?.retryAfterSec,
+      body?.fields,
     );
   }
   if (res.status === 204 || !options.schema) return undefined;

@@ -6,13 +6,22 @@ export function Chip({
   pressed,
   onPress,
   children,
+  size,
 }: {
   pressed: boolean;
   onPress: () => void;
   children: ReactNode;
+  /** lg: 한 화면에 질문 하나일 때 쓰는 큰 칩 */
+  size?: "lg";
 }) {
   return (
-    <button type="button" className="chip" aria-pressed={pressed} onClick={onPress}>
+    <button
+      type="button"
+      className="chip"
+      data-size={size}
+      aria-pressed={pressed}
+      onClick={onPress}
+    >
       <CheckIcon />
       <span>{children}</span>
     </button>

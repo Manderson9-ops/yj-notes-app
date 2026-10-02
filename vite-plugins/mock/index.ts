@@ -3,6 +3,7 @@ import { notesMock } from "./notes.ts";
 import { overviewMock } from "./overview.ts";
 import { checkupsMock, growthMock } from "./health.ts";
 import { libraryMock } from "./library.ts";
+import { logsModule, logTypesModule } from "./logs.ts";
 
 /**
  * FAKE API modules for `npm run dev:mock` (local UI work and e2e only, never in a build).
@@ -24,4 +25,12 @@ export interface MockContext {
   readJson: () => Promise<unknown>;
 }
 
-export const MOCK_MODULES: MockModule[] = [notesMock, overviewMock, libraryMock, checkupsMock, growthMock];
+export const MOCK_MODULES: MockModule[] = [
+  notesMock,
+  overviewMock,
+  libraryMock,
+  checkupsMock,
+  growthMock,
+  logsModule,
+  logTypesModule,
+];

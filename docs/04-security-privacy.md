@@ -57,6 +57,12 @@ Cache-Control: private, no-store        (모든 /api/*)
 
 - 기존 보고서 HTML 은 인라인 스크립트를 쓰므로 **`/api/reports/:slug/raw` 를 `sandbox="allow-scripts"`(allow-same-origin 없음) iframe** 으로만 띄운다. 그 응답에만 별도 CSP(`script-src 'unsafe-inline'`, `connect-src 'none'`)를 준다.
 
+### 4-1. 오프라인 대기열·서비스 워커 (F2-6)
+- **서비스 워커(`public/sw.js`)는 앱 껍데기만 캐시한다**: 화면 HTML 과 해시가 붙은 빌드 파일(`/assets/`, `/fonts/`). **`/api/*` 는 건드리지 않는다**(항상 네트워크, 저장 안 함). 이유: 가족 기록·알림장은 S1 이라 기기 캐시에 오래 남으면 안 된다. 껍데기에는 자료가 없다(ADR-0002).
+- **기록 대기열**은 IndexedDB(`yj-queue`)에 **아직 못 보낸 기록만** 두고, 보내면 지운다. 로그아웃해도 못 보낸 기록은 유실하지 않으려고 남기므로, 기기를 넘길 때는 먼저 연결해서 비우거나 브라우저 사이트 데이터를 지운다.
+- 대기열·서비스 워커 모두 같은 출처 스크립트(`script-src 'self'`)만 쓴다. 인라인 스크립트 없음.
+- 질문 정의(`log_type`)는 개인 자료가 아니라 `localStorage` 에 한 벌 기억해 오프라인에서도 입력 화면이 열린다.
+
 ## 5. 자료 분리 규칙 (공개 저장소 결정 D-01 의 구현)
 
 1. 실제 자료 경로는 환경변수 `DATA_DIR` 로만 받는다. 기본값 없음 — 없으면 CLI 가 멈춘다.

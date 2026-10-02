@@ -330,7 +330,7 @@ describe("GET/DELETE /api/session", () => {
 
   it("epoch bump invalidates every existing session; new logins use the new epoch", async () => {
     const cookie = cookieFrom(await h.login(TEST_PIN));
-    expect((await h.authedGet("/api/logs", cookie)).status).toBe(404); // authed: reaches the app (no such route)
+    expect((await h.authedGet("/api/__no_such_route__", cookie)).status).toBe(404); // authed: reaches the app (no such route)
     h.fake.sqlite.exec(
       "UPDATE app_setting SET value = CAST(value AS INTEGER)+1 WHERE key='session_epoch'",
     );

@@ -10,6 +10,7 @@ import { checkupRoutes } from "./routes/checkups";
 import { fileRoutes } from "./routes/files";
 import { growthRoutes } from "./routes/growth";
 import { reportRoutes } from "./routes/reports";
+import { logRoutes } from "./routes/logs";
 import { sessionRoutes } from "./routes/session";
 
 export interface AppVariables {
@@ -38,6 +39,7 @@ export function createApp(deps: Deps = defaultDeps): Hono<AppEnv> {
   app.route("/", checkupRoutes);
   app.route("/", growthRoutes);
   app.route("/", fileRoutes);
+  app.route("/", logRoutes);
 
   return app;
 }

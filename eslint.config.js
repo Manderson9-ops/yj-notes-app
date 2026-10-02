@@ -6,7 +6,15 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist", "coverage", "playwright-report", "test-results", "node_modules", ".wrangler"],
+    ignores: [
+      "dist",
+      "coverage",
+      "playwright-report",
+      "test-results",
+      "node_modules",
+      ".wrangler",
+      "public/sw.js",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
