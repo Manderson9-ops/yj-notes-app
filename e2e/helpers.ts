@@ -33,7 +33,7 @@ async function preloadCssImages(page: Page) {
     const scan = (rules) => {
       for (const r of rules) {
         if (r.cssRules) scan(r.cssRules);
-        for (const m of (r.cssText || "").matchAll(/url\("(data:image[^"]+)"\)/g)) urls.add(m[1]);
+        for (const m of (r.cssText || "").matchAll(/url\("(data:image[^"]+|\/icons\/tex-[^"]+)"\)/g)) urls.add(m[1]);
       }
     };
     for (const s of document.styleSheets) {

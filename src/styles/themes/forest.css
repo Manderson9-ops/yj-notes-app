@@ -312,13 +312,13 @@
 }
 
 /* ---- 수채 번짐: 헤더·빈 상태·PIN 하늘의 장식 층에만. 젖은 종이에 물감을 떨어뜨린 듯:
-   하늘색(--c-deco-1) 번짐 두 개(진하기·위치 다르게)를 겹치고, 각 번짐은 마스크 SVG 안에서
-   feTurbulence + feDisplacementMap 으로 모양을 만들고 feGaussianBlur 로 풀되, 안쪽은 옅고(.5) 가장자리 고리(stroke)는
+   하늘색(--c-deco-1) 번짐 두 개(진하기·위치 다르게)를 겹치고, 각 번짐은 미리 구운 PNG 마스크(public/icons/tex-forest-blob-*.png,
+   tools/perf/make-forest-textures.ts 가 feTurbulence + feDisplacementMap + feGaussianBlur 로 한 번만 만든 결과 — 실행 중에는 필터 계산 없음)로 모양을 만들되, 안쪽은 옅고(.5) 가장자리 고리(stroke)는
    더 진하게 남겨 수채 특유의 "번짐 테두리"를 만든다. 거기에 radial-gradient 페이드를 곱한다(mask-composite: intersect).
    글자 면에는 올리지 않고, 가장 진한 합성색은 contrast.test.ts 가 --blob-alpha(-2) 로 계산해 대비를 막는다 ---- */
 :root[data-theme="forest"] {
-  --blob-mask-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-40%25' y='-60%25' width='180%25' height='220%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.014 .026' numOctaves='3' seed='4' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='46' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='11'/%3E%3C/filter%3E%3Cg filter='url(%23w)'%3E%3Cellipse cx='150' cy='60' rx='96' ry='26' fill='%23000' fill-opacity='.5'/%3E%3Cellipse cx='150' cy='60' rx='96' ry='26' fill='none' stroke='%23000' stroke-width='4' stroke-opacity='.55'/%3E%3C/g%3E%3C/svg%3E");
-  --blob-mask-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-40%25' y='-60%25' width='180%25' height='220%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02 .03' numOctaves='3' seed='9' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='46' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='11'/%3E%3C/filter%3E%3Cg filter='url(%23w)'%3E%3Cellipse cx='140' cy='56' rx='90' ry='30' fill='%23000' fill-opacity='.5'/%3E%3Cellipse cx='140' cy='56' rx='90' ry='30' fill='none' stroke='%23000' stroke-width='4' stroke-opacity='.55'/%3E%3C/g%3E%3C/svg%3E");
+  --blob-mask-a: url("/icons/tex-forest-blob-a.png");
+  --blob-mask-b: url("/icons/tex-forest-blob-b.png");
 }
 
 :root[data-theme="forest"] :is(.shell-header, .empty, .pin-screen)::before,
@@ -457,14 +457,14 @@
   background-image: var(--tex-bg);
   background-repeat: no-repeat;
 }
-/* ---- 종이 결: 정적 feTurbulence(회색조) data URI, 아주 옅게. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없다 ---- */
+/* ---- 종이 결: 미리 구운 회색조 PNG 타일(같은 스크립트가 생성, 실행 중 필터 계산 없음), 아주 옅게. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없다 ---- */
 :root[data-theme="forest"] body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: url("/icons/tex-forest-grain.png");
   opacity: 0.055; /* 연구 범위 .04~.06 안. 최악 지점 대비는 contrast.test.ts 가 계산 */
 }
 

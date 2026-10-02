@@ -3,27 +3,37 @@ import type { ReactNode, SVGProps } from "react";
 // 크레용 테마 장식 (docs/design/theme-crayon.md §3). 전부 직접 그린 오리지널 path.
 // 사람·동물·얼굴·캐릭터·로고·채점 기호 없음. 색은 CSS 클래스(토큰)로 칠한다.
 
-/** 크레용 결: 정적 feTurbulence 로 채움·선의 일부가 비쳐 보이게(거친 질감). 장식 SVG 안에서만 쓴다. */
+/** 크레용 결: 미리 만든 작은 점·짧은 선 패턴(<pattern>)을 마스크로 써 채움·선 일부가 비쳐 보이게(거친 질감).
+ *  실시간 feTurbulence 필터는 쓰지 않는다(저사양·소프트웨어 렌더 비용, docs/design/theme-system.md). 장식 SVG 안에서만 쓴다. */
+// 점·짧은 선 좌표(29×29 타일, 고정 시드로 한 번 뽑아 붙임). 점 = 길이 0.01 선을 둥근 끝으로 그린 것.
+const GRAIN_DOTS_A =
+  "M0.6 0.5h.01M15.8 18.4h.01M26.4 3.3h.01M14.4 15.9h.01M17.3 22.7h.01M1.2 21.6h.01M28 2.1h.01M20.3 13.3h.01M11.5 27.8h.01M28.8 19.2h.01M12.3 14.5h.01M8.3 12.3h.01M19.6 4.5h.01M2.6 24.7h.01M9 0.2h.01M13.4 8.5h.01M16.6 27.9h.01M0.4 22.6h.01M8.8 9.3h.01M27.7 15.9h.01M19.4 19.1h.01M18.1 4.7h.01M26.9 22.3h.01M13.3 21h.01M9.6 20.7h.01M12.8 6h.01M13.3 19.5h.01M15.1 25.3h.01M11.4 26.8h.01M21.5 4.1h.01M19.9 10.2h.01M10.4 23h.01M23.1 5.1h.01M3.5 11.7h.01M25.4 21h.01M15.5 7.2h.01M11.4 25.2h.01M23.6 10.8h.01M24.1 20.1h.01M18.3 26.7h.01M23.9 2.8h.01M17.9 17.7h.01M3.3 16.8h.01M25.8 2.7h.01M8 22.6h.01M21.2 10.9h.01M5.2 8.2h.01M25.6 11.4h.01M22.5 20.8h.01M24.4 16.2h.01M6.2 26.2h.01M11.6 5.9h.01M19.7 23.8h.01M19.1 0.6h.01M10.2 3.2h.01M28.6 8.8h.01M9.8 27h.01M26.2 5.4h.01M21 17.5h.01M12.2 10h.01M19 13h.01M13.9 14.2h.01";
+const GRAIN_DOTS_B =
+  "M10.8 10.3h.01M27.4 11.1h.01M3.4 18.1h.01M24.7 4.1h.01M16.7 18.5h.01M13.1 13.3h.01M16.7 10.5h.01M18.4 3.6h.01M9 5.3h.01M16.8 0h.01M2.9 25.3h.01M7.2 26.5h.01M2.7 10.3h.01M6.2 4.2h.01M22.3 6.4h.01M0.4 9.6h.01M17.1 11h.01M19.7 21.1h.01M3.4 2.8h.01M11.4 2.2h.01M7.9 22.4h.01M7.8 15.3h.01M9.3 12h.01M21.3 21.6h.01M28.7 2.7h.01M7 11.2h.01M25.2 27h.01M12.1 17.1h.01M5.9 20.7h.01M21.3 24.8h.01";
+const GRAIN_STROKES =
+  "M9.1 12.2l0.8 2.4M4.3 15.5l-2.2 0.1M8.6 9.4l-1 1.5M24.2 15.1l-1.8 1M21.6 20.6l-1.8 0.3M24.2 0.2l-0.7 1.1M25.1 3.2l-0.3 2M26.1 4.3l1.7 1.1M13.6 9.7l-0.6 1.8M20.1 16.7l1 1.3M15.1 10.8l0.7 1.1M5.4 5.9l-1.6 0.3";
+
 function CrayonGrain() {
   return (
     <defs>
-      <filter
+      <pattern id="yj-crayon-tex" width="29" height="29" patternUnits="userSpaceOnUse">
+        <rect width="29" height="29" fill="#e2e2e2" />
+        <g fill="none" stroke="#000" strokeLinecap="round">
+          <path strokeWidth="1" strokeOpacity="0.7" d={GRAIN_DOTS_A} />
+          <path strokeWidth="0.75" strokeOpacity="0.9" d={GRAIN_DOTS_B} />
+          <path strokeWidth="0.5" strokeOpacity="0.7" d={GRAIN_STROKES} />
+        </g>
+      </pattern>
+      <mask
         id="yj-crayon-grain"
-        filterUnits="userSpaceOnUse"
+        maskUnits="userSpaceOnUse"
         x="-10"
         y="-10"
         width="740"
         height="200"
       >
-        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" result="n" />
-        <feColorMatrix
-          in="n"
-          type="matrix"
-          values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.3 1.5"
-          result="holes"
-        />
-        <feComposite in="SourceGraphic" in2="holes" operator="in" />
-      </filter>
+        <rect x="-10" y="-10" width="740" height="200" fill="url(#yj-crayon-tex)" />
+      </mask>
     </defs>
   );
 }
@@ -43,7 +53,7 @@ export function Svg({
       {...rest}
     >
       {grain ? <CrayonGrain /> : null}
-      {grain ? <g filter="url(#yj-crayon-grain)">{children}</g> : children}
+      {grain ? <g mask="url(#yj-crayon-grain)">{children}</g> : children}
     </svg>
   );
 }
