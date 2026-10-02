@@ -68,6 +68,37 @@
 | 전체 페이지 스크린샷 | `stableShot` 은 fullPage 캡처 대신 **뷰포트를 페이지 높이만큼 키워** 찍고(position:fixed 배경 층이 첫 화면 높이에서 끊겨 중간에 경계선이 생기는 캡처 산출물 방지), 그동안 sticky 탭바에 `.is-static-for-shot`(base.css)를 달아 중간에 찍히지 않게 함 |
 | 요소 단위 시각 회귀 | `e2e/elements.spec.ts`: 테마(크레용·숲) × light/dark 의 h2 띠·선택 칩·주 버튼을 요소만 찍어 `threshold` 0.02 로 비교(`el-<요소>-<테마>-<scheme>.png`). **변이 시험(2026-10-02)**: 크레용 `--c-hl` `#ffd4da` → `#f6cfe6` 은 `el-h2-crayon-light` 에서 6,496 픽셀(요소의 60%) 차이로 **실패**, 같은 변이가 전체 화면 비교(threshold 0.05)에서는 통과 — 그래서 요소 단위를 둔다 |
 
+## 4-1. 렌더 비용 규칙 (T-A2, 2026-10-03)
+
+**What**: 테마가 화면 렌더에 쓰는 비용을 낮게 유지하는 규칙. **Why**: CI(리눅스 컨테이너·소프트웨어 렌더) 웹킷에서 크레용 라이트·다크만 30초 시간 초과(`page.evaluate`·axe 무응답)였다. 저사양 폰(조부모)도 같은 비용을 낸다. 시간 제한을 늘려 덮지 않고 원인을 없앤다. **How**:
+
+| 규칙 | 대신 쓰는 것 |
+|---|---|
+| **CSS `filter`(`drop-shadow` 포함)·`backdrop-filter` 금지**(요소마다 필터 합성 층) | 오프셋 그림자는 `box-shadow`(+`border-radius`). 크레용 `--lift` |
+| **실시간 SVG 필터(`<filter>`·feTurbulence·feDisplacementMap·feGaussianBlur 등) 금지** — decor SVG·CSS·data URI 모두 | 정적 텍스처: 작은 `<pattern>`(점·짧은 선·옅은 얼룩)을 `<mask>`/`fill` 로, 또는 한 번 구운 PNG(`public/icons/tex-*.png`, 생성 `tools/perf/make-forest-textures.ts`) |
+| 화면 전체 고정 층(`position:fixed; inset:0` + `opacity`)은 최소로 | 숲 종이 결 1장만 허용(가장 비싼 층으로 남음) |
+
+자동 확인: `src/styles/render-cost.test.ts`(CSS 전부에 `filter:`·`drop-shadow(`·`feTurbulence`·`<filter` 0개, decor `.tsx` 에 `<filter`·`fe*`·`filter=` 0개, 대조군 포함). 새 장식·질감을 넣을 때는 이 규칙을 지키고, 아래 측정 스크립트로 기본 테마 대비 배수를 확인한다.
+
+**측정**: `npm run dev:mock`(E2E_PORT) 을 띄우고 `node tools/perf/render-cost.ts [webkit|chromium] [cpuRate]`(테마×라이트/다크×홈·미리보기: 색 변경 뒤 rAF 2회까지 `repaint`, 화면 `screenshot` 시간 `shot`, axe 시간). 전/후 비교는 이전 커밋을 다른 작업 트리로 띄워 두 서버를 번갈아 잰다(`tools/perf/render-ab.ts`). PC 부하 잡음이 커서(같은 코드가 실행마다 ±50%) **최소값**을 쓰고 번갈아 2회 이상 잰다.
+
+**측정 결과** (Windows 로컬, 360×740 DPR2, 라이트, 미리보기=디자인 미리보기 화면, 최소값 ms, 전→후, 번갈아 2회 값. 모두 **실측**):
+
+| 엔진 | 테마·화면 | repaint(rAF×2) | shot(스크린샷) |
+|---|---|---|---|
+| webkit | 기본 홈 | 16/17 → 16/16 | 31/39 → 32/31 |
+| webkit | **크레용 홈** | 49/46 → **26/26** | 158/178 → **45/44** |
+| webkit | **크레용 미리보기** | 60/59 → **27/29** | 94/105 → **63/63** |
+| webkit | 숲 홈 | 72/75 → 57/47 | 178/185 → 137/147 |
+| webkit | 숲 미리보기 | 47/63 → 55/63 | 122/125 → 120/179 (잡음) |
+| chromium ×6 감속 | 기본 홈 | 9/15 → 10/8 | 51/53 → 54/55 |
+| chromium ×6 | 크레용 홈 | 14/13 → 17/18 | 57/57 → 51/49 |
+| chromium ×6 | 크레용 미리보기 | 11/30 → 40/38 | 70/58 → 64/60 |
+| chromium ×6 | 숲 홈 | 12/15 → 10/18 | 201/201 → 166/172 |
+| chromium ×6 | 숲 미리보기 | 26/36 → 28/25 | 158/154 → 130/130 |
+
+해석(추론 포함): 문제의 웹킷에서 크레용이 기본 테마의 약 3배 → 약 1.6배(홈 repaint)로 내려갔다(실측). chromium ×6 에서는 크레용 repaint 가 개선되지 않았다(미리보기는 오히려 큼, 실측): chromium 은 필터를 GPU·래스터 쪽에서 처리해 원래 이 문제가 없었고, 필터 대신 `box-shadow`·마스크가 메인 스레드 그리기로 옮겨 간 것으로 **추정**(원인 분리 시험은 마스크·box-shadow 를 각각 꺼도 변화 없음 → 미확인). 숲은 개선 폭이 작고 잡음 안이다. 숲 종이 결 층을 끄면 웹킷 재칠이 ~30% 줄었다(1회 시험, 잡음 큼). 기본 테마 대비 크레용·숲은 여전히 웹킷에서 약 1.5~3배이므로 새 장식은 위 규칙 안에서 보수적으로 늘린다.
+
 ## 5. 저작권·상표 체크리스트 (PR 마다)
 
 - [ ] 캐릭터(사람·동물·괴물)를 그리지 않았다. 사람 형태는 쓰지 않는다.
@@ -82,7 +113,7 @@
 |---|---|---|
 | `--c-border`(기본 테마) | 라이트 `#7d838c`, 다크 `#737a85` | 기존 `#d9dce1` 은 흰 바탕 대비 1.4:1 이라 TH-2(3:1) 불가. 옛 값은 `--c-line`(장식선)으로 옮겨 구분선에 계속 씀 |
 | 크레용 `--c-link`·`--c-earth`·`--c-badge`·`--c-on-badge` | 명세에 없어 추가 | 계약상 모든 테마가 정의해야 함. 링크=포인트 파랑, 배지=노랑 면, earth=갈색 |
-| 종이 결 질감 | 구현(숲): `body::before` 에 정적 feTurbulence data URI, opacity .05/.04, z-index -1 | CSS 파일 안 `url(data:)` 는 CSP `img-src data:` 허용. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없음(1차 구현 메모를 번복) |
+| 종이 결 질감 | 구현(숲): `body::after` 에 종이 결 PNG 타일(`public/icons/tex-forest-grain.png`, 원래 feTurbulence 로 한 번 구운 것), opacity .055/.05, z-index -1(T-A2 에서 data URI → PNG) | CSS 파일 안 `url(data:)` 는 CSP `img-src data:` 허용. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없음(1차 구현 메모를 번복) |
 | 큰 글씨·`--font-display` | 앱 이름·h1·h2·탭·`.btn` 에만 | 숫자·PIN 키는 본문 글꼴 + tabular-nums |
 | 폰트 부분 집합 글자 | 소스(테스트·주석 제외)의 한글 + ASCII | 글자 목록은 `tools/fonts/subset.ts` 가 재현 |
 | 스와치 색 | 각 테마 CSS 가 자기 스와치를 정의(hex) | 선택지에서 다른 테마 색을 보여야 해 토큰 불가 |

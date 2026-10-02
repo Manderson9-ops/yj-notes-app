@@ -54,7 +54,7 @@
 
 | 컴포넌트 | 규칙 |
 |---|---|
-| 앱 헤더 | 하늘 워시 위 앱 이름(display), 아래 장식선 1px. 헤더 오른쪽에 설정 아이콘 왼쪽 위 구석에 작고 옅은 수채 번짐(`--blob-alpha(-2)`; 하늘색 번짐 둘을 겹침; 마스크 SVG 안에서 feTurbulence + feDisplacementMap 으로 모양을 만들고 feGaussianBlur 로 경계를 풀고 radial-gradient 페이드와 `mask-composite: intersect`) 위로 작은 구름(다크는 달·별). 빈 상태는 하늘 영역 위쪽에 넓고 옅게 |
+| 앱 헤더 | 하늘 워시 위 앱 이름(display), 아래 장식선 1px. 헤더 오른쪽에 설정 아이콘 왼쪽 위 구석에 작고 옅은 수채 번짐(`--blob-alpha(-2)`; 하늘색 번짐 둘을 겹침; 마스크는 `public/icons/tex-forest-blob-{a,b}.png`: `tools/perf/make-forest-textures.ts` 가 feTurbulence + feDisplacementMap + feGaussianBlur 로 **한 번만 구운** PNG 라서 실행 중 필터 계산이 없다. radial-gradient 페이드와 `mask-composite: intersect`) 위로 작은 구름(다크는 달·별). 빈 상태는 하늘 영역 위쪽에 넓고 옅게 |
 | 주 버튼 | 숲 초록 면, 흰 글자, 라운드 14px, 푸른 기 그림자, 누르면 1px 내려감 |
 | 보조 버튼 | surface 면 + `--c-border` 1px + 초록 글자 |
 | 라디오(테마 고르기) | `appearance:none` `--c-border` 원 + 선택 시 초록 점 |
@@ -72,7 +72,7 @@
 
 | 이름 | 쓰는 곳 | 그리는 법 |
 |---|---|---|
-| `HillLayers` | PIN 화면 아래, 빈 상태 | 언덕 3겹: 뒤 `--c-deco-1` 옅게, 가운데 `--c-deco-2`, 맨 앞 `--c-hill-front`(항상 가장 어둡게, 다크 `#1A2E26` 로 바탕과 구분). 채움에 정적 feTurbulence 농담(multiply, 불투명 채움에만)을 곱하고 각 언덕 윗가장자리에 `--c-badge` 빛줄기 1.2px(옅게) |
+| `HillLayers` | PIN 화면 아래, 빈 상태 | 언덕 3겹: 뒤 `--c-deco-1` 옅게, 가운데 `--c-deco-2`, 맨 앞 `--c-hill-front`(항상 가장 어둡게, 다크 `#1A2E26` 로 바탕과 구분). 채움 위에 미리 만든 농담 `<pattern>`(240×32, 가로로 긴 옅은 얼룩 + 기본 4% 어둠)을 같은 모양 path 로 한 겹 더 깔고(실시간 SVG 필터 없음) 각 언덕 윗가장자리에 `--c-badge` 빛줄기 1.2px(옅게) |
 | `CumulusCloud` | 헤더, PIN 화면 | 원 6개를 위로 쌓은 큰 적운(PIN 에서 화면 폭의 약 40%), 아래쪽 푸른 음영은 몸통 안으로 clip(바깥 테두리 없음) |
 | `Leaf` / `Sprout` | 빈 상태 | 잎 1장, 잎맥 1줄 |
 | `WindLines` | PIN 화면 | 끝이 가늘어지는 길이 다른 3줄, `--c-deco-1` 옅게 |
@@ -95,6 +95,11 @@
 | 본문 고운돋움 웹폰트 | 본문 시스템 글꼴 | 한글 본문 폰트 용량. display 만 부분 집합 |
 | 테두리 전부 1px 장식선 | 컨트롤 경계는 `--c-border`(3:1), 장식선은 `--c-line` 으로 분리 | WCAG 1.4.11 |
 | 경고 하나(#A33A2B) | 주의(`--c-warn`, 황토)·오류(`--c-alert`, 붉은 흙빛) 둘 | docs/06 §4 상태 표시가 둘을 구분 |
+
+## 구현 메모: 정적 텍스처 (T-A2, 2026-10-03)
+
+- 수채 번짐 마스크 2장·종이 결 타일은 `public/icons/tex-forest-*.png`(가드 G2 허용 경로 `public/icons/`)에서 읽는다. 생성: `node tools/perf/make-forest-textures.ts`(SVG 원본 필터는 이 스크립트에만 남는다). CSS·decor 에는 `filter`·feTurbulence 가 없다(`src/styles/render-cost.test.ts` 가 확인).
+- 종이 결(`body::after`, 화면 전체 고정 층)은 PNG 로 바꿔도 가장 비싼 층으로 남는다: 웹킷 실측에서 이 층을 끄면 재칠 비용이 약 30% 줄었다(측정 잡음 큼, theme-system.md 표 참고).
 
 ## 구현 메모: 배경 층 (리뷰 5차)
 

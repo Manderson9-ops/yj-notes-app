@@ -123,7 +123,7 @@ test("reduced-motion: crayon tab underline, button pop and press move are off", 
   });
   await login(page);
   // 활성 탭 밑줄(홈 탭)
-  const underline = page.locator(".tab.active .decor-tab path");
+  const underline = page.locator(".tab.active .decor-tab path.d-line");
   await expect(underline).toHaveCount(1);
   await expect(underline).toHaveCSS("animation-name", "none");
   // 포인터로 눌렀다 뗀 버튼의 pop
