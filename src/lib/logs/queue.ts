@@ -185,6 +185,22 @@ export function useQueueCounts(): QueueCounts {
   );
 }
 
+/** 이 기기에 남은(아직 서버에 없는) 기록 수. 저장소를 읽은 뒤의 값이다. */
+export async function unsentCounts(): Promise<QueueCounts> {
+  await loadQueue();
+  return counts;
+}
+
+/** 이 기기의 보내지 않은 기록을 모두 지운다(로그아웃 때 사용자가 고른 경우). */
+export async function clearQueue(): Promise<void> {
+  await loadQueue();
+  if (timer !== undefined) {
+    deps.clearTimer(timer);
+    timer = undefined;
+  }
+  for (const e of [...entries]) await drop(e.id);
+}
+
 export function listFailed(): PendingLog[] {
   return entries.filter((e) => e.status === "failed");
 }

@@ -4,6 +4,8 @@ import { uuidv7 } from "./ids";
 import {
   BACKOFF_MAX_MS,
   backoffDelayMs,
+  clearQueue,
+  unsentCounts,
   configureQueue,
   createMemoryStore,
   discardFailed,
@@ -205,5 +207,27 @@ describe("uuidv7", () => {
     const b = uuidv7(1_700_000_000_001);
     expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(a < b).toBe(true);
+  });
+});
+
+describe("logout helpers (unsent records on this device)", () => {
+  it("unsentCounts reports pending + failed; clearQueue empties memory and store", async () => {
+    online = false;
+    const s = setup(() => Promise.resolve(OK));
+    expect(await unsentCounts()).toEqual({ pending: 0, failed: 0 });
+    await submitLog(uuidv7(), body(1));
+    await submitLog(uuidv7(), body(2));
+    expect(await unsentCounts()).toEqual({ pending: 2, failed: 0 });
+    expect(await s.getAll()).toHaveLength(2);
+    await clearQueue();
+    expect(await unsentCounts()).toEqual({ pending: 0, failed: 0 });
+    expect(await s.getAll()).toEqual([]);
+  });
+
+  it("counts records saved by an earlier session of the app (read from the store)", async () => {
+    const s = store();
+    await s.put({ id: "old", body: body(3), createdAt: 1, attempts: 2, status: "failed" });
+    setup(() => Promise.resolve(OK), s);
+    expect(await unsentCounts()).toEqual({ pending: 0, failed: 1 });
   });
 });

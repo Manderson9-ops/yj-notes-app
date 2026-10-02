@@ -1,8 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ThemePicker } from "../components/ThemePicker";
 import { api } from "../lib/api";
 import { useLargeText } from "../lib/largeText";
+import { clearQueue, unsentCounts } from "../lib/logs/queue";
 import { handleUnauthorized } from "../lib/queryClient";
 
 export function SettingsPage() {
@@ -14,6 +17,15 @@ export function SettingsPage() {
       handleUnauthorized(qc);
     },
   });
+
+  // 보내지 않은 기록이 이 기기에 있으면 로그아웃 전에 물어본다(남겨 두면 다시 로그인할 때 보낸다).
+  const [unsent, setUnsent] = useState<number | null>(null);
+  const askLogout = async () => {
+    const c = await unsentCounts();
+    const total = c.pending + c.failed;
+    if (total === 0) logout.mutate();
+    else setUnsent(total);
+  };
 
   return (
     <>
@@ -41,7 +53,7 @@ export function SettingsPage() {
           className="btn"
           disabled={logout.isPending}
           onClick={() => {
-            logout.mutate();
+            void askLogout();
           }}
         >
           이 기기 로그아웃
@@ -54,6 +66,31 @@ export function SettingsPage() {
         </Link>
       </section>
       <p className="app-version">앱 버전 {__APP_VERSION__}</p>
+      <ConfirmDialog
+        open={unsent !== null}
+        title="보내지 않은 기록이 있어요"
+        confirmLabel="지우고 로그아웃"
+        secondaryLabel="남겨 두고 로그아웃"
+        cancelLabel="취소"
+        busy={logout.isPending}
+        onCancel={() => {
+          setUnsent(null);
+        }}
+        onSecondary={() => {
+          setUnsent(null);
+          logout.mutate();
+        }}
+        onConfirm={() => {
+          void clearQueue().then(() => {
+            setUnsent(null);
+            logout.mutate();
+          });
+        }}
+      >
+        <p>이 기기에 보내지 않은 기록이 {String(unsent ?? 0)}건 있어요.</p>
+        <p>남겨 두면 다시 로그인할 때 보내요.</p>
+        <p>지우면 되돌릴 수 없어요.</p>
+      </ConfirmDialog>
     </>
   );
 }

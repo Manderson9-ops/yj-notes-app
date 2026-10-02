@@ -10,6 +10,8 @@ export function ConfirmDialog({
   children,
   confirmLabel,
   cancelLabel = "취소",
+  secondaryLabel,
+  onSecondary,
   busy = false,
   onConfirm,
   onCancel,
@@ -19,6 +21,9 @@ export function ConfirmDialog({
   children?: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
+  /** 취소와 확인 사이의 선택지(예: 지우지 않고 계속). 둘 다 있을 때만 보인다. */
+  secondaryLabel?: string;
+  onSecondary?: () => void;
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -43,6 +48,11 @@ export function ConfirmDialog({
         <button ref={cancelRef} type="button" className="btn" onClick={onCancel}>
           {cancelLabel}
         </button>
+        {secondaryLabel && onSecondary ? (
+          <button type="button" className="btn" disabled={busy} onClick={onSecondary}>
+            {secondaryLabel}
+          </button>
+        ) : null}
         <button type="button" className="btn btn-danger" disabled={busy} onClick={onConfirm}>
           {confirmLabel}
         </button>
