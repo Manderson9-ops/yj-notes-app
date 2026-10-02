@@ -113,7 +113,7 @@ export function validatePayload(
     const field = byKey.get(key);
     const name = `payload.${key}`;
     if (field === undefined) {
-      fields["payload"] = "항목이 맞지 않아요.";
+      fields.payload = "항목이 맞지 않아요.";
     } else if (raw[key] === undefined) {
       fields[name] = "꼭 필요한 항목이에요.";
     } else if (field.type === "enum") {

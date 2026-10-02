@@ -4,7 +4,7 @@
 //  - 교차표: 행 필드 × 열 필드의 개수(정의의 summary.crosstabs). 선택지 순서는 정의 순서.
 //  - 경고: 정의의 alerts 규칙에 걸린 (기록, 규칙) 쌍의 수.
 // 숫자는 전부 기록에서 센다(P3). 순수 함수 — 서버 라우트와 dev mock 이 같이 쓴다.
-import { evaluateAlerts, type LogTypeDefinition } from "./definition";
+import { evaluateAlerts, type LogTypeDefinition } from "./definition.ts";
 
 export interface SummaryLog {
   id: string;
@@ -129,8 +129,9 @@ export function computeSummary(input: {
   const inRange = logs.filter(
     (l) => from !== null && to !== null && l.occurredOn >= from && l.occurredOn <= to,
   );
+  const fromDay = from === null ? 0 : dayNumber(from);
   for (const l of inRange) {
-    const idx = Math.floor((dayNumber(l.occurredOn) - dayNumber(from as string)) / 7);
+    const idx = Math.floor((dayNumber(l.occurredOn) - fromDay) / 7);
     const w = weeks[idx];
     if (w === undefined) continue;
     w.count += 1;

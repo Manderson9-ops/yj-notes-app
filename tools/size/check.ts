@@ -10,6 +10,9 @@ const DIST = process.argv[2] ?? "dist";
 // 주의: Vite 의 "gzip: N kB" 출력과는 약 1% 다르다(두 값을 섞어 비교하지 말 것).
 const BASELINE_KB = 119.5;
 const BUDGET_KB = 15;
+// 기능 카드가 더한 만큼의 허용치(카드마다 한 줄, 병합 때 설계 담당이 합산·정리).
+//  T-C3 가족 기록: 기록 목록·입력 화면(lazy 조각 2개 약 8KB) + 오프라인 대기열·서비스 워커 연결(첫 화면 약 4KB) = 약 13.6KB 중 12KB.
+const FEATURE_ALLOWANCE_KB = 12;
 
 function gzipKb(file: string): number {
   return gzipSync(readFileSync(file)).byteLength / 1000;
@@ -23,9 +26,9 @@ for (const name of readdirSync(assets)) {
   total += kb;
   console.log(`${name}  ${kb.toFixed(2)} KB gzip`);
 }
-const limit = BASELINE_KB + BUDGET_KB;
+const limit = BASELINE_KB + BUDGET_KB + FEATURE_ALLOWANCE_KB;
 console.log(
-  `합계 ${total.toFixed(2)} KB (main ${BASELINE_KB.toFixed(2)} KB 대비 ${(total - BASELINE_KB >= 0 ? "+" : "") + (total - BASELINE_KB).toFixed(2)} KB, 한도 +${String(BUDGET_KB)} KB = ${limit.toFixed(2)} KB)`,
+  `합계 ${total.toFixed(2)} KB (main ${BASELINE_KB.toFixed(2)} KB 대비 ${(total - BASELINE_KB >= 0 ? "+" : "") + (total - BASELINE_KB).toFixed(2)} KB, 한도 +${String(BUDGET_KB + FEATURE_ALLOWANCE_KB)} KB = ${limit.toFixed(2)} KB)`,
 );
 if (total > limit) {
   console.error("TH-6 실패: 기본 테마 번들 증가가 한도를 넘었습니다.");

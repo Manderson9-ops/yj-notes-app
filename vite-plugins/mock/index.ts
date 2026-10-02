@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { logsModule, logTypesModule } from "./logs.ts";
 
 /**
  * FAKE API modules for `npm run dev:mock` (local UI work and e2e only, never in a build).
@@ -20,4 +21,4 @@ export interface MockContext {
   readJson: () => Promise<unknown>;
 }
 
-export const MOCK_MODULES: MockModule[] = [];
+export const MOCK_MODULES: MockModule[] = [logsModule, logTypesModule];

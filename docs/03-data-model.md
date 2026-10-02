@@ -132,6 +132,14 @@ CREATE TABLE app_setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);  -- sessio
 
 경고 규칙(F2-5)은 코드에 하드코딩하지 않고 `log_type.schema_json.alerts` 로 둔다. 예: `{"field":"tantrum_min","op":">=","value":25,"guide":"guide/05#3-1"}`.
 
+**`schema_json` 모양** (`server/logs/definition.ts` 가 zod 로 읽는다. 마이그레이션 `0004_c3_*` 에서 화면용 항목을 더했다):
+- `fields[]`: `{key, label_ko, type:"enum"|"int"|"text", required, …}` — enum: `options[]`, int: `min`·`max`·`unit?`·`presets?`(화면 칩 값), text: `max?`.
+- `alerts[]`: `{field, op, value, guide, message_ko?}` — `message_ko` 는 저장 직후·목록에 보이는 사실 문구.
+- `summary?`: `{highlight?: 키[], crosstabs?: [{rows, cols}]}` — 주차 비교·목록 요약에 쓸 필드와 교차표(`05` summary 정의).
+- 종류를 더하려면 `log_type` 에 행만 넣는다(코드 변경 없음). 단 새 종류의 `code` 아이콘은 없으면 점 하나로 보인다.
+
+**`family_log_history`** (`0004_c3_*`): 수정·삭제 때 바뀌기 전 모습을 남긴다(F2-3, `04` "기록 변조·삭제"). `(id, log_id, changed_at, change['update'|'delete'], before_json)`. 앱 화면에는 노출하지 않고 복구용이다.
+
 ## 4. R2 객체
 
 | 키 접두어 | 내용 | 등급 |

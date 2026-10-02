@@ -13,5 +13,6 @@ export const errorBodySchema = z.object({
   error: z.string(),
   message: z.string().optional(),
   retryAfterSec: z.number().int().nonnegative().optional(),
+  fields: z.record(z.string(), z.string()).optional(),
 });
 export type ErrorBody = z.infer<typeof errorBodySchema>;

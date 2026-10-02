@@ -487,3 +487,167 @@ mark {
 [data-tone="serious"] *::before {
   animation: none !important;
 }
+
+/* ---- 가족 기록 (S20·S21): 큰 칩, 확인 목록, 표, 대화상자 ---- */
+.chip[data-size="lg"] {
+  min-height: 64px;
+  padding: 0 var(--space-5);
+  font-size: var(--fs-lg);
+}
+
+.chip[data-size="lg"] > svg:not(.chip-check) {
+  flex: none;
+}
+
+.chip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.chip-grid[data-cols="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.chip-grid .chip {
+  justify-content: center;
+  border-radius: var(--radius-lg);
+}
+
+.step-meta {
+  margin: 0;
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.actions > .btn-lg {
+  margin-bottom: 0;
+}
+
+.field-row {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+}
+
+.field-area {
+  min-height: 96px;
+  padding: var(--space-3) var(--space-4);
+  resize: vertical;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--c-alert);
+  font-weight: 600;
+}
+
+.review-list {
+  margin: var(--space-3) 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.review-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 1px solid var(--c-line);
+  background: transparent;
+  color: var(--c-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.review-value {
+  font-weight: 700;
+  text-align: right;
+}
+
+.log-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+}
+
+.data-table-wrap {
+  overflow-x: auto;
+  margin-top: var(--space-3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--c-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table thead th {
+  background: var(--c-surface);
+  white-space: nowrap;
+}
+
+.data-table tbody th {
+  min-width: 5em;
+  font-weight: 600;
+}
+
+.data-table[data-kind="weeks"] td {
+  min-width: 6em;
+}
+
+.cell-line {
+  display: block;
+}
+
+.data-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.btn-danger {
+  border-color: var(--c-alert);
+  background: transparent;
+  color: var(--c-alert);
+}
+
+.dialog {
+  width: min(92vw, 420px);
+  padding: var(--space-4);
+  border: var(--bw) solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  color: var(--c-fg);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+.dialog > h2 {
+  margin-top: 0;
+}

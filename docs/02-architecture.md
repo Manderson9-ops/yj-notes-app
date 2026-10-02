@@ -46,7 +46,7 @@
 | 스타일 | CSS Modules + 디자인 토큰(CSS 변수) | Tailwind: 조부모용 큰 글씨 토큰을 한곳에서 통제하기에 CSS 변수가 단순 |
 | 라우팅 | React Router | — |
 | 서버 상태 | TanStack Query | 캐시·재시도·오프라인 재전송 일관 |
-| 오프라인 | Service Worker(vite-plugin-pwa) + IndexedDB 대기열 | F2-6 |
+| 오프라인 | 직접 쓴 최소 Service Worker(`public/sw.js`, 앱 껍데기만 캐시) + IndexedDB 대기열(라이브러리 없음). 의존성을 늘리지 않으려 vite-plugin-pwa 는 쓰지 않았다 | F2-6 |
 | 차트 | uPlot | 성장 곡선 1종, 가볍다(Recharts 대비 번들 작음) |
 | 마크다운 | markdown-it + DOMPurify | guide/wiki 렌더링, XSS 차단 |
 | API | Pages Functions + Hono | 라우팅·미들웨어 정리. 런타임 의존성 최소 |

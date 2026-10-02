@@ -43,7 +43,7 @@ function body(over: Record<string, unknown> = {}) {
 function call(method: string, path: string, json?: unknown): Promise<Response> {
   const headers: Record<string, string> = { Cookie: cookie };
   const init: RequestInit = { method, headers };
-  if (method !== "GET") headers["Origin"] = ORIGIN;
+  if (method !== "GET") headers.Origin = ORIGIN;
   if (json !== undefined) {
     headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(json);
@@ -52,8 +52,7 @@ function call(method: string, path: string, json?: unknown): Promise<Response> {
 }
 
 const put = (id: string, json: unknown) => call("PUT", `/api/logs/${id}`, json);
-const count = (sql: string): number =>
-  Number((h.fake.sqlite.prepare(sql).get() as { n: number }).n);
+const count = (sql: string): number => (h.fake.sqlite.prepare(sql).get() as { n: number }).n;
 
 interface PutResult {
   item: {
@@ -121,11 +120,11 @@ describe("PUT /api/logs/:id", () => {
     const r = await (
       await put(ID1, body({ payload: { ...MEAL, tantrum_min: 30 }, recorder: "아빠" }))
     ).json<PutResult>();
-    expect(r.item.payload["tantrum_min"]).toBe(30);
+    expect(r.item.payload.tantrum_min).toBe(30);
     expect(count("SELECT COUNT(*) AS n FROM family_log")).toBe(1);
     const hist = h.fake.sqlite.prepare("SELECT change, before_json FROM family_log_history").all();
     expect(hist).toHaveLength(1);
-    expect(String(hist[0]?.["before_json"])).toContain('"tantrum_min":10');
+    expect(String(hist[0]?.before_json)).toContain('"tantrum_min":10');
   });
 
   it("returns the triggered alerts with the guide link from the type data", async () => {
@@ -145,7 +144,7 @@ describe("PUT /api/logs/:id", () => {
 
   it("422 validation_error with per-field messages", async () => {
     const bad = { ...MEAL, came: "몰라", tantrum_min: 999, extra: 1 } as Record<string, unknown>;
-    delete bad["phone"];
+    delete bad.phone;
     const res = await put(ID1, body({ payload: bad }));
     expect(res.status).toBe(422);
     const j = await res.json<{ error: string; fields: Record<string, string> }>();
@@ -203,7 +202,7 @@ describe("PUT /api/logs/:id", () => {
   it("empty note is stored as null; error bodies carry no payload content", async () => {
     await put(ID1, body({ note: "   " }));
     const row = h.fake.sqlite.prepare("SELECT note FROM family_log").get();
-    expect(row?.["note"]).toBeNull();
+    expect(row?.note).toBeNull();
     const res = await put(ID2, body({ payload: { ...MEAL, came: "비밀문장" } }));
     expect(await res.text()).not.toContain("비밀문장");
   });
@@ -317,14 +316,14 @@ describe("GET /api/logs/summary (fixture 대조)", () => {
       [2, "2020-03-17", "2020-03-23", 2],
     ]);
     // 떼쓴 시간: 1주차 0+10+30 = 40 (평균 13.3, 최대 30), 2주차 25+5 = 30 (평균 15, 최대 25)
-    expect(s.weeks[0]?.fields["tantrum_min"]).toEqual({
+    expect(s.weeks[0]?.fields.tantrum_min).toEqual({
       kind: "int",
       n: 3,
       sum: 40,
       avg: 13.3,
       max: 30,
     });
-    expect(s.weeks[1]?.fields["tantrum_min"]).toEqual({
+    expect(s.weeks[1]?.fields.tantrum_min).toEqual({
       kind: "int",
       n: 2,
       sum: 30,
@@ -332,15 +331,15 @@ describe("GET /api/logs/summary (fixture 대조)", () => {
       max: 25,
     });
     // 먹은 양: 1주차 많이1·조금1·안 먹음1, 2주차 많이1·조금1
-    expect(s.weeks[0]?.fields["amount"]).toEqual({
+    expect(s.weeks[0]?.fields.amount).toEqual({
       kind: "enum",
       counts: { 많이: 1, 조금: 1, "안 먹음": 1 },
     });
-    expect(s.weeks[1]?.fields["amount"]).toEqual({
+    expect(s.weeks[1]?.fields.amount).toEqual({
       kind: "enum",
       counts: { 많이: 1, 조금: 1, "안 먹음": 0 },
     });
-    expect(s.weeks[0]?.fields["came"]).toEqual({
+    expect(s.weeks[0]?.fields.came).toEqual({
       kind: "enum",
       counts: { "바로 옴": 1, "달래서 옴": 1, "안 옴": 1 },
     });
@@ -377,7 +376,7 @@ describe("GET /api/logs/summary (fixture 대조)", () => {
     const cry = await summary("?type=cry");
     expect(cry.total).toBe(5);
     expect(cry.crosstabs).toEqual([]);
-    expect(cry.weeks[0]?.fields["minutes"]).toEqual({
+    expect(cry.weeks[0]?.fields.minutes).toEqual({
       kind: "int",
       n: 3,
       sum: 18,
@@ -424,7 +423,7 @@ describe("GET /api/logs/summary (fixture 대조)", () => {
         type: r.type,
         occurredOn: r.occurred_on,
         recorder: r.recorder,
-        payload: JSON.parse(r.payload),
+        payload: JSON.parse(r.payload) as unknown,
         note: r.note,
         deviceId: "fixture-device",
       });

@@ -46,7 +46,8 @@ test("tab navigation", async ({ page }) => {
     await nav.getByRole("link", { name }).click();
     await expect(page).toHaveURL(path);
     await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
-    await expect(page.getByText("준비 중")).toBeVisible();
+    // 기록 탭은 T-C3 에서 실제 화면이 됐다(준비 중 아님).
+    if (name !== "기록") await expect(page.getByText("준비 중")).toBeVisible();
   }
 });
 
