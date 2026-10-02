@@ -12,9 +12,12 @@ describe("security headers (docs/04 §4)", () => {
 
   it("reportCsp is the sandboxed report policy", () => {
     expect(reportCsp).toBe(
-      "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; " +
-        "connect-src 'none'; frame-ancestors 'self'",
+      "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " +
+        "img-src data:; connect-src 'none'; frame-ancestors 'self'; form-action 'none'; base-uri 'none'",
     );
+    // 주소를 직접 열어도 앱 origin 에서 실행되지 않게: CSP sandbox 에 allow-same-origin 이 없어야 한다.
+    expect(reportCsp.startsWith("sandbox allow-scripts;")).toBe(true);
+    expect(reportCsp).not.toContain("allow-same-origin");
   });
 
   it("applies every header to a static response and leaves its Cache-Control alone", () => {

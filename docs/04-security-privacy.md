@@ -55,7 +55,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 Cache-Control: private, no-store        (모든 /api/*)
 ```
 
-- 기존 보고서 HTML 은 인라인 스크립트를 쓰므로 **`/api/reports/:slug/raw` 를 `sandbox="allow-scripts"`(allow-same-origin 없음) iframe** 으로만 띄운다. 그 응답에만 별도 CSP(`script-src 'unsafe-inline'`, `connect-src 'none'`)를 준다.
+- 기존 보고서 HTML 은 인라인 스크립트를 쓰므로 **`/api/reports/:slug/raw` 를 `sandbox="allow-scripts"`(allow-same-origin 없음) iframe** 으로만 띄운다. 그 응답에만 별도 CSP(`script-src 'unsafe-inline'`, `connect-src 'none'`)를 준다. 응답 CSP 에도 `sandbox allow-scripts`·`form-action 'none'`·`base-uri 'none'` 을 넣어, 주소를 새 탭으로 직접 열어도 앱 origin 이 아닌 고유 origin 에서 실행된다(보안 검토 2026-10-02 P1).
 
 ### 4-1. 오프라인 대기열·서비스 워커 (F2-6)
 - **서비스 워커(`public/sw.js`)는 앱 껍데기만 캐시한다**: 화면 HTML 과 해시가 붙은 빌드 파일(`/assets/`, `/fonts/`). **`/api/*` 는 건드리지 않는다**(항상 네트워크, 저장 안 함). 이유: 가족 기록·알림장은 S1 이라 기기 캐시에 오래 남으면 안 된다. 껍데기에는 자료가 없다(ADR-0002).

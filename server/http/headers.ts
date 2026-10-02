@@ -17,14 +17,18 @@ export const CSP = [
 /**
  * `/api/reports/:slug/raw` 응답 전용 CSP (docs/04 §4). 기존 보고서 HTML 의 인라인 스크립트용.
  * sandbox="allow-scripts"(allow-same-origin 없음) iframe 안에서만 띄운다. connect-src 'none'.
+ * CSP sandbox 도 건다: 주소를 새 탭으로 직접 열어도 고유 origin(opaque)에서 실행돼 앱 자료를 읽지 못한다.
  */
 export const reportCsp = [
+  "sandbox allow-scripts",
   "default-src 'none'",
   "script-src 'unsafe-inline'",
   "style-src 'unsafe-inline'",
   "img-src data:",
   "connect-src 'none'",
   "frame-ancestors 'self'",
+  "form-action 'none'",
+  "base-uri 'none'",
 ].join("; ");
 
 /** 이 경로의 응답만 reportCsp 를 쓸 수 있다. */
