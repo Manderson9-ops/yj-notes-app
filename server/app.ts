@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { defaultDeps, type Deps } from "./deps";
 import type { Env } from "./env";
 import { errorResponse, toErrorResponse } from "./http/errors";
+import { logRoutes } from "./routes/logs";
 import { sessionRoutes } from "./routes/session";
 
 export interface AppVariables {
@@ -26,6 +27,7 @@ export function createApp(deps: Deps = defaultDeps): Hono<AppEnv> {
   app.notFound(() => errorResponse(404, "not_found", "찾을 수 없어요."));
 
   app.route("/", sessionRoutes);
+  app.route("/", logRoutes);
 
   return app;
 }
