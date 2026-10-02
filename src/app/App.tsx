@@ -1,15 +1,22 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { QueueSync } from "../components/QueueSync";
+import { QuietBoundary } from "../components/QuietBoundary";
 import { ApiError } from "../lib/api";
 import { useSession } from "../lib/session";
-import { DesignPreview } from "../pages/DesignPreview";
 import { Placeholder } from "../pages/Placeholder";
 import { PinScreen } from "../pages/PinScreen";
-import { SettingsPage } from "../pages/SettingsPage";
 import { AppShell } from "./AppShell";
 
 // 화면은 필요할 때 내려받는다(첫 화면 크기를 지킨다. 초기 번들 예산: docs/08 Q-PERF).
+const QueueSync = lazy(() =>
+  import("../components/QueueSync").then((m) => ({ default: m.QueueSync })),
+);
+const SettingsPage = lazy(() =>
+  import("../pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+);
+const DesignPreview = lazy(() =>
+  import("../pages/DesignPreview").then((m) => ({ default: m.DesignPreview })),
+);
 const HomePage = lazy(() => import("../pages/HomePage"));
 const NotesPage = lazy(() => import("../pages/NotesPage"));
 const NoteDetailPage = lazy(() => import("../pages/NoteDetailPage"));
@@ -68,6 +75,8 @@ function AuthGate() {
     if (authed !== true) return;
     const id = window.setTimeout(() => {
       void loadLogEditor();
+      // 연결이 끊기기 전에 받아 둔다(서비스 워커가 캐시): 오프라인 배너의 건수 부분.
+      void import("../components/QueueBanners");
     }, 1500);
     return () => {
       window.clearTimeout(id);
@@ -85,7 +94,11 @@ function AuthGate() {
   }
   return (
     <>
-      <QueueSync />
+      <QuietBoundary>
+        <Suspense fallback={null}>
+          <QueueSync />
+        </Suspense>
+      </QuietBoundary>
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route element={<AppShell />}>

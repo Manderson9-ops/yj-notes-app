@@ -14,6 +14,8 @@ const DIST = process.argv[2] ?? "dist";
 const BASELINE_KB = 119.5;
 const BUDGET_KB = 20;
 const TOTAL_JS_MAX_KB = 200;
+// 한도에 바짝 붙지 않게: 한도까지 남은 여유가 이 값보다 적으면 실패한다(새 기능은 lazy 로 두고 시작한다).
+const HEADROOM_MIN_KB = 5;
 const FONT_MAX_BYTES = 80 * 1024;
 
 function gzipKb(file: string): number {
@@ -45,9 +47,18 @@ console.log(
   `초기 로드(entry JS+CSS) 합계 ${total.toFixed(2)} KB (main ${BASELINE_KB.toFixed(2)} KB 대비 ${(total - BASELINE_KB >= 0 ? "+" : "") + (total - BASELINE_KB).toFixed(2)} KB, 한도 +${String(BUDGET_KB)} KB = ${limit.toFixed(2)} KB)`,
 );
 console.log(
+  `초기 로드 여유 ${(limit - total).toFixed(2)} KB (최소 ${String(HEADROOM_MIN_KB)} KB 유지)`,
+);
+console.log(
   `전체 JS 합계 ${totalJs.toFixed(2)} KB (한도 ${String(TOTAL_JS_MAX_KB)} KB, docs/08 Q-PERF)`,
 );
 let failed = false;
+if (limit - total < HEADROOM_MIN_KB && total <= limit) {
+  console.error(
+    `TH-6 실패: 한도까지 여유가 ${(limit - total).toFixed(2)} KB 로 최소 ${String(HEADROOM_MIN_KB)} KB 보다 적습니다. 초기 청크의 것을 lazy 로 옮기세요(한도를 늘리지 않는다).`,
+  );
+  failed = true;
+}
 if (total > limit) {
   console.error("TH-6 실패: 초기 로드가 한도를 넘었습니다. 초기 청크의 것을 lazy 로 옮기세요.");
   failed = true;
