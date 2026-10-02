@@ -2,11 +2,16 @@
 //   npm run fonts:subset
 // src/ 의 (테스트가 아닌) 소스에서 한글 글자를 모아 + ASCII + 숫자만 남긴 woff2 를 public/fonts/ 에 쓴다.
 // 원본 TTF 는 .cache/fonts/ 에 내려받는다(gitignore). 정적 UI 문구를 바꿨으면 다시 실행해 커밋한다.
-// 빠진 글자는 시스템 글꼴로 보일 뿐 깨지지 않는다.
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+// 빠진 글자는 시스템 글꼴로 보일 뿐 깨지지 않는다(그래서 눈에 안 띈다: tools/fonts/subset.test.ts 가 목록 누락을 잡는다).
+// 쓴 글자 목록은 tools/fonts/display-chars.txt 에 함께 커밋한다.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import subsetFont from "subset-font";
+import { collectHangul, walk } from "./collect.ts";
+
+/** 부분 집합에 넣은 한글 목록(커밋한다). 단위 시험이 「src 의 화면 한글 ⊆ 이 목록」 을 확인한다. */
+export const CHARS_FILE = "tools/fonts/display-chars.txt";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const SRC = join(ROOT, "src");
@@ -26,29 +31,6 @@ const JOBS: readonly Job[] = [
   { family: "gowunbatang", ttf: "GowunBatang-Bold.ttf", out: "yj-forest-display.woff2" },
 ];
 
-function walk(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const p = join(dir, name);
-    return statSync(p).isDirectory() ? walk(p) : [p];
-  });
-}
-
-/** 한글 음절(가-힣)을 정렬해 모은다. 테스트·목업 파일은 제외. */
-export function collectHangul(files: readonly string[]): string {
-  const set = new Set<string>();
-  for (const f of files) {
-    if (!/\.(ts|tsx)$/.test(f) || /\.test\.tsx?$/.test(f)) continue;
-    // 주석 속 한글은 UI 에 나오지 않으므로 뺀다(줄 주석은 줄 시작에서만 인식).
-    const code = readFileSync(f, "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
-    for (const ch of code) {
-      if (ch >= "\uac00" && ch <= "\ud7a3") set.add(ch);
-    }
-  }
-  return [...set].sort().join("");
-}
-
 function ascii(): string {
   let s = "";
   for (let c = 0x20; c <= 0x7e; c++) s += String.fromCharCode(c);
@@ -66,6 +48,7 @@ async function main(): Promise<void> {
   mkdirSync(OUT, { recursive: true });
   const hangul = collectHangul(walk(SRC));
   const text = hangul + ascii();
+  writeFileSync(join(ROOT, CHARS_FILE), `${hangul}\n`);
   console.log(`글자 ${String(hangul.length)}개(한글) + ASCII`);
   for (const job of JOBS) {
     const ttf = join(CACHE, job.ttf);
