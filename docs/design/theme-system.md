@@ -26,7 +26,8 @@
 | 색 | `--c-bg`, `--c-fg`, `--c-muted`, `--c-border`(컨트롤 경계, 3:1), `--c-line`(장식선, 기준 밖), `--c-surface`, `--c-surface-2` | 바탕·글자·보조 글자·경계·카드·섹션 면 |
 | 색 | `--c-accent`, `--c-on-accent`, `--c-accent-soft`, `--c-on-accent-soft`, `--c-link` | 주 행동·선택 상태·링크 |
 | 색 | `--c-badge`, `--c-on-badge`, `--c-earth`(메타정보) | 배지·날짜 |
-| 색 | `--c-deco-1`, `--c-deco-2`, `--c-deco-3` | 장식 SVG 전용(글자 금지, 대비 기준 밖) |
+| 색 | `--c-deco-1`, `--c-deco-2`, `--c-deco-3`, `--c-cloud` | 장식 SVG 전용(글자 금지, 대비 기준 밖). `--c-cloud` = 구름 몸통(다크에서도 하늘 면 위에서 보이게) |
+| 색(숲 전용) | `--c-hill-front` | 맨 앞 언덕. 계약 밖(숲 CSS 에만 있고 다른 테마는 쓰지 않음). 항상 뒤 언덕보다 어둡게 |
 | 색 | `--c-warn`, `--c-alert`, `--c-ok`, `--c-info` + 각 `-bg` | 상태 배지(판정 아님, 상태 표시만) |
 | 글꼴 | `--font-body`, `--font-display` | 본문 / 정적 UI 문구 |
 | 크기 | `--fs-base`, `--fs-lg`, `--fs-xl`, `--lh-base` | 큰 글씨 설정이 덮어씀 |
@@ -42,9 +43,9 @@
 | TH-1 | 6 조합 모두 본문 대비 ≥ 4.5:1 (`fg/bg`, `fg/surface`, `muted/bg`, `on-accent/accent`, 상태색/상태 바탕) | `src/styles/contrast.test.ts` 가 CSS 를 읽어 계산 |
 | TH-2 | UI 경계·포커스 링 대비 ≥ 3:1 | 같은 테스트 |
 | TH-3 | axe serious/critical 0 (6 조합 × PIN·홈·설정·미리보기) | `e2e/a11y.spec.ts` |
-| TH-4 | 터치 영역 ≥ 48px, 큰 글씨 설정 유지 | e2e + 스크린샷 |
+| TH-4 | 터치 영역 ≥ 48px, 큰 글씨 설정 유지 | `e2e/large-text.spec.ts`: 3테마 × (보통·큰 글씨) 에서 `.key .chip .btn .btn-primary .tab .theme-option` 의 `boundingBox` 높이·너비 ≥ 48, 키 글자 넘침 없음, axe 0, 스크린샷 `*-<테마>-large-light.png` |
 | TH-5 | `prefers-reduced-motion` 에서 움직임 0 | CSS 규칙 + e2e |
-| TH-6 | 기본 테마 번들 증가 ≤ 15 KB gzip(JS+CSS), 폰트는 테마별 ≤ 80 KB, 기본 테마에선 폰트 요청 0 | build 출력 + e2e 네트워크 확인 |
+| TH-6 | 기본 테마 번들 증가 ≤ 15 KB gzip(JS+CSS), 폰트는 테마별 ≤ 80 KB, 기본 테마에선 폰트 요청 0 | `npm run build && npm run size:check`(JS+CSS gzip 합계가 main 119.50 KB + 15 KB 를 넘으면 실패; `check` 에는 넣지 않음) + `e2e/theme.spec.ts` 의 폰트 요청 수 확인 |
 | TH-7 | 캐릭터·로고·원화·대사·상표명 UI 노출 0, 외부 이미지 0 | 리뷰 체크리스트 §5 |
 | TH-8 | 화면 코드에 테마 분기 없음 (`data-theme` 문자열은 `theme.ts`·CSS·decor 에만) | `grep` 리뷰 |
 | TH-9 | CSP 변경 없음 (`style-src 'self'`, 인라인 `<style>` 없음) | `server/http/headers.ts` 무변경 |
@@ -61,6 +62,7 @@
 | 새 테마 추가 | ① 그림체 연구 문서 ② `theme-<id>.md` ③ `themes/<id>.css` 에 §2 토큰 전부 ④ decor SVG ⑤ `THEMES` 목록 ⑥ 대비 테스트·axe 통과 ⑦ ADR 갱신 |
 | 새 화면 만들기 | 토큰·공용 클래스만 사용. 색 hex 직접 쓰기 금지. 미리보기 화면에 새 컴포넌트 상태 추가 |
 | 폰트 부분 집합 다시 만들기 | 정적 UI 문구를 바꿨으면 `npm run fonts:subset` 후 커밋. 빠진 글자는 시스템 글꼴로 보임(깨지지 않음) |
+| 번들 크기 확인 | 빌드 뒤 `npm run size:check`. 한도는 `tools/size/check.ts` 상단 상수 |
 | 스크린샷 갱신 | `npm run test:e2e` 가 `e2e/__screenshots__/<화면>-<테마>-<light|dark>.png` 로 저장 |
 
 ## 5. 저작권·상표 체크리스트 (PR 마다)
@@ -77,8 +79,11 @@
 |---|---|---|
 | `--c-border`(기본 테마) | 라이트 `#7d838c`, 다크 `#737a85` | 기존 `#d9dce1` 은 흰 바탕 대비 1.4:1 이라 TH-2(3:1) 불가. 옛 값은 `--c-line`(장식선)으로 옮겨 구분선에 계속 씀 |
 | 크레용 `--c-link`·`--c-earth`·`--c-badge`·`--c-on-badge` | 명세에 없어 추가 | 계약상 모든 테마가 정의해야 함. 링크=포인트 파랑, 배지=노랑 면, earth=갈색 |
-| 종이 결 질감 | 넣지 않음 | 정적 노이즈는 data URL/이미지가 필요해 CSP·번들 부담. 워시 그라디언트만 사용 |
+| 종이 결 질감 | 구현(숲): `body::before` 에 정적 feTurbulence data URI, opacity .05/.04, z-index -1 | CSS 파일 안 `url(data:)` 는 CSP `img-src data:` 허용. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없음(1차 구현 메모를 번복) |
 | 큰 글씨·`--font-display` | 앱 이름·h1·h2·탭·`.btn` 에만 | 숫자·PIN 키는 본문 글꼴 + tabular-nums |
 | 폰트 부분 집합 글자 | 소스(테스트·주석 제외)의 한글 + ASCII | 글자 목록은 `tools/fonts/subset.ts` 가 재현 |
 | 스와치 색 | 각 테마 CSS 가 자기 스와치를 정의(hex) | 선택지에서 다른 테마 색을 보여야 해 토큰 불가 |
-| 대비 테스트 항목 | 명세 + `earth/bg·surface`, `accent/surface` 추가 | 같은 토큰을 글자로 쓰므로 |
+| 대비 테스트 항목 | 명세 + `earth/bg·surface`, `accent/bg·surface`, `link/surface`, `muted/surface-2` 추가(대조군 테스트 포함) | 같은 토큰을 글자로 쓰므로 |
+| 큰 글씨 스위치 | 크레용·숲은 `appearance:none` + 체크 표시(CSS 만) | 기본 테마는 네이티브 |
+| 빈 상태 변형 | `ThemeDecor slot="empty" variant="home / logs / notes / library"` | 화면 코드는 variant 만 넘기고 테마를 모름 |
+| `--font-display` 범위 | 크레용: 앱 이름·h1·h2·탭·버튼 / 숲: 앱 이름·h1·h2 만(20px 이상) | 테마 명세대로 |

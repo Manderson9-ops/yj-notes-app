@@ -64,6 +64,17 @@ test("crayon theme requests exactly one font file (Jua subset)", async ({ page }
   expect(fonts).toHaveLength(1);
 });
 
+test("forest theme requests exactly one font file (Gowun Batang subset)", async ({ page }) => {
+  const fonts = trackFonts(page);
+  await login(page);
+  await page.getByRole("link", { name: "설정", exact: true }).click();
+  await page.getByRole("radio", { name: "숲" }).check();
+  await expect.poll(() => fonts.length).toBe(1);
+  expect(fonts[0]).toBe("/fonts/yj-forest-display.woff2");
+  await page.getByRole("link", { name: "디자인 미리보기" }).click();
+  await page.waitForLoadState("networkidle");
+  expect(fonts).toHaveLength(1);
+});
 test("prefers-reduced-motion switches decor animation off", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
