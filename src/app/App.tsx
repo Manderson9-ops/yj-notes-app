@@ -21,10 +21,10 @@ function AuthGate() {
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<Placeholder title="홈" />} />
-        <Route path="logs" element={<Placeholder title="기록" />} />
-        <Route path="notes" element={<Placeholder title="알림장" />} />
-        <Route path="library" element={<Placeholder title="자료" />} />
+        <Route index element={<Placeholder title="홈" variant="home" />} />
+        <Route path="logs" element={<Placeholder title="기록" variant="logs" />} />
+        <Route path="notes" element={<Placeholder title="알림장" variant="notes" />} />
+        <Route path="library" element={<Placeholder title="자료" variant="library" />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="settings/design" element={<DesignPreview />} />
         <Route path="*" element={<Placeholder title="홈" />} />

@@ -34,11 +34,6 @@ export function SettingsPage() {
       <section className="settings-section" aria-labelledby="set-theme">
         <h2 id="set-theme">화면 테마</h2>
         <ThemePicker />
-        <p>
-          <Link className="link" to="/settings/design">
-            디자인 미리보기
-          </Link>
-        </p>
       </section>
       <section className="settings-section">
         <button
@@ -51,6 +46,12 @@ export function SettingsPage() {
         >
           이 기기 로그아웃
         </button>
+      </section>
+      <section className="settings-section" aria-labelledby="set-more">
+        <h2 id="set-more">더 보기</h2>
+        <Link className="link" to="/settings/design">
+          디자인 미리보기
+        </Link>
       </section>
       <p className="app-version">앱 버전 {__APP_VERSION__}</p>
     </>

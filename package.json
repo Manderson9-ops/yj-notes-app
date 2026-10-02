@@ -24,6 +24,7 @@
     "guard:bundle": "node tools/guard/cli.ts --bundle dist",
     "prepare": "husky",
     "fonts:subset": "node tools/fonts/subset.ts",
+    "size:check": "node tools/size/check.ts",
     "pin:hash": "node tools/admin/pin-hash.ts",
     "session:revoke": "node tools/admin/session-revoke.ts",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:cov && npm run guard",

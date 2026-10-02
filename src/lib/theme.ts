@@ -11,10 +11,10 @@ export type ThemeId = (typeof THEMES)[number]["id"];
 
 export const THEME_KEY = "yj.theme";
 
-/** 주소창·상태바 색(index.html 의 theme-color 두 줄: 라이트/다크). 바탕색(--c-bg)과 같다. */
-const THEME_COLORS: Record<ThemeId, { light: string; dark: string }> = {
+/** 주소창·상태바 색(index.html 의 theme-color 두 줄: 라이트/다크). 각 테마 --c-bg 와 같아야 한다(contrast.test.ts 가 확인). */
+export const THEME_COLORS: Record<ThemeId, { light: string; dark: string }> = {
   basic: { light: "#ffffff", dark: "#121316" },
-  crayon: { light: "#d7edf8", dark: "#1e1a18" },
+  crayon: { light: "#fffdf5", dark: "#1e1a18" },
   forest: { light: "#f6f1e3", dark: "#121b1a" },
 };
 

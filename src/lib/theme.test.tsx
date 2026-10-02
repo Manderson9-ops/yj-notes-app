@@ -64,7 +64,7 @@ describe("theme", () => {
     expect(result.current[0]).toBe("crayon");
     expect(localStorage.getItem(THEME_KEY)).toBe("crayon");
     expect(document.documentElement.dataset.theme).toBe("crayon");
-    expect(light.content).toBe("#d7edf8");
+    expect(light.content).toBe("#fffdf5");
     act(() => {
       result.current[1]("basic");
     });

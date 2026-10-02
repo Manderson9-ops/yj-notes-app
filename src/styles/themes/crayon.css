@@ -27,6 +27,7 @@
   --c-deco-1: #c8102e;
   --c-deco-2: #ffd4da;
   --c-deco-3: #ffe600;
+  --c-cloud: #ffffff;
   --c-warn: #7a4300;
   --c-warn-bg: #fff1d6;
   --c-alert: #a3201a;
@@ -68,6 +69,7 @@
     --c-deco-1: #ff7a8a;
     --c-deco-2: #5a3a40;
     --c-deco-3: #ffe45c;
+    --c-cloud: #3a302c;
     --c-warn: #ffc978;
     --c-warn-bg: #3a2a12;
     --c-alert: #ff9a8f;
@@ -110,6 +112,11 @@
   color: var(--c-accent);
 }
 
+/* Jua 는 굵기가 하나뿐이라 활성 탭 라벨은 글자 둘레선으로 굵게 */
+:root[data-theme="crayon"] .tab.active span {
+  -webkit-text-stroke: 0.5px currentColor;
+}
+
 :root[data-theme="crayon"] .tab .decor-tab {
   display: none;
   width: 36px;
@@ -149,6 +156,27 @@
   box-shadow: var(--shadow-press);
 }
 
+/* 뗄 때 튀어 오름(scale .94 → 1.04 → 1). 누르는 동안엔 :active 가 이기고, 뗀 뒤 포커스가 남은 버튼에서 한 번 재생 */
+:root[data-theme="crayon"] :is(.btn, .btn-primary, .chip, .key):focus:not(:active):not(:disabled) {
+  animation: crayon-pop var(--dur) var(--ease);
+}
+
+@keyframes crayon-pop {
+  0% {
+    transform: translate(2px, 2px) scale(0.94);
+  }
+  55% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+:root[data-theme="crayon"] :is(.btn, .btn-primary, .chip, .key):disabled {
+  box-shadow: none;
+}
+
 :root[data-theme="crayon"] .btn {
   background: var(--c-surface);
   color: var(--c-fg);
@@ -171,9 +199,15 @@
   justify-self: center;
   border-radius: 50%;
   background: var(--c-surface);
+  font-size: calc(var(--fs-xl) * 1.077); /* 28px (큰 글씨 땐 비례) */
+}
+
+:root[data-theme="crayon"] .key-aux {
+  font-size: max(14px, calc(var(--fs-base) * 0.8));
 }
 
 :root[data-theme="crayon"] .key-primary {
+  font-size: var(--fs-lg);
   background: var(--c-accent);
   border-color: var(--c-border);
 }
@@ -194,7 +228,6 @@
   inset: 0 0 auto;
   height: 6px;
   background: var(--c-surface-2);
-  border-bottom: 2px solid var(--c-line);
 }
 
 :root[data-theme="crayon"] .card:nth-child(3n + 2)::before {
@@ -237,6 +270,39 @@
   transform: none;
 }
 
+/* ---- 큰 글씨 스위치: 먹선 네모 + 체크 ---- */
+:root[data-theme="crayon"] .setting-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  border: var(--bw) solid var(--c-border);
+  border-radius: 9px;
+  background: var(--c-surface);
+  box-shadow: var(--shadow);
+}
+
+:root[data-theme="crayon"] .setting-row input[type="checkbox"]:checked {
+  background: var(--c-accent-soft);
+}
+
+:root[data-theme="crayon"] .setting-row input[type="checkbox"]::before {
+  content: "";
+  width: 16px;
+  height: 9px;
+  border-bottom: 4px solid var(--c-on-accent-soft);
+  border-left: 4px solid var(--c-on-accent-soft);
+  transform: translateY(-2px) rotate(-45deg) scale(0);
+  transition: transform var(--dur) var(--ease);
+}
+
+:root[data-theme="crayon"] .setting-row input[type="checkbox"]:checked::before {
+  transform: translateY(-2px) rotate(-45deg) scale(1);
+}
 /* 스와치(설정·미리보기의 테마 고르기) */
 .swatch[data-swatch="crayon"] i:nth-child(1) {
   background: #d7edf8;

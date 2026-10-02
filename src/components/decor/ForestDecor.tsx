@@ -3,7 +3,7 @@ import { Svg } from "./CrayonDecor";
 // 숲 테마 장식 (docs/design/theme-forest.md §3). 전부 직접 그린 오리지널 path.
 // 정령·동물·사람·탈것·특정 건물·장면 구도 없음. 둥근 적운, 겹친 언덕, 잎.
 
-/** 언덕 2겹: 뒤 언덕은 연하게(공기 원근) */
+/** 언덕 3겹: 뒤로 갈수록 연하고(공기 원근), 맨 앞이 가장 어둡다(라이트·다크 모두) */
 export function HillLayers() {
   return (
     <Svg viewBox="0 0 360 96" preserveAspectRatio="none">
@@ -16,7 +16,7 @@ export function HillLayers() {
         d="M0 70 C40 52 92 54 148 66 C206 78 262 74 306 60 C330 53 348 54 360 58 L360 96 L0 96 Z"
       />
       <path
-        className="d-f3 d-soft"
+        className="d-hill-front"
         d="M0 86 C60 78 120 84 200 88 C260 90 320 82 360 84 L360 96 L0 96 Z"
       />
     </Svg>
@@ -28,7 +28,7 @@ export function CumulusCloud() {
   return (
     <Svg viewBox="0 0 120 60">
       <path
-        className="d-paper"
+        className="d-cloud"
         d="M20 50 A14 14 0 0 1 22 22 A18 18 0 0 1 56 14 A16 16 0 0 1 86 24 A14 14 0 0 1 100 50 Z"
       />
       <path
@@ -60,15 +60,16 @@ export function Sprout() {
   );
 }
 
-/** 바람결: 끝이 둥근 곡선 세 줄 */
+/** 바람결: 끝이 가늘어지는 길이 다른 세 줄(옅게) */
 export function WindLines() {
   return (
     <Svg viewBox="0 0 120 40">
       <path
-        className="d-st1"
-        strokeWidth="3"
-        d="M4 10 C30 4 50 16 76 9 C88 6 96 8 100 12 M16 22 C40 16 60 28 88 21 M30 33 C50 29 62 36 82 32"
+        className="d-f1 d-soft"
+        d="M4 11 C30 3 52 17 80 9 C96 5 104 8 110 12 C98 9 90 11 78 13 C52 19 30 9 4 11 Z"
       />
+      <path className="d-f1 d-soft" d="M18 24 C40 17 60 29 86 22 C70 28 44 27 18 24 Z" />
+      <path className="d-f1 d-soft" d="M34 35 C48 31 62 37 78 33 C64 38 48 37 34 35 Z" />
     </Svg>
   );
 }
@@ -83,5 +84,19 @@ export function MoonStars() {
         d="M72 8 L74 13 L79 14.5 L74 16 L72 21 L70 16 L65 14.5 L70 13 Z M88 30 L89.2 33 L92 34 L89.2 35 L88 38 L86.8 35 L84 34 L86.8 33 Z M68 42 L69.2 45 L72 46 L69.2 47 L68 50 L66.8 47 L64 46 L66.8 45 Z"
       />
     </Svg>
+  );
+}
+
+/** 낮엔 구름, 밤(다크)엔 달과 별 */
+export function SkyPair() {
+  return (
+    <span className="decor-sky" aria-hidden="true">
+      <span className="decor-day">
+        <CumulusCloud />
+      </span>
+      <span className="decor-night">
+        <MoonStars />
+      </span>
+    </span>
   );
 }

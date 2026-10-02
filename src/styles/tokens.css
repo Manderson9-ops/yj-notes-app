@@ -22,6 +22,7 @@
   --c-deco-1: #8fb3ec;
   --c-deco-2: #c9d6ee;
   --c-deco-3: #f2d98a;
+  --c-cloud: #ffffff;
   --c-warn: #a14a00;
   --c-warn-bg: #fdf0dc;
   --c-alert: #b3261e;
@@ -87,6 +88,7 @@
     --c-deco-1: #2b4a80;
     --c-deco-2: #2a3550;
     --c-deco-3: #6b5a20;
+    --c-cloud: #2a3550;
     --c-warn: #ffb066;
     --c-warn-bg: #33250f;
     --c-alert: #ff8a80;

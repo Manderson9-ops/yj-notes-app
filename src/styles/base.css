@@ -230,11 +230,12 @@ h2 {
   font-size: var(--fs-xl);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
   cursor: pointer;
 }
 
 .key-aux {
-  font-size: 14px;
+  font-size: max(14px, calc(var(--fs-base) * 0.8));
 }
 
 .key-primary {

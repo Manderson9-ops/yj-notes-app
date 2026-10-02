@@ -109,3 +109,50 @@ export function DoodleHouse() {
     </Svg>
   );
 }
+
+/** 기울어진 우산(펼친 채): 갓 + 손잡이 */
+export function DoodleUmbrella() {
+  return (
+    <Svg viewBox="0 0 80 80">
+      <g transform="rotate(-18 40 44)">
+        <path className="d-line" strokeWidth="3" d="M40 38 L41.5 66 C42.3 74 51 74 51.5 67" />
+        <path
+          className="d-ink d-f1"
+          d="M7 40 C9 19 36 8 57 17 C68 23 73 32 73 40 C67 35 62 36 56.5 40 C51 35 45 35 40 40 C34 35 29 35 23.5 40 C18 35 13 36 7 40 Z"
+        />
+      </g>
+    </Svg>
+  );
+}
+
+/** 튀는 공: 동그란 공 + 땅 그림자 + 움직임 선 두 줄 */
+export function DoodleBall() {
+  return (
+    <Svg viewBox="0 0 88 72">
+      <path className="d-line" strokeWidth="2.5" d="M8 20 L21 24 M5 36 L18 36" />
+      <path className="d-line" strokeWidth="2.5" d="M31 63 C41 67 53 67 63 62" />
+      <path
+        className="d-ink d-f3"
+        d="M45 12 C57 11 66 21 66 32 C66 44 57 52 45 52 C33 52 24 43 24 32 C24 21 33 13 45 12 Z"
+      />
+      <path className="d-line" strokeWidth="2" d="M26 30 C38 37 52 37 65 29" />
+    </Svg>
+  );
+}
+
+/** 물웅덩이: 납작한 물 모양 + 물결 두 줄 */
+export function DoodlePuddle() {
+  return (
+    <Svg viewBox="0 0 96 40">
+      <path
+        className="d-ink d-sky"
+        d="M6 28 C4 18 20 12 34 15 C44 8 66 9 74 17 C90 17 94 27 84 31 C72 37 40 38 20 35 C12 34 7 32 6 28 Z"
+      />
+      <path
+        className="d-line"
+        strokeWidth="2"
+        d="M28 25 C36 22 46 22 54 25 M58 29 C64 27 70 27 76 29"
+      />
+    </Svg>
+  );
+}

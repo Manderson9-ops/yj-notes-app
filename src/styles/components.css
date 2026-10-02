@@ -2,6 +2,9 @@
    화면 코드는 이 클래스만 쓰고 테마를 모른다(TH-8). */
 
 .link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
   color: var(--c-link);
   text-underline-offset: 3px;
 }
@@ -58,6 +61,18 @@ mark {
 }
 
 /* ---- 칩 (선택은 색 + 체크 아이콘 + aria-pressed) ---- */
+/* 입력·칩 줄·결과 카드가 이어질 때 숨 쉴 간격 */
+.field,
+.chip-row {
+  margin-top: var(--space-3);
+}
+
+.chip-row + .card,
+.chip-row + .card-stack,
+.field + .chip-row {
+  margin-top: var(--space-3);
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -179,7 +194,7 @@ mark {
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-5) var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-5);
   color: var(--c-muted);
   text-align: center;
 }
@@ -321,6 +336,15 @@ mark {
 .d-f3 {
   fill: var(--c-deco-3);
 }
+.d-cloud {
+  fill: var(--c-cloud);
+}
+.d-hill-front {
+  fill: var(--c-hill-front);
+}
+.d-sky {
+  fill: var(--c-surface-2);
+}
 .d-paper {
   fill: var(--c-surface);
 }
@@ -352,15 +376,16 @@ mark {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: var(--space-2);
-  height: 120px;
+  gap: var(--space-3);
+  height: 96px;
   max-width: 100%;
   pointer-events: none;
 }
 
 .decor-empty .decor {
-  width: 84px;
+  width: 88px;
   height: auto;
+  max-height: 96px;
 }
 
 .decor-empty .decor:nth-child(3) {
@@ -397,9 +422,14 @@ mark {
   height: 100%;
 }
 
+.decor-sky,
 .decor-day,
 .decor-night {
   height: 100%;
+}
+
+.decor-sky {
+  display: block;
 }
 
 .decor-day {

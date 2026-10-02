@@ -28,6 +28,8 @@
   --c-deco-1: #64a0bc;
   --c-deco-2: #66a063;
   --c-deco-3: #28533d;
+  --c-cloud: #fffdf6;
+  --c-hill-front: #28533d; /* 숲 전용(계약 밖): 맨 앞 언덕은 항상 뒤 언덕보다 어둡게 */
   --c-warn: #7a4a00;
   --c-warn-bg: #f7e8c4;
   --c-alert: #7a2a1f;
@@ -45,8 +47,8 @@
   --shadow-press: 0 1px 4px rgba(40, 73, 95, 0.12);
   /* 하늘(위)·숲(아래) 워시. 글자 뒤 카드·입력은 --c-surface 단색이라 대비에 영향 없음 */
   --tex-bg:
-    radial-gradient(120% 38% at 50% -6%, #dceaf0 0%, rgba(220, 234, 240, 0) 72%),
-    radial-gradient(110% 30% at 50% 108%, rgba(102, 160, 99, 0.16) 0%, rgba(102, 160, 99, 0) 72%);
+    radial-gradient(150% 46% at 50% -4%, #dceaf0 0%, #dceaf0 38%, rgba(220, 234, 240, 0) 100%),
+    radial-gradient(130% 40% at 50% 106%, rgba(102, 160, 99, 0.28) 0%, rgba(102, 160, 99, 0) 100%);
   --tex-surface: none;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --dur: 260ms;
@@ -72,6 +74,8 @@
     --c-deco-1: #28495f;
     --c-deco-2: #28533d;
     --c-deco-3: #f2d58a;
+    --c-cloud: #3a4f55;
+    --c-hill-front: #0f1f1a;
     --c-warn: #f2c46d;
     --c-warn-bg: #2e2614;
     --c-alert: #f09a84;
@@ -83,15 +87,20 @@
     --shadow: 0 0 0 1px rgba(237, 230, 211, 0.06);
     --shadow-press: 0 0 0 1px rgba(237, 230, 211, 0.06);
     --tex-bg:
-      radial-gradient(120% 38% at 50% -6%, #1e3033 0%, rgba(30, 48, 51, 0) 72%),
-      radial-gradient(110% 30% at 50% 108%, rgba(40, 83, 61, 0.35) 0%, rgba(40, 83, 61, 0) 72%);
+      radial-gradient(150% 46% at 50% -4%, #1e3033 0%, #1e3033 38%, rgba(30, 48, 51, 0) 100%),
+      radial-gradient(130% 40% at 50% 106%, rgba(40, 83, 61, 0.5) 0%, rgba(40, 83, 61, 0) 100%);
   }
 }
 
 /* ---- 글꼴: 정적 UI 문구만 (본문·숫자는 시스템 글꼴) ---- */
-:root[data-theme="forest"] :is(h1, h2, .app-title, .tab span, .btn, .btn-primary) {
+/* display 글꼴은 20px 이상 제목(앱 이름·h1·h2)에만. 탭·버튼은 본문 글꼴 */
+:root[data-theme="forest"] :is(h1, h2, .app-title) {
   font-family: var(--font-display);
   font-weight: 700;
+}
+
+:root[data-theme="forest"] :is(.tab, .btn, .btn-primary) {
+  font-family: var(--font-body);
 }
 
 /* ---- 머리글·탭 ---- */
@@ -193,7 +202,7 @@
   border-radius: 8px;
 }
 
-/* 장식 배치: 빈 상태(언덕 위에 구름·잎·새싹), 머리글 구름 */
+/* 장식 배치: 머리글 하늘(낮 구름/밤 달), 빈 상태(카드 폭 가득 언덕 3겹 + 하늘·잎·새싹) */
 :root[data-theme="forest"] .decor-header .decor {
   width: 100%;
   height: 100%;
@@ -201,44 +210,59 @@
 
 :root[data-theme="forest"] .decor-empty-forest {
   position: relative;
-  width: 100%;
-  max-width: 320px;
-  height: 120px;
+  align-self: stretch;
+  height: 112px;
+  margin: 0 calc(-1 * var(--space-4));
+  max-width: none;
 }
 
-:root[data-theme="forest"] .decor-empty-forest .decor {
+:root[data-theme="forest"] .decor-empty-forest > .decor {
   position: absolute;
-  width: auto;
-  height: 44px;
-}
-
-:root[data-theme="forest"] .decor-empty-forest .decor:nth-child(1) {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 60px;
+  height: 56px;
 }
 
-:root[data-theme="forest"] .decor-empty-forest .decor:nth-child(2) {
-  top: 6px;
+:root[data-theme="forest"] .decor-empty-forest .decor-sky {
+  position: absolute;
+  top: 8px;
   left: 14%;
+  height: 40px;
+  width: 72px;
 }
 
-:root[data-theme="forest"] .decor-empty-forest .decor:nth-child(3) {
-  bottom: 26px;
+:root[data-theme="forest"] .decor-empty-forest .decor-sky .decor {
+  width: 100%;
+  height: 100%;
+}
+
+:root[data-theme="forest"] .decor-empty-forest .decor-sway {
   left: 46%;
-  height: 64px;
+  bottom: 30px;
+  width: auto;
+  height: 40px;
 }
 
-:root[data-theme="forest"] .decor-empty-forest .decor:nth-child(4) {
+:root[data-theme="forest"] .decor-empty-forest > .decor:last-child:not(.decor-sway) {
+  left: auto;
   right: 12%;
   bottom: 30px;
+  width: auto;
   height: 52px;
 }
 
+:root[data-theme="forest"] .decor-empty-forest > .decor:first-child {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 56px;
+}
 /* 빈 상태: 하늘 워시 */
 :root[data-theme="forest"] .empty {
-  background: linear-gradient(var(--c-surface-2), rgba(0, 0, 0, 0) 75%);
+  overflow: hidden;
+  background: linear-gradient(var(--c-surface-2), var(--c-surface) 75%);
+  border: 1px solid var(--c-line);
   border-radius: var(--radius-lg);
 }
 
@@ -279,6 +303,56 @@
   display: none;
 }
 
+/* ---- 종이 결: 정적 feTurbulence(회색조) data URI, 아주 옅게. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없다 ---- */
+:root[data-theme="forest"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="forest"] body::before {
+    opacity: 0.04;
+  }
+}
+
+/* ---- 큰 글씨 스위치: 둥근 네모 + 체크 ---- */
+:root[data-theme="forest"] .setting-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  background: var(--c-surface);
+}
+
+:root[data-theme="forest"] .setting-row input[type="checkbox"]:checked {
+  border-color: var(--c-accent);
+  background: var(--c-accent);
+}
+
+:root[data-theme="forest"] .setting-row input[type="checkbox"]::before {
+  content: "";
+  width: 16px;
+  height: 9px;
+  border-bottom: 3px solid var(--c-on-accent);
+  border-left: 3px solid var(--c-on-accent);
+  transform: translateY(-2px) rotate(-45deg) scale(0);
+  transition: transform var(--dur) var(--ease);
+}
+
+:root[data-theme="forest"] .setting-row input[type="checkbox"]:checked::before {
+  transform: translateY(-2px) rotate(-45deg) scale(1);
+}
 /* 스와치(설정·미리보기의 테마 고르기) */
 .swatch[data-swatch="forest"] i:nth-child(1) {
   background: #dceaf0;
