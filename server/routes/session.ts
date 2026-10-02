@@ -2,8 +2,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../app";
-import { verifyPin } from "../auth/pin";
-import { beginAttempt, hashIp, markSuccess } from "../auth/ratelimit";
+import { isPinConfigured, parsePinLength, verifyPin } from "../auth/pin";
+import { beginAttempt, hashIp, markSuccess, voidAttempt } from "../auth/ratelimit";
 import {
   buildClearCookie,
   buildSessionCookie,
@@ -35,6 +35,8 @@ sessionRoutes.post("/api/session", async (c) => {
   if (!parsed.success) return errorResponse(400, "bad_request", "잘못된 요청이에요.");
 
   const env = c.env;
+  // 서버 설정 오류(PIN 비밀값 없음)는 시도로 세지 않는다: 기록·잠금 계산 전에 500 (fail closed).
+  if (!isPinConfigured(env)) throw new Error("PIN_HASH/PIN_SALT not configured");
   const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
   const ipHash = await hashIp(ip, env.IP_HASH_SALT);
 
@@ -50,7 +52,14 @@ sessionRoutes.post("/api/session", async (c) => {
     );
   }
 
-  const ok = await verifyPin(parsed.data.pin, env.PIN_SALT, env.PIN_HASH);
+  let ok: boolean;
+  try {
+    ok = await verifyPin(parsed.data.pin, env.PIN_SALT, env.PIN_HASH);
+  } catch (e) {
+    // 대조 자체가 못 된 것(PIN_HASH/PIN_SALT 형식 오류 등)은 틀린 PIN 이 아니다 -> 기록을 되돌리고 500.
+    await voidAttempt(env.DB, attempt.attemptId);
+    throw e;
+  }
 
   let cookie: string | null = null;
   if (ok) {
@@ -70,7 +79,12 @@ sessionRoutes.post("/api/session", async (c) => {
 
 sessionRoutes.get("/api/session", async (c) => {
   const authenticated = await isAuthenticated(c.req.raw, c.env, c.get("deps").now());
-  return jsonResponse(200, { authenticated });
+  // pinLength: 유효한 PIN_LENGTH 일 때만, 세션 유무와 무관하게 포함(로그인 화면용).
+  const pinLength = parsePinLength(c.env.PIN_LENGTH);
+  return jsonResponse(
+    200,
+    pinLength === undefined ? { authenticated } : { authenticated, pinLength },
+  );
 });
 
 sessionRoutes.delete("/api/session", () => {
