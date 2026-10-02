@@ -1,4 +1,6 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
+import { MOCK_MODULES, type MockContext } from "./mock/index.ts";
 
 /**
  * FAKE session API for local UI work and e2e only. NOT a real auth implementation.
@@ -13,11 +15,57 @@ import type { Plugin } from "vite";
  */
 const COOKIE = "yj_mock_session";
 
+function sender(res: ServerResponse): MockContext["send"] {
+  return (status, body, headers = {}) => {
+    res.statusCode = status;
+    for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
+    if (body === undefined) {
+      res.end();
+      return;
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(body));
+  };
+}
+
+function readJson(req: IncomingMessage): Promise<unknown> {
+  return new Promise((resolve) => {
+    let raw = "";
+    req.on("data", (c: Buffer) => (raw += c.toString()));
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(raw) as unknown);
+      } catch {
+        resolve(undefined);
+      }
+    });
+  });
+}
+
 export function mockApi(): Plugin {
   return {
     name: "mock-api",
     apply: "serve",
     configureServer(server) {
+      // Feature modules (vite-plugins/mock/*.ts). Like the real middleware, data routes need a session.
+      for (const mod of MOCK_MODULES) {
+        server.middlewares.use(mod.prefix, (req, res) => {
+          const url = new URL(req.url ?? "/", "http://mock");
+          const authed = (req.headers.cookie ?? "").includes(`${COOKIE}=1`);
+          const send = sender(res);
+          if (!authed) {
+            send(401, { error: "unauthenticated", message: "unauthenticated" });
+            return;
+          }
+          void mod.handle(req, res, {
+            subPath: url.pathname === "/" ? "" : url.pathname,
+            query: url.searchParams,
+            authed,
+            send,
+            readJson: () => readJson(req),
+          });
+        });
+      }
       server.middlewares.use("/api/session", (req, res) => {
         const send = (status: number, body?: unknown, headers: Record<string, string> = {}) => {
           res.statusCode = status;
