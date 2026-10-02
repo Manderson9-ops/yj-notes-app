@@ -1,0 +1,535 @@
+/* 테마: 숲 (docs/design/theme-forest.md). 토큰·모양·모션만 바꾼다. 화면 구조는 그대로.
+   글자가 올라가는 면은 단색. 수채 워시는 바탕 층(body 배경)과 장식에만 쓴다. */
+
+/* 장식 폰트: 정적 UI 문구 글자만 남긴 부분 집합. 이 테마가 켜져 글자가 쓰일 때만 내려받는다. */
+@font-face {
+  font-family: "YJ Forest Display";
+  src: url("/fonts/yj-forest-display.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root[data-theme="forest"] {
+  --c-bg: #f6f1e3;
+  --c-fg: #2b3a33;
+  --c-muted: #4f5d55;
+  --c-border: #8a7b5e;
+  --c-line: rgba(122, 86, 52, 0.22);
+  --c-surface: #fffdf6;
+  --c-surface-2: #dceaf0;
+  --c-accent: #2f6b4f;
+  --c-on-accent: #ffffff;
+  --c-accent-soft: #ddebdd;
+  --c-on-accent-soft: #1f4d38;
+  --c-link: #2d6a8e;
+  --c-badge: #f2d58a;
+  --c-on-badge: #2b3a33;
+  --c-earth: #7a5634;
+  --c-deco-1: #64a0bc;
+  --c-deco-2: #66a063;
+  --c-deco-3: #28533d;
+  --c-cloud: #fffdf6;
+  --c-shadow: #28495f; /* 푸른 기 그림자 */
+  --c-hill-front: #28533d; /* 숲 전용(계약 밖): 맨 앞 언덕은 항상 뒤 언덕보다 어둡게 */
+  --blob-alpha: 0.18; /* 숲 전용: 하늘 번짐의 진하기(contrast.test.ts 가 읽어 대비 확인) */
+  --blob-alpha-2: 0.1; /* 숲 전용: 숲색 번짐 */
+  --c-warn: #7a4a00;
+  --c-warn-bg: #f7e8c4;
+  --c-alert: #7a2a1f;
+  --c-alert-bg: #f8e3dc;
+  --c-info: #1f4a66;
+  --c-info-bg: #e4eef2;
+  --c-ok: #1f4d38;
+  --c-ok-bg: #ddebdd;
+
+  --font-display: "YJ Forest Display", var(--font-body);
+  --radius: 14px;
+  --radius-lg: 16px;
+  --bw: 1px;
+  --shadow: 0 2px 12px color-mix(in srgb, var(--c-shadow) 16%, transparent);
+  --shadow-press: 0 1px 5px color-mix(in srgb, var(--c-shadow) 16%, transparent);
+  /* 하늘(위)·숲(아래) 워시. 글자 뒤 카드·입력은 --c-surface 단색이라 대비에 영향 없음 */
+  --tex-bg:
+    radial-gradient(150% 46% at 50% -4%, #dceaf0 0%, #dceaf0 38%, rgba(220, 234, 240, 0) 100%),
+    radial-gradient(130% 40% at 50% 106%, rgba(102, 160, 99, 0.12) 0%, rgba(102, 160, 99, 0) 100%);
+  --tex-surface: none;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur: 260ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="forest"] {
+    --c-bg: #121b1a;
+    --c-fg: #ede6d3;
+    --c-muted: #b9c2b5;
+    --c-border: #76887c;
+    --c-line: rgba(237, 230, 211, 0.1);
+    --c-surface: #1b2826;
+    --c-surface-2: #1e3033;
+    --c-accent: #8cc7a1;
+    --c-on-accent: #10201a;
+    --c-accent-soft: #2a4a3a;
+    --c-on-accent-soft: #dcefe2;
+    --c-link: #9cc9e3;
+    --c-badge: #f2d58a;
+    --c-on-badge: #121b1a;
+    --c-earth: #d2b48c;
+    --c-deco-1: #28495f;
+    --c-deco-2: #28533d;
+    --c-deco-3: #f2d58a;
+    --c-cloud: #3a4f55;
+    --c-shadow: #000000;
+    --c-hill-front: #1a2e26;
+    --blob-alpha: 0.28;
+    --blob-alpha-2: 0.2;
+    --c-warn: #f2c46d;
+    --c-warn-bg: #2e2614;
+    --c-alert: #f09a84;
+    --c-alert-bg: #2e1b17;
+    --c-info: #9cc9e3;
+    --c-info-bg: #16262e;
+    --c-ok: #8cc7a1;
+    --c-ok-bg: #16291f;
+    --shadow: 0 0 0 1px rgba(237, 230, 211, 0.06);
+    --shadow-press: 0 0 0 1px rgba(237, 230, 211, 0.06);
+    --tex-bg:
+      radial-gradient(150% 46% at 50% -4%, #1e3033 0%, #1e3033 38%, rgba(30, 48, 51, 0) 100%),
+      radial-gradient(130% 40% at 50% 106%, rgba(40, 83, 61, 0.5) 0%, rgba(40, 83, 61, 0) 100%);
+  }
+}
+
+/* ---- 글꼴: 정적 UI 문구만 (본문·숫자는 시스템 글꼴) ---- */
+/* display 글꼴은 20px 이상 제목(앱 이름·h1·h2)에만. 탭·버튼은 본문 글꼴 */
+:root[data-theme="forest"] :is(h1, h2, .app-title) {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+:root[data-theme="forest"] :is(.tab, .btn, .btn-primary) {
+  font-family: var(--font-body);
+}
+
+/* ---- 머리글·탭 ---- */
+:root[data-theme="forest"] .shell-header {
+  position: relative;
+  background: var(--c-surface-2);
+  border-bottom: 1px solid var(--c-line);
+}
+
+:root[data-theme="forest"] .shell-header .decor-header {
+  position: absolute;
+  right: 64px;
+  top: 8px;
+  width: 56px;
+  height: 28px;
+}
+
+:root[data-theme="forest"] .tabbar {
+  background: var(--c-surface);
+  border-top: 1px solid var(--c-line);
+}
+
+:root[data-theme="forest"] .tab {
+  position: relative;
+}
+
+:root[data-theme="forest"] .tab.active {
+  background: transparent;
+  color: var(--c-accent);
+}
+
+:root[data-theme="forest"] .tab.active::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 22%;
+  right: 22%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--c-accent);
+}
+
+/* ---- 버튼·키 ---- */
+:root[data-theme="forest"] :is(.btn, .btn-primary, .key) {
+  box-shadow: var(--shadow);
+  transition:
+    transform var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+:root[data-theme="forest"] :is(.btn, .btn-primary, .key):active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: var(--shadow-press);
+}
+
+:root[data-theme="forest"] .btn {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  color: var(--c-accent);
+}
+
+:root[data-theme="forest"] .btn-primary {
+  border-color: var(--c-accent);
+}
+
+:root[data-theme="forest"] .key {
+  width: 72px;
+  height: 72px;
+  min-height: 0;
+  font-size: calc(var(--fs-xl) * 1.077); /* 28px (큰 글씨 땐 비례) */
+  justify-self: center;
+  border-radius: 50%;
+}
+
+:root[data-theme="forest"] .key-aux {
+  font-size: var(--fs-sm);
+}
+
+:root[data-theme="forest"] .key-primary {
+  font-size: var(--fs-lg);
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+}
+
+/* ---- 카드: 평면 + 위 2px 띠(하늘/숲, 장식) ---- */
+:root[data-theme="forest"] .card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--c-deco-1);
+}
+
+:root[data-theme="forest"] .card:nth-child(even)::before {
+  background: var(--c-deco-2);
+}
+
+/* 안내 상자: 왼쪽 4px 막대 */
+:root[data-theme="forest"] .notice {
+  border-left: 4px solid var(--tone);
+  border-radius: 8px;
+}
+
+/* 장식 배치: 머리글 하늘(낮 구름/밤 달), 빈 상태(카드 폭 가득 언덕 3겹 + 하늘·잎·새싹) */
+:root[data-theme="forest"] .decor-header .decor {
+  width: 100%;
+  height: 100%;
+}
+
+:root[data-theme="forest"] .decor-empty-forest {
+  position: relative;
+  align-self: stretch;
+  height: 112px;
+  margin: 0 calc(-1 * var(--space-4));
+  max-width: none;
+}
+
+:root[data-theme="forest"] .decor-empty-forest > .decor {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 56px;
+}
+
+:root[data-theme="forest"] .decor-empty-forest .decor-sky {
+  position: absolute;
+  top: 8px;
+  left: 14%;
+  height: 40px;
+  width: 72px;
+}
+
+:root[data-theme="forest"] .decor-empty-forest .decor-sky .decor {
+  width: 100%;
+  height: 100%;
+}
+
+:root[data-theme="forest"] .decor-empty-forest .decor-sway {
+  left: 46%;
+  bottom: 14px; /* 언덕에 닿게 */
+  width: auto;
+  height: 30px; /* 언덕(56px)의 60% 이하 */
+}
+
+:root[data-theme="forest"] .decor-empty-forest > .decor:last-child:not(.decor-sway) {
+  left: auto;
+  right: 12%;
+  bottom: 12px;
+  width: auto;
+  height: 32px;
+}
+
+:root[data-theme="forest"] .decor-empty-forest > .decor:first-child {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 56px;
+}
+/* 빈 상태: 하늘 워시 */
+:root[data-theme="forest"] .empty {
+  overflow: hidden;
+  background: linear-gradient(var(--c-surface-2), var(--c-surface) 75%);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+}
+
+/* ---- 모션: 느리고 작게. 장식 1개만 흔들림, 전환은 opacity + 4px ---- */
+:root[data-theme="forest"] .shell-main > * {
+  animation: forest-rise var(--dur) var(--ease) both;
+}
+
+:root[data-theme="forest"] .decor-sway {
+  transform-origin: 50% 100%;
+  animation: forest-sway 7s ease-in-out infinite;
+}
+
+@keyframes forest-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes forest-sway {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+
+/* 진지한 영역: 띠·흔들림·그림자 끔 (장식 숨김은 components.css) */
+:root[data-theme="forest"] [data-tone="serious"] .card::before,
+:root[data-theme="forest"] .card[data-tone="serious"]::before {
+  display: none;
+}
+
+/* ---- 수채 번짐: 헤더·빈 상태·PIN 하늘의 장식 층에만. 젖은 종이에 물감을 떨어뜨린 듯:
+   하늘색(--c-deco-1) 번짐 두 개(진하기·위치 다르게)를 겹치고, 각 번짐은 마스크 SVG 안에서
+   feTurbulence + feDisplacementMap 으로 모양을 만들고 feGaussianBlur 로 풀되, 안쪽은 옅고(.5) 가장자리 고리(stroke)는
+   더 진하게 남겨 수채 특유의 "번짐 테두리"를 만든다. 거기에 radial-gradient 페이드를 곱한다(mask-composite: intersect).
+   글자 면에는 올리지 않고, 가장 진한 합성색은 contrast.test.ts 가 --blob-alpha(-2) 로 계산해 대비를 막는다 ---- */
+:root[data-theme="forest"] {
+  --blob-mask-a: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-40%25' y='-60%25' width='180%25' height='220%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.014 .026' numOctaves='3' seed='4' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='46' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='11'/%3E%3C/filter%3E%3Cg filter='url(%23w)'%3E%3Cellipse cx='150' cy='60' rx='96' ry='26' fill='%23000' fill-opacity='.5'/%3E%3Cellipse cx='150' cy='60' rx='96' ry='26' fill='none' stroke='%23000' stroke-width='4' stroke-opacity='.55'/%3E%3C/g%3E%3C/svg%3E");
+  --blob-mask-b: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-40%25' y='-60%25' width='180%25' height='220%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02 .03' numOctaves='3' seed='9' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='46' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='11'/%3E%3C/filter%3E%3Cg filter='url(%23w)'%3E%3Cellipse cx='140' cy='56' rx='90' ry='30' fill='%23000' fill-opacity='.5'/%3E%3Cellipse cx='140' cy='56' rx='90' ry='30' fill='none' stroke='%23000' stroke-width='4' stroke-opacity='.55'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+:root[data-theme="forest"] :is(.shell-header, .empty, .pin-screen)::before,
+:root[data-theme="forest"] :is(.shell-header, .empty)::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+:root[data-theme="forest"] :is(.shell-header, .empty, .pin-screen)::before {
+  background: var(--c-deco-1);
+  opacity: var(--blob-alpha);
+  -webkit-mask:
+    var(--blob-mask-a) center / 100% 100% no-repeat,
+    radial-gradient(closest-side, #000 70%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-composite: source-in;
+  mask:
+    var(--blob-mask-a) center / 100% 100% no-repeat,
+    radial-gradient(closest-side, #000 70%, rgba(0, 0, 0, 0) 100%);
+  mask-composite: intersect;
+}
+
+:root[data-theme="forest"] :is(.shell-header, .empty)::after {
+  background: var(--c-deco-1);
+  opacity: var(--blob-alpha-2);
+  -webkit-mask:
+    var(--blob-mask-b) center / 100% 100% no-repeat,
+    radial-gradient(closest-side, #000 70%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-composite: source-in;
+  mask:
+    var(--blob-mask-b) center / 100% 100% no-repeat,
+    radial-gradient(closest-side, #000 70%, rgba(0, 0, 0, 0) 100%);
+  mask-composite: intersect;
+}
+
+/* 헤더: 설정 아이콘 왼쪽 위 구석에 작게(제목과 겹치지 않음) */
+:root[data-theme="forest"] .shell-header::before {
+  top: 0;
+  right: 44px;
+  bottom: 0;
+  width: 150px;
+}
+
+:root[data-theme="forest"] .shell-header::after {
+  top: 0;
+  right: 100px;
+  bottom: 0;
+  width: 110px;
+}
+
+/* 빈 상태: 하늘 영역 위쪽에 넓고 옅게 */
+:root[data-theme="forest"] .empty {
+  position: relative;
+}
+
+:root[data-theme="forest"] .empty::before {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 52%;
+}
+
+:root[data-theme="forest"] .empty::after {
+  top: 6%;
+  left: 34%;
+  width: 66%;
+  height: 40%;
+}
+
+:root[data-theme="forest"] .empty > p {
+  position: relative;
+}
+
+/* PIN: 하늘 번짐 1개(화면 위, 글자 뒤 맨 아래 층) */
+:root[data-theme="forest"] .pin-screen::before {
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 190px;
+}
+
+:root[data-theme="forest"] :is(.app-title, .icon-btn) {
+  position: relative;
+}
+
+/* 비활성 키: 흐린 면 대신 평평한 면 + 점선 테두리 + muted 글자 */
+:root[data-theme="forest"] .key:disabled,
+:root[data-theme="forest"] .key-primary:disabled {
+  border: 1px dashed var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-muted);
+}
+/* PIN 위 하늘: 구름을 크게(화면 폭의 35~40%) */
+:root[data-theme="forest"] .pin-screen {
+  padding-bottom: calc(
+    var(--space-5) + 96px
+  ); /* 큰 글씨에서도 맨 아래 키 줄이 언덕(96px)에 닿지 않게 */
+}
+
+:root[data-theme="forest"] .decor-pin-top {
+  height: 96px;
+}
+
+/* 구름은 줄어들지 않게(화면 폭의 35~40%), 바람선이 먼저 줄어든다 */
+:root[data-theme="forest"] .decor-pin-top .decor-sky {
+  flex: none;
+}
+
+:root[data-theme="forest"] .decor-pin-top > .decor {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 46px;
+}
+
+/* 섹션 제목 위계: 더 크고, 위 여백 넉넉, 아래 1px 장식선 */
+:root[data-theme="forest"] h2 {
+  margin-top: var(--space-6);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--c-line);
+  font-size: calc(var(--fs-lg) * 1.12);
+}
+/* ---- 워시: iOS Safari 는 background-attachment: fixed 를 무시하므로 body 배경이 아닌 fixed 층(body::before)으로 둔다.
+   순서: 워시(::before) 아래 → 종이 결(::after) 위. 둘 다 맨 뒤(z-index -1)라 카드·버튼·입력 면 위에는 없다 ---- */
+:root[data-theme="forest"] body {
+  background-image: none;
+}
+
+:root[data-theme="forest"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--tex-bg);
+  background-repeat: no-repeat;
+}
+/* ---- 종이 결: 정적 feTurbulence(회색조) data URI, 아주 옅게. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없다 ---- */
+:root[data-theme="forest"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.055; /* 연구 범위 .04~.06 안. 최악 지점 대비는 contrast.test.ts 가 계산 */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="forest"] body::after {
+    opacity: 0.05;
+  }
+}
+
+/* ---- 테마 고르기 라디오: --c-border 원 + 초록 점 ---- */
+:root[data-theme="forest"] .theme-option input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--c-border);
+  border-radius: 50%;
+  background: var(--c-surface);
+}
+
+:root[data-theme="forest"] .theme-option input[type="radio"]:checked {
+  border-color: var(--c-accent);
+  background: radial-gradient(circle, var(--c-accent) 0 40%, var(--c-surface) 44%);
+}
+/* ---- 큰 글씨 스위치: 둥근 네모 + 체크 ---- */
+:root[data-theme="forest"] .setting-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  background: var(--c-surface);
+}
+
+:root[data-theme="forest"] .setting-row input[type="checkbox"]:checked {
+  border-color: var(--c-accent);
+  background: var(--c-accent);
+}
+
+:root[data-theme="forest"] .setting-row input[type="checkbox"]::before {
+  content: "";
+  width: 16px;
+  height: 9px;
+  border-bottom: 3px solid var(--c-on-accent);
+  border-left: 3px solid var(--c-on-accent);
+  transform: translateY(-2px) rotate(-45deg) scale(0);
+  transition: transform var(--dur) var(--ease);
+}
+
+:root[data-theme="forest"] .setting-row input[type="checkbox"]:checked::before {
+  transform: translateY(-2px) rotate(-45deg) scale(1);
+}
+/* 스와치(설정·미리보기의 테마 고르기) */
+.swatch[data-swatch="forest"] i:nth-child(1) {
+  background: #dceaf0;
+}
+.swatch[data-swatch="forest"] i:nth-child(2) {
+  background: #2f6b4f;
+}
+.swatch[data-swatch="forest"] i:nth-child(3) {
+  background: #f2d58a;
+}

@@ -1,26 +1,67 @@
-/* Design tokens (docs/06 §5). Light by default, dark via prefers-color-scheme. */
+/* Design tokens (docs/06 §5, docs/design/theme-system.md §2) — 「기본」 테마 값.
+   라이트가 기본, 다크는 prefers-color-scheme. 다른 테마는 themes/*.css 가 같은 토큰을 덮어쓴다. */
 :root {
   color-scheme: light dark;
 
+  /* 색 */
   --c-bg: #ffffff;
   --c-fg: #1b1d21;
   --c-muted: #5b6068;
-  --c-border: #d9dce1;
+  --c-border: #7d838c;
+  --c-line: #d9dce1;
   --c-surface: #eef0f4;
-  --c-on-accent: #ffffff;
+  --c-surface-2: #e3e9f4;
   --c-accent: #1558c0;
+  --c-on-accent: #ffffff;
+  --c-accent-soft: #dbe7fb;
+  --c-on-accent-soft: #0f3f8c;
+  --c-link: #1558c0;
+  --c-badge: #ffe08a;
+  --c-on-badge: #1b1d21;
+  --c-earth: #6b5a45;
+  --c-deco-1: #8fb3ec;
+  --c-deco-2: #c9d6ee;
+  --c-deco-3: #f2d98a;
+  --c-cloud: #ffffff;
+  --c-shadow: #141e32;
   --c-warn: #a14a00;
+  --c-warn-bg: #fdf0dc;
   --c-alert: #b3261e;
+  --c-alert-bg: #fce8e6;
+  --c-info: #1d4f9c;
+  --c-info-bg: #e8f0fc;
   --c-ok: #1b6e3a;
+  --c-ok-bg: #e4f4ea;
 
+  /* 글꼴 */
+  --font-body:
+    system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-display: var(--font-body);
+
+  /* 크기(큰 글씨 설정이 덮어씀) */
   --fs-base: 17px;
   --fs-lg: 20px;
   --fs-xl: 26px;
+  --fs-sm: max(14px, calc(var(--fs-base) * 0.82)); /* 탭 라벨·배지·메타: 큰 글씨에 비례 */
   --lh-base: 1.6;
 
-  --tap: 48px;
+  /* 모양 */
   --radius: 12px;
+  --radius-lg: 16px;
+  --bw: 1px;
+  --shadow: 0 1px 2px rgba(20, 30, 50, 0.08);
+  --shadow-press: none;
 
+  /* 질감 */
+  --tex-bg: none;
+  --tex-surface: none;
+
+  /* 동작(prefers-reduced-motion 에서는 base.css 가 전부 끈다) */
+  --ease: ease;
+  --dur: 150ms;
+
+  /* 간격 — 테마 무관 */
+  --tap: 48px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -34,13 +75,32 @@
     --c-bg: #121316;
     --c-fg: #ececf0;
     --c-muted: #a3a8b1;
-    --c-border: #34373d;
+    --c-border: #737a85;
+    --c-line: #34373d;
     --c-surface: #1e2025;
-    --c-on-accent: #0b1220;
+    --c-surface-2: #1b2433;
     --c-accent: #7fb0ff;
+    --c-on-accent: #0b1220;
+    --c-accent-soft: #22385e;
+    --c-on-accent-soft: #d6e4ff;
+    --c-link: #8fbaff;
+    --c-badge: #f0cf6b;
+    --c-on-badge: #121316;
+    --c-earth: #cdb89a;
+    --c-deco-1: #2b4a80;
+    --c-deco-2: #2a3550;
+    --c-deco-3: #6b5a20;
+    --c-cloud: #2a3550;
+    --c-shadow: #000000;
     --c-warn: #ffb066;
+    --c-warn-bg: #33250f;
     --c-alert: #ff8a80;
+    --c-alert-bg: #3a1a18;
+    --c-info: #9cc2ff;
+    --c-info-bg: #17233a;
     --c-ok: #7dd69a;
+    --c-ok-bg: #16291f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 }
 

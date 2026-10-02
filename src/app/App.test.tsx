@@ -48,5 +48,10 @@ describe("App", () => {
     renderApp("/settings");
     expect(await screen.findByText(`앱 버전 ${__APP_VERSION__}`)).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "큰 글씨" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "화면 테마" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "디자인 미리보기" })).toHaveAttribute(
+      "href",
+      "/settings/design",
+    );
   });
 });

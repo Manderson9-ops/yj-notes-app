@@ -1,6 +1,7 @@
 # design docs are hand-formatted (tables, ASCII diagrams); do not reformat
 docs/*.md
 docs/adr/
+docs/design/
 # root policy docs are hand-written; keep them untouched
 /*.md
 dist

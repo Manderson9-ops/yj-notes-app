@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ThemeDecor } from "../components/decor/ThemeDecor";
 import { BackspaceIcon } from "../components/icons";
 import { ApiError, api } from "../lib/api";
 import { sessionQueryKey } from "../lib/session";
@@ -99,6 +100,7 @@ export function PinScreen() {
 
   return (
     <main className="pin-screen">
+      <ThemeDecor slot="pin" />
       <h1 className="pin-title">가족 기록</h1>
       <p className="pin-hint" id="pin-hint">
         PIN 을 눌러 주세요.

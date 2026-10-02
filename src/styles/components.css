@@ -1,0 +1,489 @@
+/* 공용 컴포넌트 (theme-system §1). 색·모양은 토큰만. 테마별 모양 차이는 themes/*.css 에서 덮어쓴다.
+   화면 코드는 이 클래스만 쓰고 테마를 모른다(TH-8). */
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  color: var(--c-link);
+  text-underline-offset: 3px;
+}
+
+mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--c-badge);
+  color: var(--c-on-badge);
+}
+
+/* ---- 버튼 ---- */
+.btn,
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius);
+  font-family: var(--font-display);
+  font-size: var(--fs-base);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn {
+  border: 2px solid var(--c-accent);
+  background: transparent;
+  color: var(--c-accent);
+}
+
+.btn-primary {
+  border: 2px solid var(--c-accent);
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+}
+
+.btn-lg {
+  width: 100%;
+  margin-bottom: var(--space-3);
+  min-height: 64px;
+  font-size: var(--fs-lg);
+}
+
+.btn:disabled,
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---- 칩 (선택은 색 + 체크 아이콘 + aria-pressed) ---- */
+/* 입력·칩 줄·결과 카드가 이어질 때 숨 쉴 간격 */
+.field,
+.chip-row {
+  margin-top: var(--space-3);
+}
+
+.chip-row + .card,
+.chip-row + .card-stack,
+.field + .chip-row {
+  margin-top: var(--space-3);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: var(--bw) solid var(--c-border);
+  border-radius: 999px;
+  background: var(--c-surface);
+  color: var(--c-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.chip .chip-check {
+  display: none;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--c-accent);
+  background: var(--c-accent-soft);
+  color: var(--c-on-accent-soft);
+  font-weight: 700;
+}
+
+.chip[aria-pressed="true"] .chip-check {
+  display: inline-block;
+}
+
+/* ---- 카드 ---- */
+.card {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-4);
+  border: var(--bw) solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background-color: var(--c-surface);
+  background-image: var(--tex-surface);
+  box-shadow: var(--shadow);
+}
+
+.card > :first-child {
+  margin-top: 0;
+}
+
+.card > :last-child {
+  margin-bottom: 0;
+}
+
+.card-stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* 배지·링크처럼 가로로 늘어놓는 줄 */
+.row-center {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+/* ---- 배지 ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border-radius: 999px;
+  background: var(--c-badge);
+  color: var(--c-on-badge);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* ---- 안내 상자: 상태색 면 + 아이콘 + 글 (장식·모션 없음) ---- */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--tone-bg);
+  color: var(--tone);
+}
+
+.notice > svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.notice > p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.notice[data-tone="warn"] {
+  --tone: var(--c-warn);
+  --tone-bg: var(--c-warn-bg);
+}
+
+.notice[data-tone="alert"] {
+  --tone: var(--c-alert);
+  --tone-bg: var(--c-alert-bg);
+}
+
+.notice[data-tone="info"] {
+  --tone: var(--c-info);
+  --tone-bg: var(--c-info-bg);
+}
+
+.notice[data-tone="ok"] {
+  --tone: var(--c-ok);
+  --tone-bg: var(--c-ok-bg);
+}
+
+/* ---- 빈 상태 ---- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-5);
+  color: var(--c-muted);
+  text-align: center;
+}
+
+.empty > p {
+  margin: 0;
+}
+
+/* ---- 입력(검색칸) ---- */
+.field {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: var(--bw) solid var(--c-border);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+  color: var(--c-fg);
+  font: inherit;
+}
+
+.field::placeholder {
+  color: var(--c-muted);
+  opacity: 1;
+}
+
+/* ---- 목록 줄 · 라벨-값 ---- */
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.list-row:last-child {
+  border-bottom: 0;
+}
+
+.meta {
+  color: var(--c-earth);
+  font-size: var(--fs-sm);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+}
+
+.kv dt {
+  color: var(--c-muted);
+}
+
+.kv dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 테마 고르기(설정·미리보기) ---- */
+.theme-group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: 0 var(--space-4);
+  border: var(--bw) solid var(--c-border);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+  cursor: pointer;
+}
+
+.theme-option:has(input:checked) {
+  border-color: var(--c-accent);
+  background: var(--c-accent-soft);
+  color: var(--c-on-accent-soft);
+  font-weight: 700;
+}
+
+.theme-option:has(input:focus-visible) {
+  outline: 3px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+.theme-option input {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--c-accent);
+}
+
+.theme-option .theme-name {
+  flex: 1;
+}
+
+.swatch {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+}
+
+.swatch i {
+  display: block;
+  width: 18px;
+  height: 24px;
+}
+
+.swatch[data-swatch="basic"] i:nth-child(1) {
+  background: #eef0f4;
+}
+.swatch[data-swatch="basic"] i:nth-child(2) {
+  background: #1558c0;
+}
+.swatch[data-swatch="basic"] i:nth-child(3) {
+  background: #ffe08a;
+}
+
+/* ---- 장식 SVG (ThemeDecor). 읽는 정보가 아니다 ---- */
+.decor {
+  display: block;
+  max-width: 100%;
+  pointer-events: none;
+}
+
+.d-f1 {
+  fill: var(--c-deco-1);
+}
+.d-f2 {
+  fill: var(--c-deco-2);
+}
+.d-f3 {
+  fill: var(--c-deco-3);
+}
+.d-cloud {
+  fill: var(--c-cloud);
+}
+.d-hill-front {
+  fill: var(--c-hill-front);
+}
+.d-sky {
+  fill: var(--c-surface-2);
+}
+.d-paper {
+  fill: var(--c-surface);
+}
+.d-st1 {
+  fill: none;
+  stroke: var(--c-deco-1);
+  stroke-linecap: round;
+}
+.d-ink {
+  stroke: var(--c-line);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.d-stem {
+  fill: none;
+  stroke: var(--c-earth);
+  stroke-linecap: round;
+}
+.d-line {
+  fill: none;
+  stroke: var(--c-line);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.d-ridge path {
+  fill: none;
+  stroke: var(--c-badge);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.4;
+}
+.d-soft {
+  opacity: 0.55;
+}
+.d-shade {
+  opacity: 0.3;
+}
+
+.decor-empty {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 96px;
+  max-width: 100%;
+  pointer-events: none;
+}
+
+.decor-empty .decor {
+  width: 88px;
+  height: auto;
+  max-height: 96px;
+}
+
+.decor-empty .decor:nth-child(3) {
+  width: 104px;
+}
+
+.decor-pin-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  height: 56px;
+  margin-bottom: var(--space-2);
+  pointer-events: none;
+}
+
+.decor-pin-top .decor {
+  height: 100%;
+  width: auto;
+}
+
+.decor-pin-bottom {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  height: 96px;
+  pointer-events: none;
+}
+
+.decor-pin-bottom .decor {
+  width: 100%;
+  height: 100%;
+}
+
+.decor-sky,
+.decor-day,
+.decor-night {
+  height: 100%;
+}
+
+.decor-sky {
+  display: block;
+}
+
+.decor-day {
+  display: block;
+}
+
+.decor-night {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .decor-night {
+    display: block;
+  }
+
+  .decor-day {
+    display: none;
+  }
+}
+
+/* ---- 진지한 영역 (theme-system §3-1): 장식·장식 모션·오프셋 그림자 끔 ---- */
+[data-tone="serious"] {
+  --shadow: none;
+  --shadow-press: none;
+}
+
+[data-tone="serious"] .decor,
+[data-tone="serious"] .decor-empty,
+[data-tone="serious"] .decor-pin-top {
+  display: none;
+}
+
+[data-tone="serious"] *,
+[data-tone="serious"] *::before {
+  animation: none !important;
+}
