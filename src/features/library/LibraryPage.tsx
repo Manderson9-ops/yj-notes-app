@@ -2,9 +2,10 @@
 import { Link } from "react-router-dom";
 import "./library.css";
 import { useCheckups, useReports, type ReportMeta } from "./api";
-import { formatKoDate } from "./format";
+import { displayTitles, formatKoDate } from "./format";
 import { LoadError } from "./LoadError";
 import { VerifyBadge } from "./VerifyBadge";
+import { useMemo } from "react";
 
 const GROUPS: { id: ReportMeta["group"]; title: string }[] = [
   { id: "report", title: "보고서" },
@@ -15,6 +16,9 @@ const GROUPS: { id: ReportMeta["group"]; title: string }[] = [
 export default function LibraryPage() {
   const reports = useReports();
   const checkups = useCheckups();
+  const items = reports.data?.items;
+  const titles = useMemo(() => displayTitles(items ?? []), [items]);
+  const latest = items?.reduce((a, d) => (d.generatedAt > a ? d.generatedAt : a), "") ?? "";
 
   return (
     <>
@@ -57,24 +61,29 @@ export default function LibraryPage() {
           </p>
         </>
       ) : (
-        GROUPS.map((g) => {
-          const docs = reports.data.items.filter((d) => d.group === g.id);
-          if (docs.length === 0) return null;
-          return (
-            <section key={g.id} aria-labelledby={`lib-${g.id}`}>
-              <h2 id={`lib-${g.id}`}>{g.title}</h2>
-              <div className="card-stack">
-                {docs.map((d) => (
-                  <Link key={d.slug} to={`/library/doc/${d.slug}`} className="card doc-card">
-                    <strong className="doc-title">{d.title}</strong>
-                    <span className="meta">{formatKoDate(d.generatedAt)}</span>
-                    <VerifyBadge doc={d} />
-                  </Link>
-                ))}
-              </div>
-            </section>
-          );
-        })
+        <>
+          {latest !== "" && (
+            <p className="lib-intro">자료를 마지막으로 갱신한 날: {formatKoDate(latest)}</p>
+          )}
+          {GROUPS.map((g) => {
+            const docs = reports.data.items.filter((d) => d.group === g.id);
+            if (docs.length === 0) return null;
+            return (
+              <section key={g.id} aria-labelledby={`lib-${g.id}`}>
+                <h2 id={`lib-${g.id}`}>{g.title}</h2>
+                <div className="card-stack">
+                  {docs.map((d) => (
+                    <Link key={d.slug} to={`/library/doc/${d.slug}`} className="card doc-card">
+                      <strong className="doc-title">{titles.get(d.slug) ?? d.title}</strong>
+                      {d.summary ? <span className="doc-summary">{d.summary}</span> : null}
+                      <VerifyBadge doc={d} />
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </>
       )}
     </>
   );

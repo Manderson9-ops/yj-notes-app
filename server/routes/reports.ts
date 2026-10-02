@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AppEnv } from "../app";
 import { errorResponse, jsonResponse } from "../http/errors";
 import { reportCsp } from "../http/headers";
+import { docSummary } from "../../src/lib/docSummary";
 
 const SLUG = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/);
 
@@ -31,6 +32,9 @@ export function reportGroup(slug: string): ReportGroup {
   return "report";
 }
 
+/** 목록 카드의 설명을 만들려고 본문 앞부분만 읽는다(HTML 은 스타일이 길어 더 읽는다). */
+const HEAD_SQL = "substr(body, 1, CASE kind WHEN 'html' THEN 30000 ELSE 1500 END) AS head";
+
 function toMeta(r: ReportRow) {
   return {
     slug: r.slug,
@@ -43,15 +47,19 @@ function toMeta(r: ReportRow) {
   };
 }
 
+function withSummary(r: ReportRow & { head: string }) {
+  return { ...toMeta(r), summary: docSummary(r.kind, r.head) };
+}
+
 const COLUMNS = "slug, title, kind, generated_at, source_commit, verify_ok";
 
 export const reportRoutes = new Hono<AppEnv>();
 
 reportRoutes.get("/api/reports", async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT ${COLUMNS} FROM report_doc ORDER BY generated_at DESC, slug ASC`,
-  ).all<ReportRow>();
-  return jsonResponse(200, { items: results.map(toMeta) });
+    `SELECT ${COLUMNS}, ${HEAD_SQL} FROM report_doc ORDER BY generated_at DESC, slug ASC`,
+  ).all<ReportRow & { head: string }>();
+  return jsonResponse(200, { items: results.map(withSummary) });
 });
 
 reportRoutes.get("/api/reports/:slug", async (c) => {

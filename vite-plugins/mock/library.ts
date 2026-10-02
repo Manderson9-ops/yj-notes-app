@@ -1,4 +1,5 @@
 import { reportCsp } from "../../server/http/headers.ts";
+import { docSummary } from "../../src/lib/docSummary.ts";
 import type { MockModule } from "./index.ts";
 
 /** FAKE 자료실 API (합성 자료만). 응답 모양은 server/routes/reports.ts 와 같다. */
@@ -76,6 +77,24 @@ const GUIDE_MD = [
   "",
   "<script>alert('이 줄은 글자 그대로 보여야 한다')</script>",
   "",
+  "## 점검 목록",
+  "",
+  "- [x] 잠자리 시각 적기",
+  "- [ ] 식사 기록 남기기",
+  "- 하루 흐름",
+  "  - 아침",
+  "  - 저녁  ",
+  "    줄바꿈 뒤 이어지는 글",
+  "",
+  "~~지난 방식~~ 대신 칩으로 고른다.",
+  "",
+  "<details>",
+  "<summary>자세히 보기</summary>",
+  "",
+  "접어 둔 설명이다. **굵은 `코드` 글자** 도 함께 보인다.",
+  "",
+  "</details>",
+  "",
   "## 용어 메모",
   "",
   "1. 백분위: 같은 나이 아이들을 키 순서로 세웠을 때의 위치를 나타내는 숫자.",
@@ -126,6 +145,9 @@ const REPORT_HTML = [
   "</body></html>",
 ].join("\n");
 
+const bodyOf = (slug: string): string =>
+  slug === "guide-routine" ? GUIDE_MD : slug === "guide-05" ? GUIDE_05_MD : WIKI_MD;
+
 export const libraryMock: MockModule = {
   prefix: "/api/reports",
   handle(req, res, { subPath, send }) {
@@ -134,7 +156,12 @@ export const libraryMock: MockModule = {
       return;
     }
     if (subPath === "") {
-      send(200, { items: DOCS });
+      send(200, {
+        items: DOCS.map((d) => ({
+          ...d,
+          summary: docSummary(d.kind, d.slug === "report-summary" ? REPORT_HTML : bodyOf(d.slug)),
+        })),
+      });
       return;
     }
     const m = /^\/([^/]+)(\/raw)?$/.exec(subPath);
@@ -156,8 +183,6 @@ export const libraryMock: MockModule = {
     }
     res.statusCode = 200;
     res.setHeader("Content-Type", "text/markdown; charset=utf-8");
-    res.end(
-      doc.slug === "guide-routine" ? GUIDE_MD : doc.slug === "guide-05" ? GUIDE_05_MD : WIKI_MD,
-    );
+    res.end(bodyOf(doc.slug));
   },
 };

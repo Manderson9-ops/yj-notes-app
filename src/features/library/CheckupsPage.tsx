@@ -1,4 +1,5 @@
 // S42 검진: 결과지 문구·백분위를 그대로 보여 준다(판정 문구를 만들지 않는다). 진지한 영역(data-tone="serious").
+import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import "./library.css";
 import { Notice } from "../../components/Notice";
@@ -9,6 +10,7 @@ import { ScrollRegion } from "./ScrollRegion";
 
 function CheckupCard({ c }: { c: Checkup }) {
   const uncertain = c.measurements.some((m) => m.readStatus === "UNCERTAIN");
+  const noted = c.measurements.filter((m) => m.note);
   return (
     <article className="card" aria-labelledby={`ck-${String(c.id)}`}>
       <h2 id={`ck-${String(c.id)}`} className="card-title">
@@ -30,6 +32,7 @@ function CheckupCard({ c }: { c: Checkup }) {
         <dt>발달 평가</dt>
         <dd>{c.devResult}</dd>
       </dl>
+      <p className="meta source-note">결과지에 적힌 내용 그대로예요.</p>
 
       {c.measurements.length > 0 ? (
         <ScrollRegion label={`${c.roundLabel} 계측`}>
@@ -40,7 +43,7 @@ function CheckupCard({ c }: { c: Checkup }) {
                 <th scope="col">항목</th>
                 <th scope="col">값</th>
                 <th scope="col">결과지 백분위</th>
-                <th scope="col">판독</th>
+                {uncertain ? <th scope="col">판독</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -53,21 +56,39 @@ function CheckupCard({ c }: { c: Checkup }) {
                       {info.unit ? `${String(m.value)} ${info.unit}` : String(m.value)}
                     </td>
                     <td>{m.sheetPct === null ? "없음" : String(m.sheetPct)}</td>
-                    <td>
-                      {m.readStatus === "UNCERTAIN" ? (
-                        <span className="badge" data-status="uncertain">
-                          판독 불확실
-                        </span>
-                      ) : (
-                        "확인"
-                      )}
-                    </td>
+                    {uncertain ? (
+                      <td>
+                        {m.readStatus === "UNCERTAIN" ? (
+                          <span className="badge" data-status="uncertain">
+                            판독 불확실
+                          </span>
+                        ) : (
+                          "확인"
+                        )}
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </ScrollRegion>
+      ) : null}
+
+      {noted.length > 0 ? (
+        <section aria-labelledby={`ck-notes-${String(c.id)}`}>
+          <h3 id={`ck-notes-${String(c.id)}`} className="card-subtitle">
+            측정 조건 메모
+          </h3>
+          <dl className="kv">
+            {noted.map((m) => (
+              <Fragment key={m.id}>
+                <dt>{measureInfo(m.measure).label}</dt>
+                <dd>{m.note}</dd>
+              </Fragment>
+            ))}
+          </dl>
+        </section>
       ) : null}
 
       {uncertain ? (

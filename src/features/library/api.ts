@@ -11,6 +11,8 @@ export const reportMetaSchema = z.object({
   generatedAt: z.string(),
   sourceCommit: z.string(),
   verifyOk: z.boolean(),
+  /** 목록 카드의 설명 한 줄(목록 응답에만 있다). 없으면 null */
+  summary: z.string().nullable().optional(),
 });
 export type ReportMeta = z.infer<typeof reportMetaSchema>;
 

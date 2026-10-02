@@ -29,8 +29,8 @@ a.doc-card {
 .doc-frame {
   display: block;
   width: 100%;
-  height: 70dvh;
-  min-height: 320px;
+  height: calc(100dvh - var(--tap) * 2);
+  min-height: 420px;
   border: var(--bw) solid var(--c-line);
   border-radius: var(--radius);
   background: var(--c-surface);
@@ -55,6 +55,19 @@ a.doc-card {
 .doc-toc ol {
   margin: 0;
   padding: 0 var(--space-4) var(--space-3) var(--space-5);
+}
+
+.doc-toc ol ol {
+  padding: 0 0 0 var(--space-4);
+}
+
+.doc-toc li.doc-toc-sub {
+  margin-left: var(--space-3);
+  list-style: none;
+}
+
+.doc-toc-sub .toc-btn {
+  font-size: var(--fs-sm);
 }
 
 .toc-btn {
@@ -134,6 +147,79 @@ a.doc-card {
   margin: var(--space-5) 0;
   border: 0;
   border-top: 1px solid var(--c-line);
+}
+
+/* 열이 셋 이상인 표: 줄마다 카드처럼 쌓는다(가로 스크롤 없이 읽힌다) */
+.doc-body .md-rows {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.md-row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.md-row-title {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-base);
+}
+
+.md-row-cells {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font-size: var(--fs-base);
+  line-height: 1.6;
+}
+
+.md-row-cells dt {
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+
+.md-row-cells dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 접는 칸(<details>) */
+.md-details {
+  margin: 0 0 var(--space-4);
+  border: var(--bw) solid var(--c-line);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+}
+
+.md-details > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: var(--space-1) var(--space-4);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.md-details-body {
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+/* 체크박스 목록 */
+.doc-body li.md-task {
+  list-style: none;
+  margin-left: -1.4em;
+}
+
+.md-box {
+  margin-right: var(--space-2);
+}
+
+.doc-body li > ul,
+.doc-body li > ol {
+  margin: var(--space-1) 0 0;
 }
 
 /* ---- 표 (문서·검진·성장 공용) ---- */
@@ -329,4 +415,47 @@ a.doc-card {
   vertical-align: middle;
   border-radius: 50%;
   background: var(--c-accent);
+}
+
+/* ---- 긴 글에서 맨 위로: 탭바 위에 떠 있는 단추(스크롤한 뒤에만 보인다) ---- */
+.back-top {
+  position: sticky;
+  bottom: calc(var(--tap) + var(--space-6) + var(--space-3));
+  z-index: 2;
+  height: 0;
+}
+
+.back-top .btn {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  box-shadow: var(--shadow);
+  background: var(--c-bg);
+}
+
+/* ---- S40 문서 카드: 설명 한 줄 ---- */
+.doc-summary {
+  margin: 0;
+  color: var(--c-muted);
+  font-size: var(--fs-base);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.lib-intro {
+  margin: var(--space-4) 0 0;
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+
+.card-subtitle {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--fs-base);
+}
+
+.source-note {
+  margin: var(--space-2) 0 0;
 }

@@ -99,8 +99,11 @@ export default function GrowthPage() {
   const [asTable, setAsTable] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const q = useGrowth(measure);
-  const selected = q.data?.points.find((p) => p.id === selectedId) ?? null;
+  // 점이 하나뿐이면 누르지 않아도 값과 측정 조건을 바로 보여 준다.
+  const only = q.data?.points.length === 1 ? (q.data.points[0] ?? null) : null;
+  const selected = q.data?.points.find((p) => p.id === selectedId) ?? only;
   const drawn = q.data ? plottable(q.data.points).length : 0;
+  const anyUncertain = q.data?.points.some((p) => p.readStatus === "UNCERTAIN") ?? false;
 
   return (
     <>
@@ -177,11 +180,18 @@ export default function GrowthPage() {
                     곡선 50%
                   </li>
                   <li>
-                    <span className="legend-dot" aria-hidden="true" /> 진한 점: 측정값, 빈 점: 판독
-                    불확실
+                    <span className="legend-dot" aria-hidden="true" />{" "}
+                    {anyUncertain ? "진한 점: 측정값, 빈 점: 판독 불확실" : "점: 측정값"}
                   </li>
                   {q.data.referenceSource ? <li>기준표 출처: {q.data.referenceSource}</li> : null}
                 </ul>
+                {only ? (
+                  <p className="muted">
+                    측정이 한 번뿐이라 점이 하나예요.
+                    <br />
+                    검진이 쌓이면 선으로 이어져요.
+                  </p>
+                ) : null}
                 {selected ? (
                   <PointDetail p={selected} measure={measure} />
                 ) : drawn > 0 ? (
