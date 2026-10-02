@@ -41,6 +41,7 @@
   --fs-base: 17px;
   --fs-lg: 20px;
   --fs-xl: 26px;
+  --fs-sm: max(14px, calc(var(--fs-base) * 0.82)); /* 탭 라벨·배지·메타: 큰 글씨에 비례 */
   --lh-base: 1.6;
 
   /* 모양 */

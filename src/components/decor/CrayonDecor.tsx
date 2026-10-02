@@ -85,18 +85,21 @@ export function DoodleSun() {
   );
 }
 
-/** 크레용 한 자루: 원통 + 뾰족 끝 + 종이 띠 */
+/** 크레용 한 자루: 원통 + 종이 띠 + 뭉툭하게 닳은 원뿔 끝 */
 export function CrayonStick() {
   return (
     <Svg viewBox="0 0 120 40">
       <path className="d-ink d-f1" d="M20 12 L85 10 L86.5 31 L21 31.5 C15 28 15 15 20 12 Z" />
-      <path className="d-ink d-f1" d="M85.5 10.5 L111 20.5 L86 30.5 Z" />
-      <path className="d-ink d-paper" d="M40 11.5 L57 11 L58 30.5 L41 31 Z" />
-      <path className="d-line" strokeWidth="2" d="M104 18.5 L111 20.5 L105 23" />
+      <path
+        className="d-ink d-f1"
+        d="M85.5 10.5 L103 15 C108.5 16.5 109 23.5 103.5 25.5 L86 30.5 Z"
+      />
+      <path className="d-ink d-paper" d="M38 11.5 L60 11 L61 30.5 L39 31 Z" />
+      <path className="d-line" strokeWidth="1.6" d="M43 17 L56 16.6 M43.4 23 L56.4 22.6" />
+      <path className="d-line" strokeWidth="2" d="M101 17 L105 19.5 M100 22 L104 22.8" />
     </Svg>
   );
 }
-
 /** 집: 삼각 지붕 + 네모 + 창 2개 + 문 */
 export function DoodleHouse() {
   return (

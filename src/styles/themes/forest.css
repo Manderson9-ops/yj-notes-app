@@ -30,6 +30,7 @@
   --c-deco-3: #28533d;
   --c-cloud: #fffdf6;
   --c-hill-front: #28533d; /* 숲 전용(계약 밖): 맨 앞 언덕은 항상 뒤 언덕보다 어둡게 */
+  --blob-alpha: 0.28; /* 숲 전용: 헤더·빈 상태 수채 번짐의 진하기(contrast.test.ts 가 읽어 대비 확인) */
   --c-warn: #7a4a00;
   --c-warn-bg: #f7e8c4;
   --c-alert: #7a2a1f;
@@ -48,7 +49,7 @@
   /* 하늘(위)·숲(아래) 워시. 글자 뒤 카드·입력은 --c-surface 단색이라 대비에 영향 없음 */
   --tex-bg:
     radial-gradient(150% 46% at 50% -4%, #dceaf0 0%, #dceaf0 38%, rgba(220, 234, 240, 0) 100%),
-    radial-gradient(130% 40% at 50% 106%, rgba(102, 160, 99, 0.28) 0%, rgba(102, 160, 99, 0) 100%);
+    radial-gradient(130% 40% at 50% 106%, rgba(102, 160, 99, 0.12) 0%, rgba(102, 160, 99, 0) 100%);
   --tex-surface: none;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --dur: 260ms;
@@ -59,7 +60,7 @@
     --c-bg: #121b1a;
     --c-fg: #ede6d3;
     --c-muted: #b9c2b5;
-    --c-border: #6e7f74;
+    --c-border: #76887c;
     --c-line: rgba(237, 230, 211, 0.1);
     --c-surface: #1b2826;
     --c-surface-2: #1e3033;
@@ -76,6 +77,7 @@
     --c-deco-3: #f2d58a;
     --c-cloud: #3a4f55;
     --c-hill-front: #0f1f1a;
+    --blob-alpha: 0.4;
     --c-warn: #f2c46d;
     --c-warn-bg: #2e2614;
     --c-alert: #f09a84;
@@ -170,11 +172,17 @@
   width: 72px;
   height: 72px;
   min-height: 0;
+  font-size: calc(var(--fs-xl) * 1.077); /* 28px (큰 글씨 땐 비례) */
   justify-self: center;
   border-radius: 50%;
 }
 
+:root[data-theme="forest"] .key-aux {
+  font-size: var(--fs-sm);
+}
+
 :root[data-theme="forest"] .key-primary {
+  font-size: var(--fs-lg);
   background: var(--c-accent);
   border-color: var(--c-accent);
 }
@@ -190,10 +198,6 @@
 
 :root[data-theme="forest"] .card:nth-child(even)::before {
   background: var(--c-deco-2);
-}
-
-:root[data-theme="forest"] .card:nth-child(odd) {
-  padding-top: calc(var(--space-4) + 2px);
 }
 
 /* 안내 상자: 왼쪽 4px 막대 */
@@ -239,7 +243,7 @@
 
 :root[data-theme="forest"] .decor-empty-forest .decor-sway {
   left: 46%;
-  bottom: 30px;
+  bottom: 14px; /* 언덕에 닿게 */
   width: auto;
   height: 40px;
 }
@@ -247,7 +251,7 @@
 :root[data-theme="forest"] .decor-empty-forest > .decor:last-child:not(.decor-sway) {
   left: auto;
   right: 12%;
-  bottom: 30px;
+  bottom: 12px;
   width: auto;
   height: 52px;
 }
@@ -303,6 +307,43 @@
   display: none;
 }
 
+/* ---- 수채 번짐: 헤더·빈 상태의 장식 층에만. 경계가 번진 정적 마스크(feTurbulence + feDisplacementMap)에 토큰 색을 칠한다.
+   글자 면에는 올리지 않고, 가장 진한 합성색은 contrast.test.ts 가 --blob-alpha 로 계산해 대비를 막는다 ---- */
+:root[data-theme="forest"] .shell-header::before,
+:root[data-theme="forest"] .empty::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 62%;
+  background: var(--c-deco-1);
+  opacity: var(--blob-alpha);
+  pointer-events: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-30%25' y='-30%25' width='160%25' height='160%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018 .03' numOctaves='3' seed='4' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='34'/%3E%3C/filter%3E%3Cellipse cx='150' cy='58' rx='112' ry='34' fill='%23000' fill-opacity='.7' stroke='%23000' stroke-width='4' filter='url(%23w)'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='w' x='-30%25' y='-30%25' width='160%25' height='160%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018 .03' numOctaves='3' seed='4' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='34'/%3E%3C/filter%3E%3Cellipse cx='150' cy='58' rx='112' ry='34' fill='%23000' fill-opacity='.7' stroke='%23000' stroke-width='4' filter='url(%23w)'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+}
+
+:root[data-theme="forest"] .empty {
+  position: relative;
+}
+
+:root[data-theme="forest"] .empty::before {
+  right: auto;
+  left: 0;
+  bottom: 45%;
+  width: 100%;
+}
+
+:root[data-theme="forest"] .empty > p {
+  position: relative;
+}
+
+:root[data-theme="forest"] :is(.app-title, .icon-btn) {
+  position: relative;
+}
 /* ---- 종이 결: 정적 feTurbulence(회색조) data URI, 아주 옅게. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없다 ---- */
 :root[data-theme="forest"] body::before {
   content: "";
@@ -311,7 +352,7 @@
   z-index: -1;
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity: 0.05;
+  opacity: 0.05; /* 연구 범위 .04~.06 안. 최악 지점 대비는 contrast.test.ts 가 계산 */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -320,6 +361,22 @@
   }
 }
 
+/* ---- 테마 고르기 라디오: --c-border 원 + 초록 점 ---- */
+:root[data-theme="forest"] .theme-option input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--c-border);
+  border-radius: 50%;
+  background: var(--c-surface);
+}
+
+:root[data-theme="forest"] .theme-option input[type="radio"]:checked {
+  border-color: var(--c-accent);
+  background: radial-gradient(circle, var(--c-accent) 0 40%, var(--c-surface) 44%);
+}
 /* ---- 큰 글씨 스위치: 둥근 네모 + 체크 ---- */
 :root[data-theme="forest"] .setting-row input[type="checkbox"] {
   appearance: none;

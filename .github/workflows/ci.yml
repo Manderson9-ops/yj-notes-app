@@ -34,6 +34,8 @@ jobs:
       - name: guard (all tracked files)
         run: npm run guard
       - run: npm run build
+      - name: bundle size (TH-6, 기준값 측정법은 docs/design/theme-system.md §4)
+        run: npm run size:check
       - name: guard (bundle)
         run: npm run guard:bundle
 

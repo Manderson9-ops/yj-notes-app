@@ -23,22 +23,21 @@ export function HillLayers() {
   );
 }
 
-/** 적운: 둥근 덩어리 4개 + 아래쪽 연한 푸른 음영 */
+/** 적운: 둥근 덩어리 5개 + 아래쪽 연한 푸른 음영 */
 export function CumulusCloud() {
   return (
     <Svg viewBox="0 0 120 60">
       <path
         className="d-cloud"
-        d="M20 50 A14 14 0 0 1 22 22 A18 18 0 0 1 56 14 A16 16 0 0 1 86 24 A14 14 0 0 1 100 50 Z"
+        d="M16 50 A12 12 0 0 1 20 28 A15 15 0 0 1 42 20 A18 18 0 0 1 72 14 A15 15 0 0 1 96 24 A13 13 0 0 1 106 50 C88 55 34 55 16 50 Z"
       />
       <path
         className="d-f1 d-shade"
-        d="M22 50 C28 42 40 44 52 43 C66 42 78 40 88 44 C95 46 98 48 100 50 Z"
+        d="M20 49 C32 42 46 46 60 43 C76 40 92 42 105 48 C88 55 34 55 20 49 Z"
       />
     </Svg>
   );
 }
-
 /** 잎 한 장 + 잎맥 한 줄. 화면당 하나만 천천히 흔들린다. */
 export function Leaf() {
   return (
@@ -53,7 +52,7 @@ export function Leaf() {
 export function Sprout() {
   return (
     <Svg viewBox="0 0 80 80">
-      <path className="d-line" strokeWidth="3" d="M40 76 C40 58 38 46 40 30" />
+      <path className="d-stem" strokeWidth="3" d="M40 76 C40 58 38 46 40 30" />
       <path className="d-f2" d="M40 42 C24 42 12 32 12 18 C28 16 40 26 40 42 Z" />
       <path className="d-f3" d="M40 34 C54 34 66 26 68 12 C52 10 41 20 40 34 Z" />
     </Svg>

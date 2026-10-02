@@ -30,7 +30,7 @@
 | 색(숲 전용) | `--c-hill-front` | 맨 앞 언덕. 계약 밖(숲 CSS 에만 있고 다른 테마는 쓰지 않음). 항상 뒤 언덕보다 어둡게 |
 | 색 | `--c-warn`, `--c-alert`, `--c-ok`, `--c-info` + 각 `-bg` | 상태 배지(판정 아님, 상태 표시만) |
 | 글꼴 | `--font-body`, `--font-display` | 본문 / 정적 UI 문구 |
-| 크기 | `--fs-base`, `--fs-lg`, `--fs-xl`, `--lh-base` | 큰 글씨 설정이 덮어씀 |
+| 크기 | `--fs-base`, `--fs-lg`, `--fs-xl`, `--fs-sm`, `--lh-base` | 큰 글씨 설정이 덮어씀 |
 | 모양 | `--radius`, `--radius-lg`, `--bw`(경계 두께), `--shadow`, `--shadow-press` | 카드·버튼 |
 | 질감 | `--tex-bg`, `--tex-surface` | 배경 그림(`none` 허용). 글자 뒤에는 대비를 깎지 않는 옅은 질감만 |
 | 동작 | `--ease`, `--dur` | 전환. `prefers-reduced-motion` 에서 0 |
@@ -40,7 +40,7 @@
 
 | ID | 기준 | 확인 방법 |
 |---|---|---|
-| TH-1 | 6 조합 모두 본문 대비 ≥ 4.5:1 (`fg/bg`, `fg/surface`, `muted/bg`, `on-accent/accent`, 상태색/상태 바탕) | `src/styles/contrast.test.ts` 가 CSS 를 읽어 계산 |
+| TH-1 | 6 조합 모두 본문 대비 ≥ 4.5:1 (`fg/bg`, `fg/surface`, `muted/bg`, `on-accent/accent`, 상태색/상태 바탕) | `src/styles/contrast.test.ts` 가 CSS 를 읽어 계산. 단색 토큰 쌍 + **배경 층 최악 지점**: `--tex-bg` 의 rgba/hex 색 정지점을 `--c-bg` 위에 최대 알파로 합성(겹친 경우 포함)하고, 그 위에 종이 결 최악(실측 a·(1−v) 최대 .354 / a·v 최대 .727 × opacity)을 더해 fg·muted·link·earth·accent ≥ 4.5, border ≥ 3 을 확인. 수채 번짐(`--blob-alpha`) 위 fg·muted, 테마 전용 쌍(크레용 `on-hl/hl`)도 확인. 대조군 테스트 포함 |
 | TH-2 | UI 경계·포커스 링 대비 ≥ 3:1 | 같은 테스트 |
 | TH-3 | axe serious/critical 0 (6 조합 × PIN·홈·설정·미리보기) | `e2e/a11y.spec.ts` |
 | TH-4 | 터치 영역 ≥ 48px, 큰 글씨 설정 유지 | `e2e/large-text.spec.ts`: 3테마 × (보통·큰 글씨) 에서 `.key .chip .btn .btn-primary .tab .theme-option` 의 `boundingBox` 높이·너비 ≥ 48, 키 글자 넘침 없음, axe 0, 스크린샷 `*-<테마>-large-light.png` |
@@ -62,7 +62,7 @@
 | 새 테마 추가 | ① 그림체 연구 문서 ② `theme-<id>.md` ③ `themes/<id>.css` 에 §2 토큰 전부 ④ decor SVG ⑤ `THEMES` 목록 ⑥ 대비 테스트·axe 통과 ⑦ ADR 갱신 |
 | 새 화면 만들기 | 토큰·공용 클래스만 사용. 색 hex 직접 쓰기 금지. 미리보기 화면에 새 컴포넌트 상태 추가 |
 | 폰트 부분 집합 다시 만들기 | 정적 UI 문구를 바꿨으면 `npm run fonts:subset` 후 커밋. 빠진 글자는 시스템 글꼴로 보임(깨지지 않음) |
-| 번들 크기 확인 | 빌드 뒤 `npm run size:check`. 한도는 `tools/size/check.ts` 상단 상수 |
+| 번들 크기 확인 | 빌드 뒤 `npm run size:check`(CI check 잡에서도 build 직후 실행). 한도는 `tools/size/check.ts` 상단 상수. **기준값 측정법**: main 을 빌드한 `dist/` 에 같은 스크립트를 돌린다(`node tools/size/check.ts <main 의 dist>`) → 119.50 KB(zlib 기본 레벨, 1 KB = 1000 B). Vite 의 "gzip: N kB" 출력과는 약 1% 달라 섞어 비교하지 않는다 |
 | 스크린샷 갱신 | `npm run test:e2e` 가 `e2e/__screenshots__/<화면>-<테마>-<light|dark>.png` 로 저장 |
 
 ## 5. 저작권·상표 체크리스트 (PR 마다)
@@ -87,3 +87,7 @@
 | 큰 글씨 스위치 | 크레용·숲은 `appearance:none` + 체크 표시(CSS 만) | 기본 테마는 네이티브 |
 | 빈 상태 변형 | `ThemeDecor slot="empty" variant="home / logs / notes / library"` | 화면 코드는 variant 만 넘기고 테마를 모름 |
 | `--font-display` 범위 | 크레용: 앱 이름·h1·h2·탭·버튼 / 숲: 앱 이름·h1·h2 만(20px 이상) | 테마 명세대로 |
+| 큰 글씨의 작은 글자 | `--fs-sm` = `max(14px, 0.82 × --fs-base)` (탭 라벨·배지·메타·버전·키 보조 글자) | 큰 글씨에서 고정 14px 가 남던 문제. e2e 가 탭 라벨 > 14px 확인 |
+| 한글 줄바꿈 | `body { word-break: keep-all; overflow-wrap: anywhere }` | 단어 중간 끊김 방지 |
+| TH-8 자동 확인 | `src/theme-isolation.test.ts` | pages·app·components(decor 제외)에 `data-theme`·`"crayon"`·`"forest"` 0개 |
+| 스크린샷 안정화 | `e2e/helpers.ts` 의 `stableShot` (찍는 순간만 reduced-motion) | 흔들리는 잎 때문에 PNG 가 달라지던 문제 |

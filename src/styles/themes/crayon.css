@@ -28,6 +28,10 @@
   --c-deco-2: #ffd4da;
   --c-deco-3: #ffe600;
   --c-cloud: #ffffff;
+  /* 크레용 전용(계약 밖): 형광펜 띠, 카드 띠 하늘색 */
+  --c-hl: #ffd4da;
+  --c-on-hl: #2a1f1c;
+  --c-band-sky: #bfe3f5;
   --c-warn: #7a4300;
   --c-warn-bg: #fff1d6;
   --c-alert: #a3201a;
@@ -67,9 +71,12 @@
     --c-on-badge: #1e1a18;
     --c-earth: #d9c7b0;
     --c-deco-1: #ff7a8a;
-    --c-deco-2: #5a3a40;
+    --c-deco-2: #e8a9b4;
     --c-deco-3: #ffe45c;
     --c-cloud: #3a302c;
+    --c-hl: #e8a9b4;
+    --c-on-hl: #1e1a18;
+    --c-band-sky: #8fcbee;
     --c-warn: #ffc978;
     --c-warn-bg: #3a2a12;
     --c-alert: #ff9a8f;
@@ -156,8 +163,9 @@
   box-shadow: var(--shadow-press);
 }
 
-/* 뗄 때 튀어 오름(scale .94 → 1.04 → 1). 누르는 동안엔 :active 가 이기고, 뗀 뒤 포커스가 남은 버튼에서 한 번 재생 */
-:root[data-theme="crayon"] :is(.btn, .btn-primary, .chip, .key):focus:not(:active):not(:disabled) {
+/* 뗄 때 튀어 오름(scale .94 → 1.04 → 1). 포인터로 눌렀다 뗀 뒤(포커스가 남지만 focus-visible 은 아님)에만 1회 재생 — 키보드 Tab 포커스로는 튀지 않는다 */
+:root[data-theme="crayon"]
+  :is(.btn, .btn-primary, .chip, .key):focus:not(:focus-visible):not(:active):not(:disabled) {
   animation: crayon-pop var(--dur) var(--ease);
 }
 
@@ -203,7 +211,7 @@
 }
 
 :root[data-theme="crayon"] .key-aux {
-  font-size: max(14px, calc(var(--fs-base) * 0.8));
+  font-size: var(--fs-sm);
 }
 
 :root[data-theme="crayon"] .key-primary {
@@ -216,9 +224,9 @@
   border-width: 3px;
 }
 
-/* ---- 카드: 먹선 + 위쪽 6px 파스텔 띠(하늘→분홍→노랑, 장식) ---- */
+/* ---- 카드: 먹선 + 위쪽 12px 파스텔 띠(하늘→분홍→노랑, 장식) ---- */
 :root[data-theme="crayon"] .card {
-  padding-top: calc(var(--space-4) + 6px);
+  padding-top: calc(var(--space-4) + 12px);
   border-width: var(--bw);
 }
 
@@ -226,8 +234,8 @@
   content: "";
   position: absolute;
   inset: 0 0 auto;
-  height: 6px;
-  background: var(--c-surface-2);
+  height: 12px;
+  background: var(--c-band-sky);
 }
 
 :root[data-theme="crayon"] .card:nth-child(3n + 2)::before {
@@ -270,6 +278,31 @@
   transform: none;
 }
 
+/* ---- 섹션 제목: 파스텔 형광펜 띠(장식). 글자색은 --c-on-hl 로 대비 유지 ---- */
+:root[data-theme="crayon"] h2 {
+  display: inline-block;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--c-hl);
+  color: var(--c-on-hl);
+  transform: rotate(-0.6deg);
+}
+
+/* ---- 테마 고르기 라디오: 먹선 원 + 안쪽 채운 점 ---- */
+:root[data-theme="crayon"] .theme-option input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: var(--bw) solid var(--c-border);
+  border-radius: 50%;
+  background: var(--c-surface);
+}
+
+:root[data-theme="crayon"] .theme-option input[type="radio"]:checked {
+  background: radial-gradient(circle, var(--c-fg) 0 38%, var(--c-surface) 42%);
+}
 /* ---- 큰 글씨 스위치: 먹선 네모 + 체크 ---- */
 :root[data-theme="crayon"] .setting-row input[type="checkbox"] {
   appearance: none;

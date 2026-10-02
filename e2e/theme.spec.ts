@@ -104,6 +104,57 @@ test("decor sways only when motion is allowed", async ({ page }) => {
   await expect(page.locator(".decor-sway")).toHaveCSS("animation-name", "forest-sway");
 });
 
+async function crayonPreview(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem("yj.theme", "crayon");
+  });
+  await login(page);
+  await page.getByRole("link", { name: "설정", exact: true }).click();
+  await page.getByRole("link", { name: "디자인 미리보기" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "디자인 미리보기" })).toBeVisible();
+}
+
+test("reduced-motion: crayon tab underline, button pop and press move are off", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    localStorage.setItem("yj.theme", "crayon");
+  });
+  await login(page);
+  // 활성 탭 밑줄(홈 탭)
+  const underline = page.locator(".tab.active .decor-tab path");
+  await expect(underline).toHaveCount(1);
+  await expect(underline).toHaveCSS("animation-name", "none");
+  // 포인터로 눌렀다 뗀 버튼의 pop
+  await page.getByRole("link", { name: "설정", exact: true }).click();
+  await page.getByRole("link", { name: "디자인 미리보기" }).click();
+  const btn = page.getByRole("button", { name: "보조 버튼" });
+  await btn.click();
+  await expect(btn).toHaveCSS("animation-name", "none");
+  // 누르는 동안 이동도 없다
+  await btn.hover();
+  await page.mouse.down();
+  await expect(btn).toHaveCSS("transform", "none");
+  await page.mouse.up();
+});
+
+test("crayon: button pop plays after a pointer press, not after keyboard focus", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName === "webkit", "Safari 는 클릭해도 버튼에 포커스가 남지 않는다");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await crayonPreview(page);
+  const btn = page.getByRole("button", { name: "보조 버튼" });
+  await btn.click();
+  await expect(btn).toHaveCSS("animation-name", "crayon-pop");
+  // 키보드 포커스(Tab)로는 튀지 않는다
+  await page.getByRole("button", { name: "주 버튼" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(btn).toBeFocused();
+  await expect(btn).toHaveCSS("animation-name", "none");
+});
 test("decor SVGs are hidden from assistive tech and ignore pointers", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("yj.theme", "crayon");

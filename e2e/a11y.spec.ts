@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { settle, stableShot } from "./helpers";
 
 // Q-A11Y / TH-3: no serious/critical axe violations in 3 themes × light/dark.
 // Also writes 360px screenshots (synthetic UI only, FAKE mock API, no real data) to
@@ -14,14 +15,6 @@ async function seriousViolations(page: Page) {
   return results.violations
     .filter((v) => v.impact === "serious" || v.impact === "critical")
     .map((v) => `${v.id}: ${v.help} (${String(v.nodes.length)})`);
-}
-
-/** 끝나는 전환·등장 모션이 지난 뒤 검사한다(반투명 중간 색으로 대비를 잘못 재지 않도록). */
-async function settle(page: Page) {
-  // 문자열로 실행: e2e 의 tsconfig 에는 DOM 타입이 없다.
-  await page.evaluate(
-    "Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished))",
-  );
 }
 
 async function login(page: Page) {
@@ -44,11 +37,7 @@ for (const theme of THEMES) {
         }, theme);
         const shot = async (name: string, fullPage = false) => {
           if (info.project.name !== "mobile-chromium") return;
-          await settle(page);
-          await page.screenshot({
-            path: `e2e/__screenshots__/${name}-${theme}-${scheme}.png`,
-            fullPage,
-          });
+          await stableShot(page, `e2e/__screenshots__/${name}-${theme}-${scheme}.png`, fullPage);
         };
         const check = async () => {
           await settle(page);

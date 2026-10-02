@@ -35,7 +35,7 @@ function parseBlocks(css: string): Block[] {
       const selector = src.slice(i, open).trim();
       i = open + 1;
       const block: Block = { selector, decls: new Map(), children: [] };
-      if (selector.startsWith("@media")) {
+      if (selector.startsWith("@media") || selector.startsWith("@keyframes")) {
         block.children = parseList();
       } else {
         const end = src.indexOf("}", i);
@@ -102,6 +102,7 @@ const OTHER_TOKENS = [
   "--fs-base",
   "--fs-lg",
   "--fs-xl",
+  "--fs-sm",
   "--lh-base",
   "--radius",
   "--radius-lg",
@@ -186,6 +187,126 @@ function failures(tokens: Map<string, string>): string[] {
     return r >= min ? [] : [`${fg} on ${bg} = ${r.toFixed(2)} < ${String(min)}`];
   });
 }
+// ---- 배경 층(워시·종이 결·수채 번짐) 위 글자 대비 ----
+type Rgb = [number, number, number];
+
+function toRgb(hexColor: string): Rgb {
+  const h = hexColor.replace("#", "");
+  const full = h.length === 3 ? h.replace(/./g, "$&$&") : h;
+  return [0, 2, 4].map((o) => parseInt(full.slice(o, o + 2), 16)) as Rgb;
+}
+
+function toHex(c: Rgb): string {
+  return `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** top 색(알파 a)을 base 위에 합성한 색. */
+function over(top: Rgb, a: number, base: Rgb): Rgb {
+  return [0, 1, 2].map((i) => (top[i] ?? 0) * a + (base[i] ?? 0) * (1 - a)) as Rgb;
+}
+
+/** `--tex-bg` 값에서 알파 > 0 인 색 정지점(rgba / #hex)을 읽는다. */
+function parseStops(value: string): { rgb: Rgb; a: number }[] {
+  const re =
+    /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
+  const out: { rgb: Rgb; a: number }[] = [];
+  for (const m of value.matchAll(re)) {
+    const stop =
+      m[1] !== undefined
+        ? {
+            rgb: [Number(m[1]), Number(m[2]), Number(m[3])] as Rgb,
+            a: m[4] === undefined ? 1 : Number(m[4]),
+          }
+        : { rgb: toRgb(m[0]), a: 1 };
+    if (stop.a > 0) out.push(stop);
+  }
+  return out;
+}
+
+// 종이 결(feTurbulence 회색조 SVG) 한 장의 실측: 캔버스에 그려 픽셀별 a*(1-v)(검정으로 덮는 정도)와
+// a*v(흰색으로 덮는 정도)의 최댓값을 구했다(2026-10-02, 180×180 타일). 최악 지점 대비 계산에 쓴다.
+const GRAIN_MAX_DARKEN = 0.354;
+const GRAIN_MAX_LIGHTEN = 0.727;
+
+const WASH_PAIRS: [string, number][] = [
+  ["--c-fg", 4.5],
+  ["--c-muted", 4.5],
+  ["--c-link", 4.5],
+  ["--c-earth", 4.5],
+  ["--c-accent", 4.5],
+  ["--c-border", 3],
+];
+
+/** 글자가 올라갈 수 있는 배경 후보: bg, 워시 정지점 각각(bg 위 최대 알파), 모두 쌓은 경우, 거기에 종이 결 최악. */
+export function backdrops(
+  tokens: Map<string, string>,
+  scheme: Scheme,
+  grainOpacity: number,
+): { label: string; rgb: Rgb }[] {
+  const bg = toRgb(hex(tokens, "--c-bg"));
+  const stops = parseStops(tokens.get("--tex-bg") ?? "");
+  const list: { label: string; rgb: Rgb }[] = [{ label: "bg", rgb: bg }];
+  for (const s of stops)
+    list.push({ label: `wash ${toHex(s.rgb)}@${String(s.a)}`, rgb: over(s.rgb, s.a, bg) });
+  if (stops.length > 1) {
+    list.push({
+      label: "wash stacked",
+      rgb: stops.reduceRight((acc, s) => over(s.rgb, s.a, acc), bg),
+    });
+  }
+  if (grainOpacity > 0) {
+    const grain: [Rgb, number] =
+      scheme === "light"
+        ? [[0, 0, 0], grainOpacity * GRAIN_MAX_DARKEN]
+        : [[255, 255, 255], grainOpacity * GRAIN_MAX_LIGHTEN];
+    for (const b of [...list])
+      list.push({ label: `${b.label}+grain`, rgb: over(grain[0], grain[1], b.rgb) });
+  }
+  return list;
+}
+
+/** 워시·결 위에서 기준 미달인 (글자색, 배경) 설명 목록. */
+export function washFailures(
+  tokens: Map<string, string>,
+  scheme: Scheme,
+  grainOpacity: number,
+): string[] {
+  const out: string[] = [];
+  for (const b of backdrops(tokens, scheme, grainOpacity)) {
+    for (const [fg, min] of WASH_PAIRS) {
+      const r = ratio(hex(tokens, fg), toHex(b.rgb));
+      if (r < min)
+        out.push(`${fg} on ${b.label} ${toHex(b.rgb)} = ${r.toFixed(2)} < ${String(min)}`);
+    }
+  }
+  return out;
+}
+
+/** 수채 번짐(--blob-alpha) 위 글자(fg·muted) 대비. 번짐이 없는 테마는 빈 목록. */
+export function blobFailures(tokens: Map<string, string>): string[] {
+  const alpha = Number(tokens.get("--blob-alpha"));
+  if (!alpha) return [];
+  const comp = toHex(
+    over(toRgb(hex(tokens, "--c-deco-1")), alpha, toRgb(hex(tokens, "--c-surface-2"))),
+  );
+  return ["--c-fg", "--c-muted"].flatMap((fg) => {
+    const r = ratio(hex(tokens, fg), comp);
+    return r >= 4.5 ? [] : [`${fg} on blob ${comp} = ${r.toFixed(2)} < 4.5`];
+  });
+}
+
+/** 테마 전용 쌍(예: 크레용 형광펜 띠 위 글자). */
+const THEME_PAIRS: Record<string, [string, string, number][]> = {
+  crayon: [["--c-on-hl", "--c-hl", 4.5]],
+};
+
+function grainOpacityFor(theme: string, scheme: Scheme): number {
+  const css = files[`./themes/${theme}.css`];
+  if (!css) return 0;
+  const g = collect(css, `:root[data-theme="${theme}"] body::before`);
+  const v = (scheme === "light" ? g.light : new Map([...g.light, ...g.dark])).get("opacity");
+  return v ? Number(v) : 0;
+}
 describe("테마 파일", () => {
   it("THEMES 의 모든 테마가 CSS 를 가진다", () => {
     for (const t of THEMES) {
@@ -227,6 +348,26 @@ for (const theme of THEMES.map((t) => t.id)) {
         expect(r, `${fg} on ${bg} = ${r.toFixed(2)}`).toBeGreaterThanOrEqual(min);
       });
 
+      it("워시·종이 결 위 글자·경계 대비(최진 합성색 기준)", () => {
+        const grain = grainOpacityFor(theme, scheme);
+        expect(washFailures(t, scheme, grain)).toEqual([]);
+        if (process.env.PRINT_WASH) {
+          for (const b of backdrops(t, scheme, grain))
+            console.log(
+              `${theme}/${scheme} ${b.label} ${toHex(b.rgb)} link ${ratio(hex(t, "--c-link"), toHex(b.rgb)).toFixed(2)} fg ${ratio(hex(t, "--c-fg"), toHex(b.rgb)).toFixed(2)} border ${ratio(hex(t, "--c-border"), toHex(b.rgb)).toFixed(2)}`,
+            );
+        }
+      });
+
+      it("수채 번짐 위 글자 대비", () => {
+        expect(blobFailures(t)).toEqual([]);
+      });
+
+      it("테마 전용 쌍", () => {
+        for (const [fg, bg, min] of THEME_PAIRS[theme] ?? []) {
+          expect(ratio(hex(t, fg), hex(t, bg)), `${fg} on ${bg}`).toBeGreaterThanOrEqual(min);
+        }
+      });
       it("theme-color(주소창) 은 --c-bg 와 같다", () => {
         expect(THEME_COLORS[theme][scheme]).toBe(hex(t, "--c-bg"));
       });
@@ -252,5 +393,26 @@ describe("대조군: 검사 함수는 낮은 대비를 실제로 잡는다", () 
     const bad = new Map(tokensFor("basic", "light"));
     bad.set("--c-fg", "rgba(0,0,0,1)");
     expect(() => failures(bad)).toThrow();
+  });
+
+  it("워시 대조군: 진한 워시를 얹으면 실패 목록이 나온다", () => {
+    const bad = new Map(tokensFor("basic", "light"));
+    bad.set(
+      "--tex-bg",
+      "radial-gradient(100% 50% at 50% 100%, rgba(0, 120, 0, 0.9) 0%, rgba(0, 120, 0, 0) 70%)",
+    );
+    expect(washFailures(bad, "light", 0).length).toBeGreaterThan(0);
+    const ok = new Map(tokensFor("basic", "light"));
+    ok.set(
+      "--tex-bg",
+      "radial-gradient(100% 50% at 50% 100%, rgba(0, 120, 0, 0.05) 0%, rgba(0, 120, 0, 0) 70%)",
+    );
+    expect(washFailures(ok, "light", 0)).toEqual([]);
+  });
+
+  it("번짐 대조군: 진한 번짐은 실패", () => {
+    const bad = new Map(tokensFor("forest", "light"));
+    bad.set("--blob-alpha", "0.95");
+    expect(blobFailures(bad).length).toBeGreaterThan(0);
   });
 });

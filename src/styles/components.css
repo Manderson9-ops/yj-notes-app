@@ -142,7 +142,7 @@ mark {
   border-radius: 999px;
   background: var(--c-badge);
   color: var(--c-on-badge);
-  font-size: 14px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   line-height: 1.2;
 }
@@ -237,7 +237,7 @@ mark {
 
 .meta {
   color: var(--c-earth);
-  font-size: 14px;
+  font-size: var(--fs-sm);
 }
 
 .kv {
@@ -358,6 +358,11 @@ mark {
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+.d-stem {
+  fill: none;
+  stroke: var(--c-earth);
+  stroke-linecap: round;
 }
 .d-line {
   fill: none;
