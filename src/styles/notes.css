@@ -1,0 +1,236 @@
+/* 홈(S10)·알림장(S30·S31) 전용 클래스. 색·크기·간격은 토큰만 쓴다(테마 분기 없음).
+   이 파일은 홈·알림장 화면 묶음(React.lazy)과 함께 내려받는다. */
+
+/* ---- 검색 ---- */
+.search-box {
+  position: relative;
+}
+.search-box .field {
+  padding-left: calc(var(--space-4) + 28px);
+  padding-right: var(--tap);
+}
+.search-box .field::-webkit-search-cancel-button {
+  display: none;
+}
+.search-icon {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--space-3);
+  display: flex;
+  align-items: center;
+  color: var(--c-muted);
+  pointer-events: none;
+}
+.search-clear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--c-fg);
+  cursor: pointer;
+}
+.hint {
+  margin: var(--space-1) 0 0;
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+.status-line {
+  margin: var(--space-3) 0 0;
+  color: var(--c-muted);
+}
+
+/* ---- 일치 강조: 색 + 굵기 + 밑줄 ---- */
+mark {
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--c-badge);
+  color: var(--c-on-badge);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---- 목록 ---- */
+.month-head {
+  margin: var(--space-5) 0 var(--space-1);
+  padding-bottom: var(--space-1);
+  border-bottom: 2px solid var(--c-line);
+  color: var(--c-earth);
+  font-size: var(--fs-base);
+}
+.note-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.note-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-fg);
+  text-decoration: none;
+}
+.note-list li:last-child .note-row {
+  border-bottom: 0;
+}
+.note-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.note-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+.note-date {
+  font-weight: 700;
+}
+.note-first,
+.note-hit {
+  margin: var(--space-1) 0 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.note-first.is-compact {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+.note-first.is-empty {
+  color: var(--c-muted);
+}
+.note-hit {
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+.note-src {
+  margin-right: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+}
+.note-chevron {
+  flex: none;
+  color: var(--c-muted);
+}
+.card .note-row {
+  padding: 0;
+  border-bottom: 0;
+}
+.card .note-first {
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+.more-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+/* ---- 상세 ---- */
+.detail-top {
+  display: flex;
+  align-items: center;
+  margin: 0 0 var(--space-2);
+}
+.detail-meta {
+  margin: 0 0 var(--space-4);
+  color: var(--c-earth);
+}
+.day-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+.day-nav .btn {
+  flex-direction: column;
+  gap: 0;
+  padding: var(--space-2) var(--space-3);
+}
+.day-nav .btn small {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+}
+.day-nav .btn:disabled {
+  border-style: dashed;
+  color: var(--c-muted);
+  border-color: var(--c-border);
+}
+.note-report {
+  margin-top: var(--space-4);
+}
+.note-report h2 {
+  margin-top: 0;
+}
+.note-text {
+  max-width: 36em;
+  margin: var(--space-3) 0 0;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.note-text.is-empty {
+  color: var(--c-muted);
+}
+.note-comments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.note-comment {
+  padding: var(--space-3) var(--space-4);
+  border-left: 6px solid var(--c-border);
+  border-radius: var(--radius);
+  background: var(--c-surface);
+}
+.note-comment[data-who="teacher"] {
+  border-left-color: var(--c-earth);
+}
+.note-comment[data-who="parent"] {
+  border-left-color: var(--c-accent);
+  background: var(--c-accent-soft);
+  color: var(--c-on-accent-soft);
+}
+.note-comment .note-text {
+  margin-top: var(--space-1);
+  line-height: 1.7;
+}
+.note-comment-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+}
+.note-who {
+  font-weight: 700;
+}
+.note-comment[data-who="parent"] .meta {
+  color: inherit;
+}
+
+/* ---- 홈 ---- */
+.home-actions {
+  margin-bottom: var(--space-4);
+}
+.home-facts {
+  margin-top: var(--space-4);
+}
