@@ -528,6 +528,15 @@ mark {
   margin-top: var(--space-4);
 }
 
+/* 대화상자의 선택지는 한 줄에 하나씩 가로 가득(손가락으로 누르기 쉽게, 화면의 다른 단추와 같은 폭) */
+.dialog .actions {
+  flex-direction: column;
+}
+
+.dialog .actions > .btn {
+  width: 100%;
+}
+
 .actions > .btn-lg {
   margin-bottom: 0;
 }
