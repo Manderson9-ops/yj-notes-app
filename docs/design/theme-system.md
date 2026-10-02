@@ -46,7 +46,7 @@
 | TH-3 | axe serious/critical 0 (6 조합 × PIN·홈·설정·미리보기) | `e2e/a11y.spec.ts` |
 | TH-4 | 터치 영역 ≥ 48px, 큰 글씨 설정 유지 | `e2e/large-text.spec.ts`: 3테마 × (보통·큰 글씨) 에서 `.key .chip .btn .btn-primary .tab .theme-option` 의 `boundingBox` 높이·너비 ≥ 48, 키 글자 넘침 없음, axe 0, 스크린샷 `*-<테마>-large-light.png` |
 | TH-5 | `prefers-reduced-motion` 에서 움직임 0 | CSS 규칙 + e2e |
-| TH-6 | 기본 테마 번들 증가 ≤ 15 KB gzip(JS+CSS), 폰트는 테마별 ≤ 80 KB, 기본 테마에선 폰트 요청 0 | `npm run build && npm run size:check`(JS+CSS gzip 합계가 main 119.50 KB + 15 KB 를 넘거나 `dist/fonts/*.woff2` 가 80 KB 를 넘으면 실패; 로컬 `check` 에는 넣지 않고 CI check 잡이 build 직후 실행) + `e2e/theme.spec.ts` 의 폰트 요청 수 확인 |
+| TH-6 | 기본 테마 번들 증가 ≤ 15 KB gzip(JS+CSS), 폰트는 테마별 ≤ 80 KiB(81,920 B), 기본 테마에선 폰트 요청 0 | `npm run build && npm run size:check`(JS+CSS gzip 합계가 main 119.50 KB + 15 KB 를 넘거나 `dist/fonts/*.woff2` 가 80 KiB(81,920 B)를 넘으면 실패; 로컬 `check` 에는 넣지 않고 CI check 잡이 build 직후 실행) + `e2e/theme.spec.ts` 의 폰트 요청 수 확인 |
 | TH-7 | 캐릭터·로고·원화·대사·상표명 UI 노출 0, 외부 이미지 0 | 리뷰 체크리스트 §5 |
 | TH-8 | 화면 코드에 테마 분기 없음 (`data-theme` 문자열은 `theme.ts`·CSS·decor 에만) | `grep` 리뷰 |
 | TH-9 | CSP 변경 없음 (`style-src 'self'`, 인라인 `<style>` 없음) | `server/http/headers.ts` 무변경 |
@@ -65,7 +65,8 @@
 | 폰트 부분 집합 다시 만들기 | 정적 UI 문구를 바꿨으면 `npm run fonts:subset` 후 커밋. 빠진 글자는 시스템 글꼴로 보임(깨지지 않음) |
 | 번들 크기 확인 | 빌드 뒤 `npm run size:check`(CI check 잡에서도 build 직후 실행). 한도는 `tools/size/check.ts` 상단 상수. **기준값 측정법**: main 을 빌드한 `dist/` 에 같은 스크립트를 돌린다(`node tools/size/check.ts <main 의 dist>`) → 119.50 KB(zlib 기본 레벨, 1 KB = 1000 B). Vite 의 "gzip: N kB" 출력과는 약 1% 달라 섞어 비교하지 않는다 |
 | 스크린샷 갱신 | `npm run test:e2e` 가 `e2e/__screenshots__/<화면>-<테마>-<light|dark>.png` 로 저장. **로컬 Windows 에서는 커밋된 PNG 와 비교**(`toMatchSnapshot`: 다른 픽셀 비율 `maxDiffPixelRatio` 0.002 이하, 픽셀별 색 차이 `threshold` 0.05 — `playwright.config.ts`) — 디자인을 일부러 바꿨으면 `npx playwright test --update-snapshots` 후 PNG 를 커밋. CI(linux 컨테이너)는 렌더가 달라 비교하지 않고 저장만. **민감도 변이 시험(2026-10-02)**: 숲 `--c-deco-2` `#66a063` → `#a06066`(밝기 비슷한 색상만 변경)은 `pin-forest-light` 에서 26,263 픽셀(비율 0.03) 차이로 **실패**(기본 threshold 0.2 에서는 통과해 놓쳤음), `#ff00ff` 같은 큰 변화는 당연히 실패, `#6c9d66`(미세 변화)은 통과. 같은 설정에서 e2e 연속 3회 통과(비결정성 없음) |
-| 전체 페이지 스크린샷 | `stableShot` 이 찍는 동안만 sticky 탭바에 `.is-static-for-shot`(base.css)를 달아 중간에 찍히지 않게 함 |
+| 전체 페이지 스크린샷 | `stableShot` 은 fullPage 캡처 대신 **뷰포트를 페이지 높이만큼 키워** 찍고(position:fixed 배경 층이 첫 화면 높이에서 끊겨 중간에 경계선이 생기는 캡처 산출물 방지), 그동안 sticky 탭바에 `.is-static-for-shot`(base.css)를 달아 중간에 찍히지 않게 함 |
+| 요소 단위 시각 회귀 | `e2e/elements.spec.ts`: 테마(크레용·숲) × light/dark 의 h2 띠·선택 칩·주 버튼을 요소만 찍어 `threshold` 0.02 로 비교(`el-<요소>-<테마>-<scheme>.png`). **변이 시험(2026-10-02)**: 크레용 `--c-hl` `#ffd4da` → `#f6cfe6` 은 `el-h2-crayon-light` 에서 6,496 픽셀(요소의 60%) 차이로 **실패**, 같은 변이가 전체 화면 비교(threshold 0.05)에서는 통과 — 그래서 요소 단위를 둔다 |
 
 ## 5. 저작권·상표 체크리스트 (PR 마다)
 

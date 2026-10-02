@@ -414,6 +414,12 @@
   color: var(--c-muted);
 }
 /* PIN 위 하늘: 구름을 크게(화면 폭의 35~40%) */
+:root[data-theme="forest"] .pin-screen {
+  padding-bottom: calc(
+    var(--space-5) + 96px
+  ); /* 큰 글씨에서도 맨 아래 키 줄이 언덕(96px)에 닿지 않게 */
+}
+
 :root[data-theme="forest"] .decor-pin-top {
   height: 96px;
 }
@@ -436,8 +442,23 @@
   border-bottom: 1px solid var(--c-line);
   font-size: calc(var(--fs-lg) * 1.12);
 }
-/* ---- 종이 결: 정적 feTurbulence(회색조) data URI, 아주 옅게. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없다 ---- */
+/* ---- 워시: iOS Safari 는 background-attachment: fixed 를 무시하므로 body 배경이 아닌 fixed 층(body::before)으로 둔다.
+   순서: 워시(::before) 아래 → 종이 결(::after) 위. 둘 다 맨 뒤(z-index -1)라 카드·버튼·입력 면 위에는 없다 ---- */
+:root[data-theme="forest"] body {
+  background-image: none;
+}
+
 :root[data-theme="forest"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--tex-bg);
+  background-repeat: no-repeat;
+}
+/* ---- 종이 결: 정적 feTurbulence(회색조) data URI, 아주 옅게. 맨 뒤 층이라 카드·버튼·입력 면 위에는 없다 ---- */
+:root[data-theme="forest"] body::after {
   content: "";
   position: fixed;
   inset: 0;
@@ -448,7 +469,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root[data-theme="forest"] body::before {
+  :root[data-theme="forest"] body::after {
     opacity: 0.05;
   }
 }

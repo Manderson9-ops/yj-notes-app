@@ -46,7 +46,7 @@
 | `--radius` / `--radius-lg` | 14px / 16px | 같음 | 조약돌 |
 | `--bw` | 1px | 1px | |
 | `--shadow` / `--shadow-press` | `0 2px 12px` / `0 1px 5px` + `color-mix(--c-shadow 16%)` (푸른 기 조금 더) | `0 0 0 1px rgba(237,230,211,.06)` / 같음 | |
-| `--tex-bg` | 하늘 워시(위 38% 까지 불투명 `#DCEAF0`) + 숲 워시(`rgba(102,160,99,.12)` → 최진 합성색 `#E5E7D4`, 연구 상한 `#CFE0C4` 보다 밝음) + 정적 종이 결(`body::before`, opacity .055 — .06 은 최악 지점 링크 대비 4.48 로 실패) | 밤 워시 + 종이 결 .05 | 글자 뒤 면에는 없음(맨 뒤 층) |
+| `--tex-bg` | 하늘 워시(위 38% 까지 불투명 `#DCEAF0`) + 숲 워시(`rgba(102,160,99,.12)` → 최진 합성색 `#E5E7D4`, 연구 상한 `#CFE0C4` 보다 밝음) + 정적 종이 결(`body::after`, opacity .055 — .06 은 최악 지점 링크 대비 4.48 로 실패) | 밤 워시 + 종이 결 .05 | 글자 뒤 면에는 없음(맨 뒤 층) |
 | `--font-display` | `"YJ Forest Display"`(고운바탕 Bold 부분 집합) | 같음 | 20px 이상 제목만 |
 | `--ease` / `--dur` | `cubic-bezier(.4,0,.2,1)` / 260ms | 같음 | 튀지 않음 |
 
@@ -95,3 +95,7 @@
 | 본문 고운돋움 웹폰트 | 본문 시스템 글꼴 | 한글 본문 폰트 용량. display 만 부분 집합 |
 | 테두리 전부 1px 장식선 | 컨트롤 경계는 `--c-border`(3:1), 장식선은 `--c-line` 으로 분리 | WCAG 1.4.11 |
 | 경고 하나(#A33A2B) | 주의(`--c-warn`, 황토)·오류(`--c-alert`, 붉은 흙빛) 둘 | docs/06 §4 상태 표시가 둘을 구분 |
+
+## 구현 메모: 배경 층 (리뷰 5차)
+
+- iOS Safari 는 `background-attachment: fixed` 를 무시하므로 하늘·숲 워시를 body 배경이 아닌 `body::before`(`position: fixed; inset: 0; z-index: -1`)로 옮겼다. 종이 결은 `body::after` 로 그 위에 쌓는다(순서: 워시 → 종이 결). 둘 다 `--tex-bg` 토큰과 `opacity` 를 contrast.test.ts 가 읽는다(워시를 진하게 하면 실패하는 변이 확인: `rgba(102,160,99,.5)` → link 3.28·muted 3.86).

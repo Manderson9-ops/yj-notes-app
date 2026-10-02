@@ -247,7 +247,7 @@
 :root[data-theme="crayon"] .card::before {
   content: "";
   position: absolute;
-  inset: 4px 4px auto; /* 손그림 외곽선 안쪽에서 시작 */
+  inset: 0 0 auto; /* padding-box 위쪽에 붙임(카드 overflow:hidden 이 안쪽 둥근 모서리로 자른다) */
   height: 12px;
   background: var(--c-band-sky);
 }
@@ -372,13 +372,34 @@
   transform: translateY(-2px) rotate(-45deg) scale(1);
 }
 /* ---- 손그림 외곽선: 완전한 기하 도형 대신 살짝 흔들린 선(border-image). focus outline 은 그대로 둥근 기하 도형(접근성).
-   border-image 는 border-radius 를 무시하고 선의 모서리 곡률도 요소 라운드와 다르다. 그래서 면(배경)을 border-box 에 두면
-   모서리에서 선 밖으로 삐져나온다 → background-clip: padding-box 로 면을 선 안쪽(border 두께만큼 안)에 가둔다.
-   그림자는 box-shadow 대신 filter: drop-shadow 로 선+면 묶음 모양을 그대로 따라가 선 바로 뒤에 붙는다 ---- */
-:root[data-theme="crayon"] :is(.btn, .btn-primary, .card, .field, .theme-option, .chip, .key) {
-  background-clip: padding-box;
+   border-image 는 border-radius 를 무시하고 선의 곡률도 요소 라운드와 다르다. 그래서 배경을 두 겹으로 쌓는다:
+   위층 = 면(--face), padding-box 에 가둬 선 안쪽에만 칠한다 / 아래층 = 먹선 색 단색, border-box 전체(선 밑을 메움).
+   → 면이 선 밖으로 새지 않고(서브픽셀 위치와 무관), 선과 면 사이 투명한 틈이 없어 drop-shadow 가 한 덩어리로 보인다.
+   border-width 는 --bw + 1px: 면 가장자리를 선 바깥쪽 흔들림보다 1px 더 안으로 들인다.
+   그림자는 box-shadow 대신 filter: drop-shadow 로 선+면 묶음 모양을 따라 선 바로 뒤에 붙는다 ---- */
+:root[data-theme="crayon"]
+  :is(.btn, .btn-primary, .card, .field, .theme-option, .chip, .key, .empty) {
+  --face: var(--c-surface);
+  border-width: calc(var(--bw) + 1px);
+  background-color: transparent;
+  background-image:
+    linear-gradient(var(--face), var(--face)), linear-gradient(var(--c-border), var(--c-border));
+  background-clip: padding-box, border-box;
+  background-origin: padding-box, border-box;
 }
 
+:root[data-theme="crayon"] :is(.btn-primary, .key-primary) {
+  --face: var(--c-accent);
+}
+
+:root[data-theme="crayon"] .chip[aria-pressed="true"],
+:root[data-theme="crayon"] .theme-option:has(input:checked) {
+  --face: var(--c-accent-soft);
+}
+
+:root[data-theme="crayon"] .empty {
+  --face: var(--c-hl);
+}
 :root[data-theme="crayon"] :is(.btn, .btn-primary, .card, .field, .theme-option) {
   border-image-source: var(--bi-rect);
   border-image-slice: 20;
@@ -420,6 +441,10 @@
 :root[data-theme="crayon"] [data-tone="serious"] .card {
   padding-top: var(--space-4);
 }
+:root[data-theme="crayon"] .pin-screen {
+  padding-bottom: calc(var(--space-5) + 56px); /* 땅 장식(56px)과 키패드 사이 여백 */
+}
+
 :root[data-theme="crayon"] .decor-pin-ground {
   height: 56px;
 }
@@ -429,8 +454,6 @@
   margin-top: var(--space-3);
   border: var(--bw) solid var(--c-border);
   border-radius: var(--radius-lg);
-  background: var(--c-hl);
-  background-clip: padding-box;
   border-image: var(--bi-rect) 20 / 20px stretch;
   color: var(--c-on-hl);
 }

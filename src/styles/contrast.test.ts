@@ -317,7 +317,7 @@ const THEME_PAIRS: Record<string, [string, string, number][]> = {
 function grainOpacityFor(theme: string, scheme: Scheme): number {
   const css = files[`./themes/${theme}.css`];
   if (!css) return 0;
-  const g = collect(css, `:root[data-theme="${theme}"] body::before`);
+  const g = collect(css, `:root[data-theme="${theme}"] body::after`);
   const v = (scheme === "light" ? g.light : new Map([...g.light, ...g.dark])).get("opacity");
   return v ? Number(v) : 0;
 }

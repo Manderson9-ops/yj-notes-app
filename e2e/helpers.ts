@@ -1,5 +1,5 @@
 import { writeFile } from "node:fs/promises";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** 끝나는 전환·등장 모션이 지난 뒤로 기다린다(문자열 실행: e2e 의 tsconfig 에는 DOM 타입이 없다). */
 export async function settle(page: Page) {
@@ -43,25 +43,25 @@ async function preloadCssImages(page: Page) {
 export async function stableShot(page: Page, name: string, fullPage = false) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await settle(page);
-  // 선언된 @font-face 를 전부 불러온다(ready 만으로는 "아직 요청 전" 인 장식 폰트를 놓쳐 레이아웃이 뒤늦게 바뀐다)
   await page.evaluate(
-    "Promise.all([...document.fonts].map((f) => f.load().catch(() => null))).then(() => document.fonts.ready).then(() => true)",
+    "Promise.all([...document.fonts].map((f) => f.load().catch(() => null))).then(() => true)",
   );
   await preloadCssImages(page);
-  if (fullPage) {
-    // sticky 탭바가 전체 페이지 캡처 중간에 찍히지 않게 흐름 안에 둔다(base.css .is-static-for-shot)
+  // 전체 페이지는 fullPage 캡처 대신 뷰포트를 페이지 높이만큼 키워 찍는다: position:fixed 배경 층(숲 워시·종이 결)이
+  // 첫 화면 높이에서 끊겨 중간에 경계선이 생기는 캡처 산출물을 없앤다. sticky 탭바는 흐름 안에 둔다.
+  const original = page.viewportSize();
+  if (fullPage && original) {
     await page.evaluate("document.querySelector('.tabbar')?.classList.add('is-static-for-shot')");
-    // 화면 밖 층(마스크·필터)이 늦게 래스터되지 않도록 한 번 끝까지 훑는다
-    await page.evaluate(
-      "(async () => { for (let y = 0; y <= document.documentElement.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 30)); } window.scrollTo(0, 0); })()",
-    );
+    const height = Number(await page.evaluate("document.documentElement.scrollHeight"));
+    await page.setViewportSize({ width: original.width, height });
+    await page.waitForTimeout(300);
   }
   // 연속 세 장이 같아질 때까지 다시 찍는다
-  let shot = await page.screenshot({ fullPage });
+  let shot = await page.screenshot();
   let same = 0;
   for (let i = 0; i < 12 && same < 2; i++) {
     await page.waitForTimeout(250);
-    const next = await page.screenshot({ fullPage });
+    const next = await page.screenshot();
     same = next.equals(shot) ? same + 1 : 0;
     shot = next;
   }
@@ -70,10 +70,38 @@ export async function stableShot(page: Page, name: string, fullPage = false) {
   } else {
     await writeFile(`e2e/__screenshots__/${name}.png`, shot);
   }
-  if (fullPage) {
+  if (fullPage && original) {
+    await page.setViewportSize(original);
     await page.evaluate(
       "document.querySelector('.tabbar')?.classList.remove('is-static-for-shot')",
     );
+  }
+  await page.emulateMedia({ reducedMotion: null });
+}
+/**
+ * 작은 요소 하나만 찍어 비교한다(h2 띠·선택 칩·주 버튼 등). 전체 화면 비교는 면적이 커서 작은 요소의 미세한 색 변화를
+ * 놓칠 수 있으므로, 요소 단위로 더 엄격하게(threshold 0.02) 본다. 저장·비교 위치와 규칙은 stableShot 과 같다.
+ */
+export async function stableElementShot(page: Page, target: Locator, name: string) {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await settle(page);
+  await page.evaluate(
+    "Promise.all([...document.fonts].map((f) => f.load().catch(() => null))).then(() => true)",
+  );
+  await preloadCssImages(page);
+  await target.scrollIntoViewIfNeeded();
+  let shot = await target.screenshot();
+  let same = 0;
+  for (let i = 0; i < 12 && same < 2; i++) {
+    await page.waitForTimeout(250);
+    const next = await target.screenshot();
+    same = next.equals(shot) ? same + 1 : 0;
+    shot = next;
+  }
+  if (process.platform === "win32" && !process.env.CI) {
+    expect(shot).toMatchSnapshot(`${name}.png`, { threshold: 0.02, maxDiffPixelRatio: 0.002 });
+  } else {
+    await writeFile(`e2e/__screenshots__/${name}.png`, shot);
   }
   await page.emulateMedia({ reducedMotion: null });
 }
