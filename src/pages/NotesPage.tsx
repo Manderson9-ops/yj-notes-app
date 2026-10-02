@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Chip } from "../components/Chip";
 import { QueryError } from "../components/QueryError";
 import { NoteRow } from "../components/NoteRow";
 import { ClearIcon, SearchIcon } from "../components/notesIcons";
@@ -167,7 +166,7 @@ export default function NotesPage() {
             enterKeyHint="search"
             autoComplete="off"
             maxLength={NOTES_QUERY_MAX}
-            placeholder="낱말로 찾기"
+            placeholder="본문·댓글에서 찾기"
             aria-describedby="notes-q-hint"
             value={input}
             onChange={(e) => {
@@ -185,48 +184,54 @@ export default function NotesPage() {
             </button>
           )}
         </div>
-        <p className="hint" id="notes-q-hint">
+        <p className="sr-only" id="notes-q-hint">
           본문과 댓글에서 찾아요. 최대 {String(NOTES_QUERY_MAX)}자.
         </p>
       </form>
 
-      <div className="chip-row" role="group" aria-label="기간">
-        {PERIODS.map((p) => (
-          <Chip
-            key={p.id}
-            pressed={period === p.id}
-            onPress={() => {
-              update({ p: p.id });
-            }}
-          >
-            {p.label}
-          </Chip>
-        ))}
-      </div>
-
-      {monthOptions.length > 1 && (
-        <div className="month-jump">
-          <label className="sr-only" htmlFor="notes-month">
-            월로 바로 가기
+      <div className="filter-row">
+        <div>
+          <label className="sr-only" htmlFor="notes-period">
+            기간
           </label>
           <select
-            id="notes-month"
+            id="notes-period"
             className="field"
-            value={month}
+            value={period}
             onChange={(e) => {
-              update({ m: e.target.value });
+              update({ p: parsePeriod(e.target.value) });
             }}
           >
-            <option value="">월 골라서 보기</option>
-            {monthOptions.map((m) => (
-              <option key={m} value={m}>
-                {monthLabelOf(m)}
+            {PERIODS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
               </option>
             ))}
           </select>
         </div>
-      )}
-
+        {monthOptions.length > 1 && (
+          <div>
+            <label className="sr-only" htmlFor="notes-month">
+              월로 바로 가기
+            </label>
+            <select
+              id="notes-month"
+              className="field"
+              value={month}
+              onChange={(e) => {
+                update({ m: e.target.value });
+              }}
+            >
+              <option value="">월 선택</option>
+              {monthOptions.map((m) => (
+                <option key={m} value={m}>
+                  {monthLabelOf(m)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
       {list.isPending ? (
         <p className="loading" role="status">
           불러오는 중

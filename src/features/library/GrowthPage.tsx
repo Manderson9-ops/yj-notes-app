@@ -5,7 +5,7 @@ import "./library.css";
 import { Chip } from "../../components/Chip";
 import { useGrowth, type Growth, type GrowthPoint, type Measure } from "./api";
 import { refAt } from "./chart";
-import { formatKoDate, MEASURES, measureInfo, withUnit } from "./format";
+import { formatKoDate, MEASURES, measureInfo, referenceName, withUnit } from "./format";
 import { GrowthChart, plottable } from "./GrowthChart";
 import { LoadError } from "./LoadError";
 import { ScrollRegion } from "./ScrollRegion";
@@ -31,16 +31,16 @@ function PointDetail({ p, measure }: { p: GrowthPoint; measure: Measure }) {
             <dd>{p.recalcPct}</dd>
           </>
         ) : null}
-        <dt>판독</dt>
-        <dd>
-          {p.readStatus === "UNCERTAIN" ? (
-            <span className="badge" data-status="uncertain">
-              판독 불확실
-            </span>
-          ) : (
-            status(p)
-          )}
-        </dd>
+        {p.readStatus === "UNCERTAIN" ? (
+          <>
+            <dt>판독</dt>
+            <dd>
+              <span className="badge" data-status="uncertain">
+                판독 불확실
+              </span>
+            </dd>
+          </>
+        ) : null}
         <dt>측정 조건</dt>
         <dd>{p.note ?? "적어 둔 메모 없음"}</dd>
       </dl>
@@ -51,6 +51,7 @@ function PointDetail({ p, measure }: { p: GrowthPoint; measure: Measure }) {
 function GrowthTable({ data, measure }: { data: Growth; measure: Measure }) {
   const info = measureInfo(measure);
   const showRecalc = data.points.some((p) => p.recalcPct !== null);
+  const showRead = data.points.some((p) => p.readStatus === "UNCERTAIN");
   const refCell = (p: GrowthPoint, key: "p3" | "p50" | "p97") => {
     const v = p.ageMonths === null ? null : refAt(data.reference, key, p.ageMonths);
     return v === null ? "없음" : String(Math.round(v * 10) / 10);
@@ -66,7 +67,7 @@ function GrowthTable({ data, measure }: { data: Growth; measure: Measure }) {
             <th scope="col">값</th>
             <th scope="col">결과지 백분위</th>
             {showRecalc ? <th scope="col">다시 계산</th> : null}
-            <th scope="col">판독</th>
+            {showRead ? <th scope="col">판독</th> : null}
             <th scope="col">측정 조건</th>
             <th scope="col">기준 3%</th>
             <th scope="col">기준 50%</th>
@@ -81,7 +82,7 @@ function GrowthTable({ data, measure }: { data: Growth; measure: Measure }) {
               <td>{p.value}</td>
               <td>{p.sheetPct ?? "없음"}</td>
               {showRecalc ? <td>{p.recalcPct ?? "없음"}</td> : null}
-              <td>{status(p)}</td>
+              {showRead ? <td>{status(p)}</td> : null}
               <td>{p.note ?? "없음"}</td>
               <td>{refCell(p, "p3")}</td>
               <td>{refCell(p, "p50")}</td>
@@ -183,7 +184,9 @@ export default function GrowthPage() {
                     <span className="legend-dot" aria-hidden="true" />{" "}
                     {anyUncertain ? "진한 점: 측정값, 빈 점: 판독 불확실" : "점: 측정값"}
                   </li>
-                  {q.data.referenceSource ? <li>기준표 출처: {q.data.referenceSource}</li> : null}
+                  {q.data.referenceSource ? (
+                    <li>기준표 출처: {referenceName(q.data.referenceSource)}</li>
+                  ) : null}
                 </ul>
                 {only ? (
                   <p className="muted">

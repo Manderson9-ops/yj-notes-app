@@ -32,6 +32,7 @@ export function withUnit(value: number, measure: Measure): string {
 const FOLDER_TAIL = /\s*\([A-Za-z0-9_-]+\/\)\s*$/;
 const DASH = " — ";
 const COMMON_SUFFIX_MIN = 3;
+const NAME_LEN = 3;
 
 /**
  * 목록 제목 다듬기: 폴더 꼬리를 떼고, 여러 문서가 같은 ` — 꼬리` 로 끝나면(아이 이름 등) 그 꼬리를 뗀다.
@@ -50,10 +51,29 @@ export function displayTitles(
     }
   }
   const common = [...tails].filter(([, n]) => n >= COMMON_SUFFIX_MIN).map(([t]) => t);
+  // 공통 꼬리가 아이 이름이면(세 글자 이름이면 성을 뺀 이름도) 다른 문서의 「 — 이름(나이)」 꼬리도 뗀다.
+  const names = common.flatMap((t) => {
+    const name = t.slice(DASH.length).trim();
+    return name.length === NAME_LEN ? [name, name.slice(1)] : name === "" ? [] : [name];
+  });
   return new Map(
     base.map((d) => {
       const tail = common.find((t) => d.title.endsWith(t));
-      return [d.slug, tail ? d.title.slice(0, d.title.length - tail.length).trim() : d.title];
+      if (tail) return [d.slug, d.title.slice(0, d.title.length - tail.length).trim()];
+      const at = d.title.lastIndexOf(DASH);
+      if (at > 0 && names.some((n) => d.title.slice(at + DASH.length).includes(n))) {
+        return [d.slug, d.title.slice(0, at).trim()];
+      }
+      return [d.slug, d.title];
     }),
   );
+}
+
+/** 기준표 출처 id 를 사람이 읽는 이름으로. 모르는 id 는 원문 그대로 보인다. */
+const REFERENCE_NAMES: Readonly<Record<string, string>> = {
+  WHOGROWTH: "WHO 아동 성장 표준",
+};
+
+export function referenceName(id: string): string {
+  return REFERENCE_NAMES[id] ?? id;
 }

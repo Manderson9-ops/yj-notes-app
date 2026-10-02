@@ -26,6 +26,20 @@ export function stripInlineMarks(s: string): string {
     .replace(/<[^>]+>/g, "");
 }
 
+/**
+ * 설명이 아닌 문단: 경로·파일 이름 꼴로 시작(`폴더/이름.확장자`), 따옴표 조각으로 시작, 생성·갱신·출처 같은 메타 문장.
+ * 이런 문단은 건너뛰고 다음 문단을 본다.
+ */
+const PATHLIKE = /^[`([]?[\w.-]*[/\\][\w./\\-]*|^[`([]?[\w-]+\.(md|html|py|ts|csv|json|xlsx)\b/i;
+const QUOTE_LEAD = /^["'「『“‘<]/;
+const META_LEAD =
+  /^(자동\s*생성|생성\s*(일|됨|도구)|갱신|마지막\s*(갱신|수정)|작성\s*(일|자)|수정\s*(일|됨)|버전|출처|기준\s*일|업데이트|※|참고\s*:|주의\s*:)/;
+
+export function isDescriptive(text: string): boolean {
+  const t = text.trim();
+  return !PATHLIKE.test(t) && !QUOTE_LEAD.test(t) && !META_LEAD.test(t);
+}
+
 export function summaryOfMarkdown(src: string): string | null {
   const lines = src
     .replace(/<!--[\s\S]*?-->/g, "")
@@ -35,7 +49,8 @@ export function summaryOfMarkdown(src: string): string | null {
   let para: string[] = [];
   let quote: string | null = null;
   const flush = (): string | null => {
-    const out = para.length > 0 ? cut(stripInlineMarks(para.join(" "))) : null;
+    const plain = stripInlineMarks(para.join(" "));
+    const out = para.length > 0 && isDescriptive(plain) ? cut(plain) : null;
     para = [];
     return out;
   };
@@ -88,6 +103,7 @@ export function summaryOfHtml(src: string): string | null {
     const text = (m[1] ?? "")
       .replace(/<[^>]+>/g, "")
       .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_s, k: string) => ENTITIES[k] ?? "");
+    if (!isDescriptive(text)) continue;
     const got = cut(text);
     if (got) return got;
   }

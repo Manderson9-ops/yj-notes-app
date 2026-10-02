@@ -30,7 +30,7 @@ export default function HomePage() {
 
   return (
     <>
-      <h1>홈</h1>
+      <h1 className="sr-only">홈</h1>
       {overview.isPending ? (
         <>
           <p className="loading" role="status">
@@ -89,11 +89,6 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
                 </div>
               ))}
             </div>
-            <p>
-              <Link to="/notes" className="link">
-                알림장 전체 보기
-              </Link>
-            </p>
           </>
         )}
       </section>

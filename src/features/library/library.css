@@ -446,7 +446,7 @@ a.doc-card {
 }
 
 .lib-intro {
-  margin: var(--space-4) 0 0;
+  margin: calc(var(--space-2) * -1) 0 var(--space-3);
   color: var(--c-muted);
   font-size: var(--fs-sm);
 }

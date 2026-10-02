@@ -43,13 +43,23 @@
   font-size: var(--fs-sm);
 }
 .status-line {
-  margin: var(--space-3) 0 0;
+  margin: var(--space-2) 0 0;
   color: var(--c-muted);
 }
 
 /* ---- 월로 바로 가기 ---- */
-.month-jump {
+/* 기간·월 선택: 한 줄에 나란히(큰 글씨에서도 첫 알림장이 첫 화면 위쪽에 오게) */
+.filter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
   margin-top: var(--space-2);
+}
+.filter-row > :only-child {
+  grid-column: 1 / -1;
+}
+.filter-row .field {
+  padding-right: var(--space-2);
 }
 
 /* ---- 일치 강조: 색 + 굵기 + 밑줄 ---- */
@@ -70,6 +80,10 @@ mark {
   border-bottom: 2px solid var(--c-line);
   color: var(--c-earth);
   font-size: var(--fs-base);
+}
+/* 첫 달 머리글은 건수 줄 바로 아래에 붙인다(첫 알림장이 첫 화면 위쪽에 오게) */
+.status-line + section > .month-head {
+  margin-top: var(--space-2);
 }
 .note-list {
   margin: 0;
@@ -238,4 +252,8 @@ mark {
 }
 .home-facts {
   margin-top: var(--space-4);
+}
+/* 홈은 제목 「홈」 을 스크린리더에만 읽히게 하고, 눈에 보이는 첫 제목은 「최근 알림장」 이다 */
+h1.sr-only + section > h2:first-child {
+  margin-top: var(--space-1);
 }

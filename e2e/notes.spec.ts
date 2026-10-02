@@ -78,21 +78,16 @@ test("search box: 40 char limit, clear button, period chip, empty states", async
   await expect(box).toHaveValue("");
   await expect(box).toBeFocused();
 
-  await page.getByRole("button", { name: "최근 1달" }).click();
-  await expect(page.getByRole("button", { name: "최근 1달" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  const period = page.getByRole("combobox", { name: "기간" });
+  await period.selectOption("1m");
+  await expect(period).toHaveValue("1m");
   await expect.poll(() => rows(page).count()).toBeGreaterThan(5);
   await expect(rows(page).first()).toContainText("5월");
 
   await box.fill("없는낱말");
   await expect(page.getByText("「없는낱말」가 들어간 알림장이 없어요.")).toBeVisible();
   await page.getByRole("button", { name: "전체 기간으로 볼게요" }).click();
-  await expect(page.getByRole("button", { name: "전체", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(period).toHaveValue("all");
   await expect(page.getByText("다른 낱말로 찾아 보세요.")).toBeVisible();
 });
 
@@ -105,7 +100,7 @@ test("list: jump to a month, and the greeting line is skipped in the preview", a
   await expect(rows(page).first()).toContainText("4월 30일 (목)");
   await expect(page.getByRole("status").filter({ hasText: "2020년 4월부터" })).toBeVisible();
   // 기간 칩을 누르면 월 선택은 풀린다
-  await page.getByRole("button", { name: "최근 1달" }).click();
+  await page.getByRole("combobox", { name: "기간" }).selectOption("1m");
   await expect(month).toHaveValue("");
   await expect(rows(page).first()).toContainText("5월 2일");
 
@@ -206,4 +201,20 @@ test("detail: several reports on one day are numbered, times use 오전/오후",
   await expect(page.getByRole("heading", { level: 2, name: "알림장 2" })).toBeVisible();
   await expect(page.getByText("오전 9:40 · 교사")).toBeVisible();
   await expect(page.getByText("오후 4:10 · 교사")).toBeVisible();
+});
+
+test("큰 글씨: 첫 알림장 행이 첫 화면 위쪽 절반 안에 온다", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("yj.largeText", "1");
+  });
+  await login(page);
+  await page.goto("/notes");
+  const first = rows(page).first();
+  await expect(first).toBeVisible();
+  const box = await first.boundingBox();
+  expect(box?.y ?? 9999).toBeLessThan(370); // 360×740 첫 화면의 위쪽 절반
+  // 기간·월 선택은 한 줄에 나란히
+  const p = await page.getByRole("combobox", { name: "기간" }).boundingBox();
+  const m = await page.getByRole("combobox", { name: "월로 바로 가기" }).boundingBox();
+  expect(Math.abs((p?.y ?? 0) - (m?.y ?? 99))).toBeLessThan(2);
 });

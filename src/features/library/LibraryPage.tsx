@@ -23,6 +23,9 @@ export default function LibraryPage() {
   return (
     <>
       <h1>자료</h1>
+      {latest !== "" && (
+        <p className="lib-intro">자료를 마지막으로 갱신한 날: {formatKoDate(latest)}</p>
+      )}
 
       <section aria-labelledby="lib-health">
         <h2 id="lib-health">건강 기록</h2>
@@ -62,9 +65,6 @@ export default function LibraryPage() {
         </>
       ) : (
         <>
-          {latest !== "" && (
-            <p className="lib-intro">자료를 마지막으로 갱신한 날: {formatKoDate(latest)}</p>
-          )}
           {GROUPS.map((g) => {
             const docs = reports.data.items.filter((d) => d.group === g.id);
             if (docs.length === 0) return null;
