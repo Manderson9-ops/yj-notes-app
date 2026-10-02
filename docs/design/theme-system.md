@@ -125,3 +125,9 @@
 | 한글 줄바꿈 | `body { word-break: keep-all; overflow-wrap: anywhere }` | 단어 중간 끊김 방지 |
 | TH-8 자동 확인 | `src/theme-isolation.test.ts` | pages·app·components(decor 제외)에 `data-theme`·`"crayon"`·`"forest"` 0개 |
 | 스크린샷 안정화 | `e2e/helpers.ts` 의 `stableShot` (찍는 순간만 reduced-motion) | 흔들리는 잎 때문에 PNG 가 달라지던 문제 |
+
+### 장식 글꼴 크기 여유 (T-E1)
+- `size:check` 는 woff2 가 80 KiB 에서 8 KiB 안쪽으로 다가오면 경고한다(실패 아님).
+- 부분 집합에서 숫자(0-9)를 뺐다: 숫자는 본문 글꼴 + tabular-nums 규칙(위 표)이라 장식 글꼴에 필요 없다. 크레용 78,616 → 76,864 B, 숲 43,920 → 41,284 B. 제목 속 숫자(예: 날짜 h1)는 본문 글꼴로 보인다.
+- 영문 대문자·소문자는 남겼다(제목·단추에 `BMI` 같은 영문이 나올 수 있고 빠지면 글꼴이 섞인다). 크기의 대부분은 한글 음절(약 290자)이라 ASCII 를 더 빼도 얻는 것이 적다.
+- 크레용 여유가 약 5 KB 로 경고선(8 KB) 안쪽이다. 한글 음절이 약 30자 늘면 한도를 넘는다: 그때는 화면 문구를 줄이거나 크레용 장식 범위(`.btn` 등)를 제목 위주로 좁힌다.

@@ -17,6 +17,8 @@ const TOTAL_JS_MAX_KB = 200;
 // 한도에 바짝 붙지 않게: 한도까지 남은 여유가 이 값보다 적으면 실패한다(새 기능은 lazy 로 두고 시작한다).
 const HEADROOM_MIN_KB = 5;
 const FONT_MAX_BYTES = 80 * 1024;
+// 한도까지 여유가 이만큼보다 적으면 경고(실패 아님): 한글이 늘면 곧 한도를 넘는다는 신호.
+const FONT_WARN_MARGIN_BYTES = 8 * 1024;
 
 function gzipKb(file: string): number {
   return gzipSync(readFileSync(file)).byteLength / 1000;
@@ -74,6 +76,11 @@ if (existsSync(fonts)) {
     if (!name.endsWith(".woff2")) continue;
     const bytes = statSync(join(fonts, name)).size;
     console.log(`${name}  ${bytes} B (한도 ${FONT_MAX_BYTES} B)`);
+    if (bytes <= FONT_MAX_BYTES && FONT_MAX_BYTES - bytes < FONT_WARN_MARGIN_BYTES) {
+      console.warn(
+        `경고: ${name} 의 한도 여유가 ${String(FONT_MAX_BYTES - bytes)} B 로 ${String(FONT_WARN_MARGIN_BYTES)} B 보다 적습니다. 화면 한글이 늘면 한도를 넘습니다(줄이는 방법: docs/design/theme-system.md §4).`,
+      );
+    }
     if (bytes > FONT_MAX_BYTES) {
       console.error(`TH-6 실패: ${name} 이(가) 80 KiB 를 넘었습니다.`);
       failed = true;

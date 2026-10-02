@@ -33,7 +33,11 @@ const JOBS: readonly Job[] = [
 
 function ascii(): string {
   let s = "";
-  for (let c = 0x20; c <= 0x7e; c++) s += String.fromCharCode(c);
+  // 숫자(0-9)는 본문 글꼴 + tabular-nums 규칙이라 장식 글꼴에 넣지 않는다(theme-system §4).
+  for (let c = 0x20; c <= 0x7e; c++) {
+    if (c >= 0x30 && c <= 0x39) continue;
+    s += String.fromCharCode(c);
+  }
   return s;
 }
 
