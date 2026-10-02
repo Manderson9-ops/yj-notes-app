@@ -19,12 +19,12 @@ export function SettingsPage() {
   });
 
   // 보내지 않은 기록이 이 기기에 있으면 로그아웃 전에 물어본다(남겨 두면 다시 로그인할 때 보낸다).
-  const [unsent, setUnsent] = useState<number | null>(null);
+  const [unsent, setUnsent] = useState<{ pending: number; failed: number } | null>(null);
   const askLogout = async () => {
     const c = await unsentCounts();
     const total = c.pending + c.failed;
     if (total === 0) logout.mutate();
-    else setUnsent(total);
+    else setUnsent({ pending: c.pending, failed: c.failed });
   };
 
   return (
@@ -87,8 +87,19 @@ export function SettingsPage() {
           });
         }}
       >
-        <p>이 기기에 보내지 않은 기록이 {String(unsent ?? 0)}건 있어요.</p>
-        <p>남겨 두면 다시 로그인할 때 보내요.</p>
+        <p>
+          이 기기에 보내지 않은 기록이 {String((unsent?.pending ?? 0) + (unsent?.failed ?? 0))}건
+          있어요.
+        </p>
+        {(unsent?.pending ?? 0) > 0 && (
+          <p>{String(unsent?.pending ?? 0)}건은 남겨 두면 다시 로그인할 때 보내요.</p>
+        )}
+        {(unsent?.failed ?? 0) > 0 && (
+          <>
+            <p>{String(unsent?.failed ?? 0)}건은 보내지 못했어요.</p>
+            <p>남겨 두면 기록 화면에서 볼 수 있어요.</p>
+          </>
+        )}
         <p>지우면 되돌릴 수 없어요.</p>
       </ConfirmDialog>
     </>

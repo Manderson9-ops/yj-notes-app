@@ -77,6 +77,24 @@ describe("logout with unsent records", () => {
     expect(await store.getAll()).toHaveLength(2);
   });
 
+  it("says exactly which are waiting and which failed to send", async () => {
+    const store = createMemoryStore();
+    await store.put(entry("a"));
+    await store.put({ ...entry("b"), status: "failed" as const });
+    configureQueue({ store, online: () => false });
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <MemoryRouter>
+          <SettingsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "이 기기 로그아웃" }));
+    expect(await screen.findByText("이 기기에 보내지 않은 기록이 2건 있어요.")).toBeInTheDocument();
+    expect(screen.getByText("1건은 남겨 두면 다시 로그인할 때 보내요.")).toBeInTheDocument();
+    expect(screen.getByText(/1건은 보내지 못했어요/)).toBeInTheDocument();
+  });
+
   it("「남겨 두고 로그아웃」 logs out and keeps the records", async () => {
     const store = await setup(["a"]);
     await userEvent.click(screen.getByRole("button", { name: "이 기기 로그아웃" }));
