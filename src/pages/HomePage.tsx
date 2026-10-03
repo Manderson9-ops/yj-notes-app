@@ -4,7 +4,7 @@ import { Notice } from "../components/Notice";
 import { NoteRow } from "../components/NoteRow";
 import { QueryError } from "../components/QueryError";
 import { ThemeDecor } from "../components/decor/ThemeDecor";
-import { daysSince, formatDateKo } from "../lib/dateFormat";
+import { daysSince, formatDateKo, formatYmdKo, seoulDateOf } from "../lib/dateFormat";
 import { useOverview } from "../lib/notesApi";
 import "../styles/notes.css";
 
@@ -58,7 +58,7 @@ export default function HomePage() {
 function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["data"]> }) {
   const [now] = useState(() => Date.now());
   const staleDays = data.lastIngest ? daysSince(data.lastIngest.at, now) : null;
-  const syncDate = data.lastIngest?.at.slice(0, 10);
+  const syncDate = data.lastIngest ? seoulDateOf(data.lastIngest.at) : undefined;
 
   return (
     <>
@@ -116,7 +116,7 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
               <>
                 <dt>기간</dt>
                 <dd>
-                  {data.range.from} ~ {data.range.to}
+                  {formatYmdKo(data.range.from)} ~ {formatYmdKo(data.range.to)}
                 </dd>
               </>
             )}

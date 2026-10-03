@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   daysSince,
+  formatYmdKo,
+  seoulDateOf,
   formatDateKo,
   formatShortKo,
   minusMonths,
@@ -49,6 +51,17 @@ describe("dateFormat", () => {
     expect(timeOf("x")).toBe("");
     expect(daysSince("2020-01-01T00:00:00Z", Date.parse("2020-01-16T12:00:00Z"))).toBe(15);
     expect(daysSince("bad", 0)).toBe(0);
+    // 한국 날짜 기준: UTC 23:50 은 한국 다음 날 08:50 — 같은 날 아침이면 "오늘"(0일)
+    expect(daysSince("2020-03-01T23:50:00Z", Date.parse("2020-03-02T00:30:00Z"))).toBe(0);
+    // 한국 어제 밤 기록은 오늘 아침 기준 1일 전
+    expect(daysSince("2020-03-01T13:00:00Z", Date.parse("2020-03-02T00:30:00Z"))).toBe(1);
+  });
+
+  it("seoulDateOf / formatYmdKo", () => {
+    expect(seoulDateOf("2020-03-01T23:50:00Z")).toBe("2020-03-02");
+    expect(seoulDateOf("2020-03-01T14:59:59Z")).toBe("2020-03-01");
+    expect(seoulDateOf("bad")).toBe("");
+    expect(formatYmdKo("2020-03-02")).toBe("2020년 3월 2일");
   });
 });
 
