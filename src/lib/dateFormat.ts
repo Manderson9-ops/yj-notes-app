@@ -53,10 +53,26 @@ export function timeKo(postedAt: string): string {
   return `${half} ${String(h % 12 === 0 ? 12 : h % 12)}:${m[2] ?? "00"}`;
 }
 
-/** ISO 시각이 지금보다 며칠 전인지(내림). */
+/** 2020년 3월 2일 (요일 없음) — 기간 표기 */
+export function formatYmdKo(date: string): string {
+  const { y, m, d } = parts(date);
+  return `${String(y)}년 ${String(m)}월 ${String(d)}일`;
+}
+
+const SEOUL_OFFSET_MS = 9 * 3_600_000; // 한국은 일광 절약 시간이 없다(UTC+9 고정).
+
+/** ISO 시각(UTC) -> 한국 날짜 YYYY-MM-DD. 잘못된 값이면 "". */
+export function seoulDateOf(iso: string | number): string {
+  const t = typeof iso === "number" ? iso : Date.parse(iso);
+  return Number.isNaN(t) ? "" : new Date(t + SEOUL_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** ISO 시각이 오늘(한국 날짜 기준)보다 며칠 전인지. 달력 날짜 차이라 어제 밤은 1일 전. */
 export function daysSince(iso: string, nowMs: number): number {
-  const t = Date.parse(iso);
-  return Number.isNaN(t) ? 0 : Math.max(0, Math.floor((nowMs - t) / 86_400_000));
+  const then = seoulDateOf(iso);
+  if (!then) return 0;
+  const diff = Date.parse(seoulDateOf(nowMs)) - Date.parse(then);
+  return Math.max(0, Math.round(diff / 86_400_000));
 }
 
 export const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
