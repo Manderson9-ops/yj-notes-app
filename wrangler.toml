@@ -16,16 +16,20 @@ migrations_dir = "migrations"
 # binding = "FILES"
 # bucket_name = "yj-notes-private"
 
-# preview 환경: 자원은 M2 이후 만든다. 미리보기에는 fixtures 만 적재한다(docs/09 §1).
-# 실제 자료를 절대 넣지 않는다. 자원 생성 후 아래 주석을 해제하고 ID 를 채운다.
-# [env.preview]
-#
-# [[env.preview.d1_databases]]
-# binding = "DB"
-# database_name = "yj-notes-db-preview"
-# database_id = "<preview D1 ID>"
-# migrations_dir = "migrations"
-#
+# preview 환경(R1-8): 미리보기 배포가 운영 D1 에 묶이지 않도록 항상 별도 자원을 명시한다.
+# 최상위 [[d1_databases]] 는 production 이다. Pages 의 [env.preview] 는 최상위 바인딩을 물려받지 않으며,
+# 아래 database_id 는 일부러 존재하지 않는 자리표시자(전부 0)라서 실제 preview D1 을 만들기 전에는
+# 미리보기가 DB 에 닿지 못하고 실패한다(= 운영 자료에 닿는 것보다 안전). 실제 자원은 M2 이후 만든다(docs/09 §1).
+# 미리보기에는 fixtures 만 적재한다. 실제 자료를 절대 넣지 않는다.
+# preview D1 을 만들면 database_id 를 그 ID 로 바꾼다(운영 ID 를 쓰지 않는다 — tests/security/deploy-config.test.ts 가 검사).
+[env.preview]
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "yj-notes-db-preview"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
 # [[env.preview.r2_buckets]]
 # binding = "FILES"
 # bucket_name = "yj-notes-private-preview"

@@ -19,8 +19,9 @@ concurrency:
 jobs:
   deploy:
     name: deploy
-    # workflow_run 은 CI 성공일 때만. 수동 실행(workflow_dispatch)은 항상 허용.
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    # workflow_run 은 CI 성공일 때만. 수동 실행(workflow_dispatch)은 main 브랜치에서 실행한 경우에만(R1-8:
+    # 다른 브랜치의 코드가 production 으로 나가는 것을 막는다).
+    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:

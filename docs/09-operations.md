@@ -8,7 +8,7 @@
 | preview | PR 미리보기 | `yj-notes-db-preview` | `yj-notes-private-preview` | fixtures 만 |
 | production | `yj-notes-app` (production 브랜치 `main`) | `yj-notes-db` (ID 는 `wrangler.toml`) | `yj-notes-private` — **M4 활성화 예정**(R2 미사용, 바인딩 주석 처리) | 실제(S1/S2) |
 
-- 미리보기 환경에는 **실제 자료를 절대 적재하지 않는다**(PR 미리보기 주소는 추측 가능). 미리보기 자원은 M2 이후 만들며 그때까지 `wrangler.toml` 의 `env.preview` 는 주석 처리.
+- 미리보기 환경에는 **실제 자료를 절대 적재하지 않는다**(PR 미리보기 주소는 추측 가능). 미리보기 자원은 M2 이후 만든다. **R1-8**: `wrangler.toml` 의 `[env.preview]` 는 운영 D1 에 묶이지 않도록 별도 D1(`yj-notes-db-preview`)을 명시하며, 실제 자원을 만들기 전까지 `database_id` 는 존재하지 않는 자리표시자(`0000…`)다 — 미리보기는 DB 에 닿지 못해 실패할 뿐 운영 자료에 닿지 않는다. 자원을 만든 뒤 그 ID 로 바꾼다(운영 ID 재사용은 `tests/security/deploy-config.test.ts` 가 막는다). 또 `deploy.yml` 의 수동 실행(`workflow_dispatch`)은 `main` 브랜치에서 실행했을 때만 배포한다(다른 브랜치는 건너뜀).
 
 ## 2. 비밀값
 
