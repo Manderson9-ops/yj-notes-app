@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { hashPin } from "../../server/auth/pin";
-import { computePinHash, formatOutput, PBKDF2_ITERATIONS, PIN_PATTERN } from "./pin-hash";
+import {
+  computePinHash,
+  formatOutput,
+  PBKDF2_ITERATIONS,
+  PIN_PATTERN,
+  PIN_TOO_SHORT_MESSAGE,
+} from "./pin-hash";
 import { REVOKE_SQL, parseArgs, printableCommand, wranglerArgs } from "./session-revoke";
 
 describe("pin-hash tool", () => {
@@ -10,9 +16,12 @@ describe("pin-hash tool", () => {
     expect(PBKDF2_ITERATIONS).toBe(100_000);
   });
 
-  it("validates 4-12 digits", () => {
-    expect(PIN_PATTERN.test("1234")).toBe(true);
-    expect(PIN_PATTERN.test("123")).toBe(false);
+  it("R1-1: admin tool requires 6-12 digits (server still accepts 4-12)", () => {
+    expect(PIN_PATTERN.test("123456")).toBe(true);
+    expect(PIN_PATTERN.test("123456789012")).toBe(true);
+    expect(PIN_PATTERN.test("1234")).toBe(false);
+    expect(PIN_PATTERN.test("12345")).toBe(false);
+    expect(PIN_TOO_SHORT_MESSAGE).toContain("6~12자리");
     expect(PIN_PATTERN.test("12345678901234")).toBe(false);
     expect(PIN_PATTERN.test("12a456")).toBe(false);
   });
