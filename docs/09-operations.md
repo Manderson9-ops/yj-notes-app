@@ -53,7 +53,7 @@ npm run ingest:verify                     # 통과해야 다음으로
 npm run ingest:upload -- --remote --yes
 npm run ingest:status -- --remote         # matches_manifest: true
 ```
-- 새 마이그레이션이 있으면 먼저 `npm run db:migrate:prod`(순서는 §3-1d). `upload` 는 시작 전에 필요한 마이그레이션(`0004_report_doc_body.sql` 이상: 문서 원문 `body` 칸)이 적용됐는지 확인하고, 안 됐으면 명확한 오류로 멈춘다.
+- 새 마이그레이션이 있으면 먼저 `npm run db:migrate:prod`(순서는 §3-1d). `upload` 는 시작 전에 필요한 마이그레이션(`0007_report_doc_summary.sql` 이상: 문서 원문 `body` 칸(0004)과 목록 설명 `summary` 칸(0007))이 적용됐는지 확인하고, 안 됐으면 명확한 오류로 멈춘다.
 - 출력은 `%LOCALAPPDATA%\yj-notes\ingest\<run-id>\`(저장소 밖, S1·S2 포함). 적재가 끝나면 오래된 run 폴더는 지워도 된다.
 - `--remote` 는 `--yes` 없이는 동작하지 않는다. 개발·검증은 `--local` 로(`npm run db:migrate:local` 이 선행).
 - Python 3.11+ 가 필요하다(런타임 패키지 없음). 없으면 `INGEST_PYTHON` 에 경로를 지정한다.
@@ -68,7 +68,7 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 - 로컬 개발은 `--remote` 대신 `--local`. 합성 값은 `fixtures/seed/library_health.sql` 에만 있다.
 
 ### 3-1d. 이번 배포 순서 (0004·0005·0006 + 실제 자료, 관리자)
-운영 D1 에는 아직 `0004_report_doc_body.sql`(문서 원문 칸), `0005_log_schema_and_history.sql`(기록 스키마·이력), `0006_*`(기록 선택지 라벨 정리, 저장 값은 그대로)이 없다. **아래 순서를 지킨다**(마이그레이션 → 자료 → 설정값 → 코드 → 확인). 코드를 먼저 올리면 새 칸이 없어 화면이 오류가 난다.
+운영 D1 에는 아직 `0004_report_doc_body.sql`(문서 원문 칸), `0007_report_doc_summary.sql`(목록 설명 칸, R1-10), `0005_log_schema_and_history.sql`(기록 스키마·이력), `0006_*`(기록 선택지 라벨 정리, 저장 값은 그대로)이 없다. **아래 순서를 지킨다**(마이그레이션 → 자료 → 설정값 → 코드 → 확인). 코드를 먼저 올리면 새 칸이 없어 화면이 오류가 난다.
 
 | # | 명령 (관리자 PC, `DATA_DIR`·적재 토큰 환경) | 확인 |
 |---|---|---|

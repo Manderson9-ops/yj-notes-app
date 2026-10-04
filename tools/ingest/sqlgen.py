@@ -104,6 +104,7 @@ TABLES: tuple[TableSpec, ...] = (
             "verify_ok",
             "sha256",
             "body",
+            "summary",
         ),
     ),
 )

@@ -22,6 +22,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from .config import Config
+from .summary import doc_summary
 from .xlsx import read_xlsx_rows
 
 Row = dict[str, str | int | float | None]
@@ -553,6 +554,7 @@ def build_docs(src: Sources, cfg: Config, commit: str) -> tuple[list[Row], dict[
                 "verify_ok": 0,  # upload 가 I4 통과 후, 그 문서 계층의 검증이 통과한 문서만 1 로 올린다(R1-7)
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "body": text,
+                "summary": doc_summary(kind, text),
             }
         )
     return sorted(rows, key=lambda x: str(x["slug"])), doc_layers

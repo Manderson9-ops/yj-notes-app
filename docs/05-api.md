@@ -4,7 +4,7 @@
 - 인증: `/api/session`(POST/GET), `/api/health` 외 **전부 세션 필요**. 없으면 `401 {"error":"auth_required"}`
 - 쓰기 요청: `Content-Type: application/json` 필수, `Origin` 이 자기 도메인이어야 함(아니면 `403`)
 - 오류 형식: `{"error": "<code>", "message": "<사람이 읽는 한국어>"}` — 자료 내용·SQL·스택을 넣지 않는다
-- 요청·응답 스키마는 `server/schemas/*.ts`(zod) 가 정본. 이 문서는 요약.
+- 요청·응답 스키마의 정본(zod, R1-10 에서 실제 위치로 정정): 응답 모양은 `src/lib/schemas.ts`(세션)·`src/lib/notesSchemas.ts`(알림장·overview)·`src/lib/logs/schemas.ts`(가족 기록)·`src/features/library/api.ts`(자료실), 서버 입력 검증은 각 `server/routes/*.ts` 와 `server/logs/definition.ts`. 이 문서는 요약.
 
 ## 인증
 

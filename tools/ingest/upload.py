@@ -23,8 +23,8 @@ class UploadError(RuntimeError):
     pass
 
 
-# 적재가 기대는 마이그레이션(문서 원문 body 칸). 더 새 마이그레이션은 이 이름이 적용된 뒤에만 있을 수 있다.
-REQUIRED_MIGRATION = "0004_report_doc_body.sql"
+# 적재가 기대는 마이그레이션(문서 원문 body 칸 0004 + 목록 설명 summary 칸 0007). 더 새 마이그레이션은 이 이름이 적용된 뒤에만 있을 수 있다.
+REQUIRED_MIGRATION = "0007_report_doc_summary.sql"
 
 
 def check_migrations(runner: Runner) -> None:
@@ -39,9 +39,9 @@ def check_migrations(runner: Runner) -> None:
     if REQUIRED_MIGRATION not in applied:
         raise UploadError(f"마이그레이션 {REQUIRED_MIGRATION} 이(가) 대상 DB 에 적용되지 않았습니다. {hint}")
     try:  # 표시만이 아니라 실제 칸이 있는지도 본다(수동으로 만든 DB 대비)
-        runner.query("SELECT body FROM report_doc LIMIT 0")
+        runner.query("SELECT body, summary FROM report_doc LIMIT 0")
     except RunnerError as e:
-        raise UploadError(f"report_doc.body 칸이 없습니다. {hint}") from e
+        raise UploadError(f"report_doc.body/summary 칸이 없습니다. {hint}") from e
 
 
 def _iso(now: datetime | None) -> str:

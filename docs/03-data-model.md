@@ -102,12 +102,13 @@ CREATE TABLE family_log (
 );
 CREATE INDEX idx_log_type_date ON family_log(type, occurred_on);
 
--- 보고서 메타. 본문은 D1 body 칸(R2 활성화 전, 0004_report_doc_body.sql). body 가 NULL 이면 r2_key 로 R2 에서 읽는다
+-- 보고서 메타. 본문은 D1 body 칸(R2 활성화 전, 0004_report_doc_body.sql; 목록 설명 summary 는 0007_report_doc_summary.sql). body 가 NULL 이면 r2_key 로 R2 에서 읽는다
 CREATE TABLE report_doc (
   slug TEXT PRIMARY KEY, title TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('html','markdown')),
   r2_key TEXT NOT NULL, generated_at TEXT NOT NULL, source_commit TEXT NOT NULL,
   verify_ok INTEGER NOT NULL, sha256 TEXT NOT NULL,
-  body TEXT                             -- 0004: 문서 원문(행당 2MB 미만). body 가 있으면 r2_key = ''
+  body TEXT,                             -- 0004: 문서 원문(행당 2MB 미만). body 가 있으면 r2_key = ''
+  summary TEXT      -- 0007(R1-10): 목록 카드 한 줄 설명(≤200자). 적재가 계산, NULL 이면 API 가 본문에서 만든다
 );
 -- 묶음(보고서·가이드·위키)은 열이 아니라 slug 규칙: `-`/`_` 로 나눈 **첫 마디**가 guide 또는 wiki 면 그 묶음, 아니면 보고서. 적재 도구가 slug 를 `<폴더>-<번호|영문 이름>` 으로 만든다(`guide/05-제목.md` → `guide-05`, 한글만 있는 이름은 해시 6자, 겹치면 `-2`). 앱 링크 `/library/doc/guide-05#3-1`.
 -- app_setting 키(성장 곡선): child_birth_date(YYYY-MM-DD, 만 개월 계산), child_sex('F'|'M', 기준표 선택. 기본 F).

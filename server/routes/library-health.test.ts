@@ -38,6 +38,26 @@ describe("GET /api/reports", () => {
     for (const item of body.items) expect(item).not.toHaveProperty("body");
   });
 
+  it("R1-10: uses the precomputed summary without reading the body; falls back when NULL", async () => {
+    const items = async () =>
+      (
+        await (
+          await get("/api/reports")
+        ).json<{ items: { slug: string; summary: string | null }[] }>()
+      ).items;
+    const sql = h.fake.sqlite;
+    sql.exec("UPDATE report_doc SET summary = NULL");
+    const before = await items();
+    // 본문 앞부분이 있어도 summary 가 있으면 그 값을 쓴다(본문과 무관한 값으로 확인)
+    sql.exec("UPDATE report_doc SET summary = '미리 계산한 합성 설명' WHERE slug = 'wiki-terms'");
+    const after = await items();
+    expect(after.find((i) => i.slug === "wiki-terms")?.summary).toBe("미리 계산한 합성 설명");
+    // 나머지(NULL)는 이전과 같은 방식으로 본문에서 만든다
+    for (const i of after.filter((x) => x.slug !== "wiki-terms")) {
+      expect(i.summary).toBe(before.find((b) => b.slug === i.slug)?.summary);
+    }
+  });
+
   it("reportGroup uses the first segment of the slug (ingest: <folder>-<number|name>)", () => {
     expect(reportGroup("guide-05")).toBe("guide");
     expect(reportGroup("wiki_00")).toBe("wiki");
