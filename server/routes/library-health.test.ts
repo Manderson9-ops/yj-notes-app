@@ -219,7 +219,58 @@ describe("GET /api/files/*", () => {
     const ok = await get("/api/files/s2/checkup/a.jpg");
     expect(ok.status).toBe(200);
     expect(ok.headers.get("Content-Type")).toBe("image/jpeg");
+    expect(ok.headers.get("Content-Disposition")).toBe('inline; filename="a.jpg"');
+    expect(ok.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect((await get("/api/files/s2/checkup/missing.jpg")).status).toBe(404);
+  });
+
+  it("R1-9: only jpeg/png/webp/pdf are served; anything else (html, svg, none) is 415", async () => {
+    const bind = (contentType: string | undefined) => {
+      h.env.FILES = {
+        get: () =>
+          Promise.resolve({
+            body: "bytes",
+            httpMetadata: contentType === undefined ? {} : { contentType },
+          }),
+      } as unknown as R2Bucket;
+    };
+    for (const [key, type] of [
+      ["a.png", "image/png"],
+      ["b.webp", "image/webp"],
+      ["c.pdf", "application/pdf"],
+      ["d.jpg", "image/jpeg; charset=binary"],
+    ] as const) {
+      bind(type);
+      const res = await get(`/api/files/s2/checkup/${key}`);
+      expect(res.status, type).toBe(200);
+      expect(res.headers.get("Content-Type")).toBe(type.split(";")[0]);
+      expect(res.headers.get("Content-Disposition")).toBe(`inline; filename="${key}"`);
+    }
+    for (const type of [
+      "text/html",
+      "image/svg+xml",
+      "application/octet-stream",
+      "application/javascript",
+      "",
+      undefined,
+    ]) {
+      bind(type);
+      const res = await get("/api/files/s2/checkup/e.jpg");
+      expect(res.status, String(type)).toBe(415);
+      expect(res.headers.get("Content-Disposition")).toBeNull();
+      expect(await res.json()).toEqual({
+        error: "unsupported_media_type",
+        message: "열 수 없는 파일 형식이에요.",
+      });
+    }
+  });
+
+  it("R1-9: Content-Disposition uses only the basename", async () => {
+    h.env.FILES = {
+      get: () => Promise.resolve({ body: "x", httpMetadata: { contentType: "image/png" } }),
+    } as unknown as R2Bucket;
+    const res = await get("/api/files/s2/checkup/sub/dir/scan-1.png");
+    expect(res.headers.get("Content-Disposition")).toBe('inline; filename="scan-1.png"');
   });
 });
 

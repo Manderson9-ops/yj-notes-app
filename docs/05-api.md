@@ -60,7 +60,7 @@
 | GET | `/checkups` | `{items:[{id, roundLabel, examDate, ageMonths, overall, remarks, devResult, imageUrl, measurements:[{id, measure, measuredOn, value, sheetPct, readStatus, note}]}]}` 최신순. 결과지 문구·백분위는 원본 그대로(판정 문구 생성 금지). 검진에 속하지 않은 가정 측정값은 제외. `imageUrl` 은 사진 지원 전까지 항상 `null` |
 | GET | `/checkups/:id` | 위 항목 1건. 없으면 `404` |
 | GET | `/growth?measure=height_cm\|weight_kg\|head_cm\|bmi` | `{measure, sex, referenceSource, points:[{id, date, ageMonths, value, sheetPct, recalcPct, readStatus, note, fromCheckup}], reference:[{ageMonth, p3, p50, p97}]}`. `ageMonths` = `app_setting.child_birth_date` 기준 만 개월(없으면 검진 회차의 개월 수, 그것도 없으면 `null`). `sheetPct` 는 결과지 값 그대로, `recalcPct` 는 기준표 L/M/S 로 다시 계산한 참고값(그 개월 행에 LMS 가 있을 때만, 아니면 `null`). 다른 `measure` 는 `400` |
-| GET | `/files/*` | R2 객체 스트리밍(허용 접두어 `s2/checkup/` 만, 그 밖은 `404`). R2(`FILES`) 바인딩이 없는 동안(M4 전)은 `501 not_implemented` |
+| GET | `/files/*` | R2 객체 스트리밍(허용 접두어 `s2/checkup/` 만, 그 밖은 `404`). **Content-Type 허용 목록(R1-9)**: `image/jpeg`·`image/png`·`image/webp`·`application/pdf` 만 내보내고 그 밖(없음 포함)은 `415 unsupported_media_type`. 응답에 `Content-Disposition: inline; filename="<basename>"` 와 `nosniff`. R2(`FILES`) 바인딩이 없는 동안(M4 전)은 `501 not_implemented` |
 
 ## 가족 기록 (F2)
 
