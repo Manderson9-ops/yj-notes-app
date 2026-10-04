@@ -93,8 +93,8 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 | O-02 | 주 1회 | 마지막 동기화 날짜, `ingest status` 건수 일치 |
 | O-03 | 최초·설정 변경 시 | 대시보드 > Workers & Pages > `yj-notes-app` > Settings > Runtime > Fail open/closed → **"Fail closed"**, R2 공개 접근 꺼짐, r2.dev 주소 꺼짐 |
 | O-04 | 월 1회 | Cloudflare 사용량(Functions·D1·R2) 무료 한도의 50% 미만 |
-| O-05 | 주 1회(자동) | D1 내보내기 → 관리자 PC Drive `backups/d1/YYYY-MM-DD.sql` (가족 기록 보호) |
-| O-06 | 분기 1회 | 백업 복구 연습(preview DB 에 복원 후 건수 대조 — 단, **가족 기록 복원 연습은 로컬에서만**) |
+| O-05 | 주 1회 | `npm run backup:prod` → `DATA_DIR/backups/d1/yj-notes-db_YYYY-MM-DD.sql` (가족 기록 보호, 저장소 밖) |
+| O-06 | 분기 1회 | 복구 연습(로컬 전용, §5-1). 최근: **2026-10-05 통과**(알림장 487일·댓글 734·문서 19 재생성, 앱 표 복원) |
 | O-07 | 주 1회 / 반기 1회 | Dependabot PR 검토·병합(주간, minor·patch 묶음) / 비밀값 교체·메이저 버전 업데이트(반기) |
 
 ## 5. 런북
@@ -104,11 +104,20 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 | R-01 | 가족이 "PIN 이 안 돼요" | 잠금 여부 확인(`auth_attempt`) → 15분 대기 안내. 전역 잠금이면 공격 의심 → 로그 확인 후 PIN 교체. **먼저 설정 화면의 「최근 전체 잠금」 날짜(= `app_setting.last_global_lock_at`, `GET /api/overview` 의 `security.lastGlobalLockAt`)를 확인**한다(R1-3). **한계**: 외부 알림 채널(메일·푸시)은 없다 — 가족 중 로그인된 사람이 설정 화면에서 보거나 관리자가 D1 을 조회해야 알 수 있다 |
 | R-02 | 적재 실패(`ingest_run.status=failed`) — 홈에 「마지막 갱신이 실패했어요」, 적재 중엔 「자료를 갱신하는 중이에요」 안내가 뜬다(R1-6) | 오류 메시지 확인(자료 내용은 출력되지 않음) → **같은 run 폴더로 `upload` 재실행**(대상 테이블 전체 교체라 멱등) → 그래도 안 되면 D1 Time Travel 로 적재 직전 시점 복원(`wrangler d1 time-travel restore`) → 원인 수정 후 재적재 |
 | R-03 | 503 quota_exceeded | 사용량 확인. 반복되면 원인(루프 요청 등) 수정. 유료 전환은 관리자 결정 |
-| R-04 | 기록이 사라졌다 | `deleted_at` 확인(소프트 삭제 복구) → 없으면 주간 백업에서 해당 id 복원 |
+| R-04 | 기록이 사라졌다 | `deleted_at` 확인(소프트 삭제 복구) → 없으면 §5-1 의 앱 표 복원(해당 id 만 골라 적용 가능) |
 | R-05 | 유출 의심 | `04` §6 절차 |
 | R-06 | 키즈노트 수집 실패 | 브라우저 로그인 상태 확인 → API 응답 형식 변경이면 수집 단계 수정, 적재는 보류 |
+
+### 5-1. 백업 복구 절차 (2026-10-05 연습으로 확정)
+`wrangler d1 export` 백업은 report_doc 본문을 한 문장으로 써서 `wrangler d1 execute --file` 로 통째로 되넣으면 `SQLITE_TOOBIG`(문장 100KB 초과)으로 실패한다. 그래서 두 갈래로 복구한다.
+1. **다시 만들 수 있는 표**(알림장·관측·근거·검진·문서): `npm run db:migrate:prod` → `npm run ingest:export` → `ingest:verify` → `ingest:upload -- --remote --yes` (DATA_DIR 가 정본).
+2. **앱에만 있는 표**(`family_log`, `family_log_history`, `app_setting`): `python tools/admin/backup-extract.py <백업.sql> <출력.sql>` → `npx wrangler d1 execute DB --remote --file <출력.sql>`. 출력 파일은 S1 이므로 저장소 밖에 두고 적용 후 지운다.
+3. `npm run ingest:status -- --remote --yes` 가 `matches_manifest: true` 인지, 앱에서 기록 목록이 보이는지 확인.
+- 7일 이내 사고는 D1 Time Travel(`wrangler d1 time-travel restore`)이 더 빠르다.
 
 ## 6. 사고·변경 기록
 | 날짜 | ID | 내용 | 조치 | 상태 |
 |---|---|---|---|---|
-| 2026-09-28 | INC-01 | 현행 정적 사이트 PIN 우회 가능 | 위험 수용(D-03), 신규 앱에서 해소 | 열림 |
+| 2026-09-28 | INC-01 | 현행 정적 사이트 PIN 우회 가능 | 위험 수용(D-03), 신규 앱에서 해소 | 열림 — 신규 앱 운영 개시(2026-10-05), 전환 대기 |
+| 2026-10-04 | CHG-01 | 운영 첫 실자료 적재(ingest_run #2, matches_manifest true), Fail closed 설정, GitHub 자동 배포 연결(Pages 편집 전용 토큰) | — | 완료 |
+| 2026-10-05 | CHG-02 | 복구 연습: 백업 통째 재적용 불가(SQLITE_TOOBIG) 발견 → §5-1 두 갈래 절차·`backup-extract.py` | — | 완료 |
