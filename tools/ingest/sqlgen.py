@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 # 문장 하나가 D1 100KB 한도를 넘지 않게: 칸 하나의 UTF-8 바이트 상한(이스케이프·나머지 칸 여유 포함)
 CHUNK_BYTES = 40_000
+# D1 행 한도 2MB(R1-5). 여유를 두고 한 행의 문자열 칸 합계가 이를 넘으면 적재 전에 멈춘다.
+MAX_ROW_BYTES = 1_900_000
 PART_MAX_BYTES = 200_000
 PART_MAX_STATEMENTS = 400
 
@@ -185,6 +187,15 @@ def row_statements(spec: TableSpec, row: dict[str, Value]) -> list[str]:
     extra = set(row) - set(spec.columns)
     if extra:
         raise SqlError(f"{spec.name}: 정의되지 않은 칸 {sorted(extra)}")
+    # R1-5: D1 행 한도(2MB)를 넘는 행은 조각으로 나눠도 적재 중에 실패한다 -> 시작 전에 어느 표·칸인지만 알리고 멈춘다.
+    sizes = {c: len(v.encode("utf-8")) for c, v in row.items() if isinstance(v, str)}
+    total = sum(sizes.values())
+    if total > MAX_ROW_BYTES:
+        biggest = max(sizes, key=lambda c: sizes[c])
+        raise SqlError(
+            f"{spec.name}: 한 행이 {total:,}바이트로 D1 행 한도(2MB, 안전선 {MAX_ROW_BYTES:,})를 넘습니다. "
+            f"가장 큰 칸은 {spec.name}.{biggest} ({sizes[biggest]:,}바이트). 원본 문서를 나누세요(값 내용은 출력하지 않습니다)"
+        )
     first: list[str] = []
     appends: list[tuple[str, str]] = []
     for col in spec.columns:

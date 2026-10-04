@@ -8,6 +8,7 @@ from tools.ingest.sqlgen import (
     CHUNK_BYTES,
     FORBIDDEN_TABLES,
     INSERT_ORDER,
+    MAX_ROW_BYTES,
     SPEC_BY_NAME,
     SqlError,
     delete_statements,
@@ -168,3 +169,37 @@ def test_validate_rejects_files_that_contain_the_tokens():
     for token in ("BEGIN TRANSACTION", "COMMIT;"):
         with pytest.raises(SqlError, match="SQL 파일"):
             validate_sql(ok + f"-- {token}\n")
+
+
+def _doc_row(body: str) -> dict:
+    return {
+        "slug": "s",
+        "title": "t",
+        "kind": "report",
+        "r2_key": None,
+        "generated_at": None,
+        "source_commit": "c",
+        "verify_ok": 0,
+        "sha256": "x",
+        "body": body,
+    }
+
+
+def test_row_size_guard_rejects_oversized_report_body():
+    """R1-5: 행(문자열 칸 합계)이 1,900,000 바이트를 넘으면 명확한 오류. 값 내용은 메시지에 없다."""
+    secret_marker = "뷁"  # 3바이트 문자(메시지에 쓰이지 않는 글자)
+    body = secret_marker * (MAX_ROW_BYTES // 3 + 10)
+    with pytest.raises(SqlError) as e:
+        row_statements(SPEC_BY_NAME["report_doc"], _doc_row(body))
+    msg = str(e.value)
+    assert "report_doc.body" in msg and "2MB" in msg
+    assert secret_marker not in msg
+
+
+def test_row_size_guard_allows_just_under_limit_and_counts_utf8_bytes():
+    spec = SPEC_BY_NAME["report_doc"]
+    ok = row_statements(spec, _doc_row("a" * (MAX_ROW_BYTES - 100)))
+    assert len(ok) > 1  # 조각으로 나뉘어 적재된다
+    # 글자 수로는 한도 이하지만 UTF-8 바이트로는 초과
+    with pytest.raises(SqlError):
+        row_statements(spec, _doc_row("한" * (MAX_ROW_BYTES // 3 + 1)))
