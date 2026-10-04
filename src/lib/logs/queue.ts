@@ -302,7 +302,8 @@ function sendEntry(entry: PendingLog): Promise<SendOutcome> {
           return { state: "queued" };
         }
         if (edited) {
-          cur = latest; // 이전 본만 거부됐다. 최신본은 따로 시도한다.
+          // 이전 본만 거부된 것이므로 최신본은 별도로 시도한다.
+          cur = latest;
           continue;
         }
         if (latest === undefined) return { state: "failed", error };

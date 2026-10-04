@@ -190,6 +190,7 @@ describe("empty database", () => {
       reports: 0,
       comments: 0,
       range: null,
+      ingestState: "idle",
       security: { lastGlobalLockAt: null },
       lastIngest: null,
       milestones: { observed: 0, unobserved: 0 },
@@ -205,6 +206,23 @@ describe("empty database", () => {
     const o = overviewSchema.parse(await (await get("/api/overview")).json());
     expect(o.security).toEqual({ lastGlobalLockAt: "2030-01-01T00:00:29.000Z" });
     expect((await h.handle(new Request("https://app.example.test/api/overview"))).status).toBe(401);
+  });
+
+  it("R1-6: overview reports ingestState from the latest run", async () => {
+    const state = async () =>
+      overviewSchema.parse(await (await get("/api/overview")).json()).ingestState;
+    const ins = h.fake.sqlite.prepare(
+      "INSERT INTO ingest_run (id, started_at, finished_at, source_commit, status, counts_json, verify_json) VALUES (?, ?, NULL, 'c', ?, '{}', '{}')",
+    );
+    expect(await state()).toBe("idle");
+    ins.run(1, "2030-01-01T00:00:00Z", "ok");
+    expect(await state()).toBe("idle");
+    ins.run(2, "2030-01-01T00:00:10Z", "failed");
+    expect(await state()).toBe("failed");
+    ins.run(3, "2030-01-01T00:00:20Z", "running");
+    expect(await state()).toBe("running");
+    ins.run(4, "2030-01-01T00:00:30Z", "ok");
+    expect(await state()).toBe("idle");
   });
 
   it("notes list is empty, not an error", async () => {

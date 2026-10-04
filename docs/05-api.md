@@ -13,7 +13,7 @@
 | POST | `/session` | `{pin}` | `204` + 쿠키 / `401 invalid_pin` / `429 locked {retryAfterSec}` |
 | GET | `/session` | — | `{authenticated: bool, pinLength?: 4~12}` — `pinLength` 는 서버 `PIN_LENGTH` 가 유효할 때만, 세션 유무와 무관하게 포함(로그인 화면이 점 개수·자동 전송 시점에 사용). 없으면 클라이언트는 4~12자리 + '확인' 방식 |
 | DELETE | `/session` | — | `204` (이 기기 로그아웃) |
-| GET | `/health` | — | `{ok, version, lastIngestAt}` — 자료 없음 |
+| GET | `/health` | — | `{ok, version, lastIngestAt, updating}` — 자료 없음. `updating` 은 최근 적재가 `running`(6시간 이내)일 때만 true(R1-6) |
 
 ## 대시보드
 
@@ -25,6 +25,8 @@
 { noteDays, reports, comments,
   range: {from,to} | null,                       // 알림장 날짜 범위
   lastIngest: {at, status:'ok', commit} | null,  // 마지막 성공 적재(finished_at, 없으면 started_at)
+  ingestState: 'idle'|'running'|'failed',        // R1-6: 가장 최근 ingest_run 상태(running 6시간 초과는 failed 로 본다)
+  security: {lastGlobalLockAt: string | null},   // R1-3: 마지막 전체 잠금(ISO UTC)
   milestones: {observed, unobserved},            // observation 에 나온 이정표 수 / 나머지
   recentNotes: [{date, ageMonths, firstLine, nComments}] ×3,   // 홈 카드용(문서 초안에 없던 필드)
   recentLogs: [{id, type, typeLabel, occurredOn, recorder, note}] ×5  // family_log, 삭제 제외

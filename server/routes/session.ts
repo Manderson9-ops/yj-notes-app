@@ -12,6 +12,7 @@ import {
   readSessionEpoch,
 } from "../auth/session";
 import { errorResponse, jsonResponse } from "../http/errors";
+import { readIngestState } from "../lib/ingest-state";
 
 /** 성공·실패 모두 응답이 이 시간 이상 걸리게 한다 (docs/04 §3 "실패 응답 지연 일정"). */
 export const MIN_LOGIN_MS = 400;
@@ -99,5 +100,7 @@ sessionRoutes.get("/api/health", async (c) => {
     ok: true,
     version: c.env.APP_VERSION ?? "dev",
     lastIngestAt: row?.finished_at ?? null,
+    // R1-6: 공개 응답이라 자료 없이 불리언 하나만(갱신 중이면 true).
+    updating: (await readIngestState(c.env.DB, c.get("deps").now())) === "running",
   });
 });

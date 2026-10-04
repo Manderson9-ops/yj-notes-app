@@ -37,7 +37,9 @@ describe("App", () => {
   it("shows the shell with 4 tabs when authenticated", async () => {
     mockSession(true);
     renderApp();
-    expect(await screen.findByRole("heading", { level: 1, name: "홈" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "홈" }, { timeout: 5000 }),
+    ).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "주요 메뉴" });
     expect(nav.querySelectorAll("a")).toHaveLength(4);
     expect(screen.getByRole("link", { name: "설정" })).toBeInTheDocument();

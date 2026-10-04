@@ -395,7 +395,12 @@ describe("GET /api/health", () => {
   it("is public, returns version and null lastIngestAt with no ingest", async () => {
     const res = await h.handle(new Request(`${ORIGIN}/api/health`));
     expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ ok: true, version: "dev", lastIngestAt: null });
+    expect(await json(res)).toEqual({
+      ok: true,
+      version: "dev",
+      lastIngestAt: null,
+      updating: false,
+    });
     expectHeaders(res);
   });
 
@@ -410,12 +415,41 @@ describe("GET /api/health", () => {
       ok: true,
       version: "1.2.3",
       lastIngestAt: "2030-01-02T01:00:00Z",
+      updating: true,
     });
+  });
+
+  it("R1-6: updating is true only while the latest run is running (and not stale)", async () => {
+    const get = async () =>
+      (await json<{ updating: boolean }>(await h.handle(new Request(`${ORIGIN}/api/health`))))
+        .updating;
+    insertRun(1, "ok", "2030-01-01T01:00:00Z");
+    expect(await get()).toBe(false);
+    insertRun(2, "running", null);
+    expect(await get()).toBe(true);
+    h.fake.sqlite.exec(
+      "UPDATE ingest_run SET status = 'ok', finished_at = '2030-01-01T02:00:00Z' WHERE id = 2",
+    );
+    expect(await get()).toBe(false);
+    insertRun(3, "failed", "2030-01-01T03:00:00Z");
+    expect(await get()).toBe(false);
+  });
+
+  it("R1-6: a run stuck in running for over 6 hours stops showing as updating", async () => {
+    insertRun(1, "running", null); // started_at 2030-01-01T00:00:00Z
+    h.deps.now = () => START_MS + 7 * 3_600_000;
+    const res = await h.handle(new Request(`${ORIGIN}/api/health`));
+    expect((await json<{ updating: boolean }>(res)).updating).toBe(false);
   });
 
   it("exposes no data beyond ok/version/lastIngestAt", async () => {
     const res = await h.handle(new Request(`${ORIGIN}/api/health`));
-    expect(Object.keys(await json<object>(res)).sort()).toEqual(["lastIngestAt", "ok", "version"]);
+    expect(Object.keys(await json<object>(res)).sort()).toEqual([
+      "lastIngestAt",
+      "ok",
+      "updating",
+      "version",
+    ]);
   });
 });
 

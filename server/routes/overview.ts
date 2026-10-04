@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { jsonResponse } from "../http/errors";
+import { readIngestState } from "../lib/ingest-state";
 import { previewOfDay } from "../../src/lib/notePreview";
 import type { Overview } from "../../src/lib/notesSchemas";
 
@@ -68,12 +69,15 @@ overviewRoutes.get("/api/overview", async (c) => {
     .prepare("SELECT value FROM app_setting WHERE key = 'last_global_lock_at'")
     .first<{ value: string }>();
 
+  const ingestState = await readIngestState(db, c.get("deps").now());
+
   const observedN = observed?.n ?? 0;
   const body: Overview = {
     noteDays: days?.n ?? 0,
     reports: days?.reports ?? 0,
     comments: days?.comments ?? 0,
     range: days?.first && days.last ? { from: days.first, to: days.last } : null,
+    ingestState,
     security: { lastGlobalLockAt: lock?.value ?? null },
     lastIngest: ingest
       ? { at: ingest.at, status: ingest.status, commit: ingest.source_commit }

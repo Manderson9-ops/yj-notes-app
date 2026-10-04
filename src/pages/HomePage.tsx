@@ -62,6 +62,10 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
 
   return (
     <>
+      {data.ingestState === "running" && (
+        <Notice tone="info">자료를 갱신하는 중이에요. 잠시 뒤 다시 확인해 주세요.</Notice>
+      )}
+      {data.ingestState === "failed" && <Notice tone="warn">마지막 갱신이 실패했어요.</Notice>}
       <section aria-labelledby="home-notes">
         <h2 id="home-notes">최근 알림장</h2>
         {data.recentNotes.length === 0 ? (
