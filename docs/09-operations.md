@@ -67,12 +67,14 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 - 키가 없을 때: `child_birth_date` 가 없으면 측정 월령 대신 **검진 회차의 개월 수**로 대체한다. `child_sex` 가 없으면 기준표는 `F` 로 읽는다(`M` 일 때만 남아용 기준표). 그래서 성별이 `M` 이면 반드시 넣는다.
 - 로컬 개발은 `--remote` 대신 `--local`. 합성 값은 `fixtures/seed/library_health.sql` 에만 있다.
 
-### 3-1d. 이번 배포 순서 (0004·0005·0006 + 실제 자료, 관리자)
-운영 D1 에는 아직 `0004_report_doc_body.sql`(문서 원문 칸), `0007_report_doc_summary.sql`(목록 설명 칸, R1-10), `0005_log_schema_and_history.sql`(기록 스키마·이력), `0006_*`(기록 선택지 라벨 정리, 저장 값은 그대로)이 없다. **아래 순서를 지킨다**(마이그레이션 → 자료 → 설정값 → 코드 → 확인). 코드를 먼저 올리면 새 칸이 없어 화면이 오류가 난다.
+### 3-1d. 새 마이그레이션이 있는 배포 순서 (관리자)
+새 마이그레이션이 포함된 배포는 **아래 순서를 지킨다**(마이그레이션 → 자료 → 설정값 → 코드 → 확인). 코드를 먼저 올리면 새 칸이 없어 화면이 오류가 난다.
+
+> 현황: `0004`(문서 원문 칸)·`0005`(기록 스키마·이력)·`0006`(기록 선택지 라벨 정리)·`0007`(목록 설명 `summary` 칸, R1-10)은 **2026-10-04 기준 운영에 적용됨**(CHG-01, §6). 아래 표는 다음 마이그레이션에도 그대로 쓴다.
 
 | # | 명령 (관리자 PC, `DATA_DIR`·적재 토큰 환경) | 확인 |
 |---|---|---|
-| 1 | `npm run db:migrate:prod` | 0004·0005·0006 이 ✅ 로 나온다 |
+| 1 | `npm run db:migrate:prod` | 이번에 새로 생긴 마이그레이션이 ✅ 로 나온다(현재까지 0004~0007 적용 완료) |
 | 2 | `npm run ingest:export` → `npm run ingest:verify` → `npm run ingest:upload -- --remote --yes` | verify 전 항목 OK, upload 가 건수를 출력 |
 | 3 | 아이 설정값 INSERT 두 줄(§3-1c: `child_birth_date`, `child_sex`) | `SELECT key FROM app_setting` 에 두 키가 보인다(값은 기록하지 않는다) |
 | 4 | `npm run deploy:prod` (또는 `main` 병합) | 배포 성공 |
@@ -81,6 +83,7 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 - 2번 `upload` 는 대상 표 전체를 교체한다(멱등). 중간에 실패하면 같은 run 폴더로 다시 실행(R-02).
 - 5번에서 `matches_manifest` 가 false 면 자료를 공개된 채로 두지 말고 R-02 순서로 조치한다.
 - 이 순서는 새 마이그레이션이 생길 때마다 같다: ①마이그레이션 ②자료 ③설정 ④코드 ⑤확인.
+- 확인 시 `0007` 도 빠지지 않았는지 본다: `ingest upload` 는 `0007_report_doc_summary.sql` 이상이 적용되지 않았으면 멈춘다(§3-1b).
 ### 3-2. Functions 실행 범위와 무료 한도
 - 보안 헤더 미들웨어(`functions/_middleware.ts`)를 **모든 요청**(정적 파일 포함)에 적용하려고 `_routes.json` 을 두지 않는다. 따라서 Functions 가 모든 요청에서 실행된다.
 - Pages Functions 는 Workers 무료 한도(일 100,000 요청)를 **공유**한다. 정적 파일 요청도 포함되므로 O-04 에서 사용량을 본다.

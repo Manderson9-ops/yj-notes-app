@@ -55,6 +55,7 @@ describe("HomePage ingest banner (R1-6)", () => {
   it("failed: says the last update failed", async () => {
     renderHome("failed");
     expect(await screen.findByText("마지막 갱신이 실패했어요.")).toBeInTheDocument();
+    expect(screen.getByText("관리자에게 알려 주세요.")).toBeInTheDocument();
   });
   it("idle: no banner", async () => {
     renderHome("idle");
