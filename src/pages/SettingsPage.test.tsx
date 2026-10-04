@@ -81,7 +81,7 @@ describe("logout with unsent records", () => {
   it("says exactly which are waiting and which failed to send", async () => {
     const store = createMemoryStore();
     await store.put(entry("a"));
-    await store.put({ ...entry("b"), status: "failed" as const });
+    await store.put({ ...entry("b"), status: "failed" as const, createdAt: Date.now() });
     configureQueue({ store, online: () => false });
     render(
       <QueryClientProvider client={createQueryClient()}>

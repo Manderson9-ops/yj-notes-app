@@ -14,6 +14,8 @@ export interface PendingLog {
   status: "pending" | "failed";
   /** failed 일 때 사람이 읽을 이유 */
   error?: string;
+  /** failed 로 바뀐 시각(ms). 30일 지나면 시작할 때 지운다(S1 최소 보관). */
+  failedAt?: number;
 }
 
 export interface QueueStore {
@@ -27,6 +29,8 @@ export type SendOutcome =
 
 const DB_NAME = "yj-queue";
 const STORE = "pending";
+/** 보내지 못한(failed) 기록을 이 기기에 남기는 최대 기간. 지나면 앱 시작 때 지운다(docs/04 S1). */
+export const FAILED_TTL_MS = 30 * 24 * 60 * 60_000;
 
 function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -106,6 +110,7 @@ interface Deps {
   setTimer: (fn: () => void, ms: number) => unknown;
   clearTimer: (h: unknown) => void;
   online: () => boolean;
+  now: () => number;
 }
 
 const defaults = (): Deps => ({
@@ -120,6 +125,7 @@ const defaults = (): Deps => ({
     window.clearTimeout(h as number);
   },
   online: () => navigator.onLine,
+  now: () => Date.now(),
 });
 
 let deps: Deps = defaults();
@@ -165,12 +171,24 @@ export function configureQueue(over: Partial<Deps> = {}): void {
 
 export async function loadQueue(): Promise<void> {
   if (loaded) return;
+  let all: PendingLog[];
   try {
-    entries = (await deps.store.getAll()).sort((a, b) => a.createdAt - b.createdAt);
+    all = (await deps.store.getAll()).sort((a, b) => a.createdAt - b.createdAt);
   } catch {
-    entries = [];
+    all = [];
   }
+  // 30일 넘게 failed 로 남은 기록은 지운다(R1-4 / S1 최소 보관).
+  const cutoff = deps.now() - FAILED_TTL_MS;
+  const expired = all.filter((e) => e.status === "failed" && (e.failedAt ?? e.createdAt) < cutoff);
+  entries = all.filter((e) => !expired.includes(e));
   loaded = true;
+  for (const e of expired) {
+    try {
+      await deps.store.remove(e.id);
+    } catch {
+      /* 다음 시작 때 다시 지운다 */
+    }
+  }
   emit();
 }
 
@@ -245,34 +263,58 @@ function scheduleRetry(): void {
   }, backoffDelayMs(failures));
 }
 
-/** 한 건 전송. 같은 id 가 이미 나가는 중이면 그 결과를 같이 받는다. */
+/**
+ * 한 건 전송. 같은 id 가 이미 나가는 중이면 그 결과를 같이 받는다.
+ * 경쟁 방지(R1-4): 보내는 동안 같은 id 가 다시 저장(수정)되면 대기열의 항목은 새 객체로 바뀐다.
+ * 응답이 오면 "보낸 그 객체"가 아직 그대로일 때만 지우고, 바뀌었으면 지우지 않고 최신본을 이어서 보낸다.
+ * 실패 상태도 보낸 객체가 그대로일 때만 기록해 더 새로운 수정을 덮어쓰지 않는다.
+ */
 function sendEntry(entry: PendingLog): Promise<SendOutcome> {
   const running = inflight.get(entry.id);
   if (running) return running;
   const p = (async (): Promise<SendOutcome> => {
-    try {
-      const result = await deps.send(entry);
-      await drop(entry.id);
-      failures = 0;
-      sentHandlers.forEach((h) => {
-        h(result);
-      });
-      return { state: "sent", result };
-    } catch (e) {
-      const error = e instanceof ApiError ? e : new ApiError(0, "network", "");
-      if (error.status === 401) return { state: "queued" }; // 로그인 후 다시 시도
-      if (isTransient(error)) {
-        await persist({ ...entry, attempts: entry.attempts + 1 });
-        scheduleRetry();
-        return { state: "queued" };
+    let cur = entry;
+    for (;;) {
+      try {
+        const result = await deps.send(cur);
+        const latest = getPending(cur.id);
+        if (latest !== undefined && latest !== cur) {
+          // 보내는 사이 수정됨: 서버엔 이전 본이 갔다. 최신본을 이어서 보낸다(지우지 않음).
+          cur = latest;
+          continue;
+        }
+        if (latest !== undefined) await drop(cur.id);
+        failures = 0;
+        sentHandlers.forEach((h) => {
+          h(result);
+        });
+        return { state: "sent", result };
+      } catch (e) {
+        const error = e instanceof ApiError ? e : new ApiError(0, "network", "");
+        if (error.status === 401) return { state: "queued" }; // 로그인 후 다시 시도
+        const latest = getPending(cur.id);
+        const edited = latest !== undefined && latest !== cur;
+        if (isTransient(error)) {
+          if (!edited && latest !== undefined) {
+            await persist({ ...cur, attempts: cur.attempts + 1 });
+          }
+          scheduleRetry();
+          return { state: "queued" };
+        }
+        if (edited) {
+          cur = latest; // 이전 본만 거부됐다. 최신본은 따로 시도한다.
+          continue;
+        }
+        if (latest === undefined) return { state: "failed", error };
+        await persist({
+          ...cur,
+          attempts: cur.attempts + 1,
+          status: "failed",
+          error: error.code,
+          failedAt: deps.now(),
+        });
+        return { state: "failed", error };
       }
-      await persist({
-        ...entry,
-        attempts: entry.attempts + 1,
-        status: "failed",
-        error: error.code,
-      });
-      return { state: "failed", error };
     }
   })().finally(() => {
     inflight.delete(entry.id);
@@ -280,7 +322,6 @@ function sendEntry(entry: PendingLog): Promise<SendOutcome> {
   inflight.set(entry.id, p);
   return p;
 }
-
 /**
  * 저장: 대기열에 먼저 쓰고, 연결돼 있으면 바로 보낸다.
  * 서버가 입력을 거부하면(422 등) 대기열에서 빼고 ApiError 를 던진다 — 사용자가 고칠 수 있게.
@@ -302,8 +343,11 @@ export async function submitLog(id: string, body: LogBody): Promise<SendOutcome>
 export function flushQueue(): Promise<void> {
   flushing ??= (async () => {
     await loadQueue();
-    for (const e of entries.filter((x) => x.status === "pending")) {
+    // 보내기 직전마다 최신본을 다시 읽는다(R1-4): 목록을 만든 뒤 수정·삭제됐을 수 있다.
+    for (const id of entries.filter((x) => x.status === "pending").map((x) => x.id)) {
       if (!deps.online()) break;
+      const e = getPending(id);
+      if (e?.status !== "pending") continue;
       const out = await sendEntry(e);
       if (out.state === "queued") break;
     }

@@ -4,6 +4,7 @@ import { uuidv7 } from "./ids";
 import {
   BACKOFF_MAX_MS,
   backoffDelayMs,
+  FAILED_TTL_MS,
   clearQueue,
   unsentCounts,
   configureQueue,
@@ -11,6 +12,7 @@ import {
   discardFailed,
   flushQueue,
   isTransient,
+  getPending,
   listFailed,
   submitLog,
   type PendingLog,
@@ -226,8 +228,142 @@ describe("logout helpers (unsent records on this device)", () => {
 
   it("counts records saved by an earlier session of the app (read from the store)", async () => {
     const s = store();
-    await s.put({ id: "old", body: body(3), createdAt: 1, attempts: 2, status: "failed" });
+    await s.put({ id: "old", body: body(3), createdAt: Date.now(), attempts: 2, status: "failed" });
     setup(() => Promise.resolve(OK), s);
     expect(await unsentCounts()).toEqual({ pending: 0, failed: 1 });
+  });
+});
+
+describe("R1-4: edit during an in-flight send never loses the newer edit", () => {
+  /** 서버 흉내: id -> 마지막으로 받은 본문. 응답은 테스트가 풀어 준다. */
+  function fakeServer() {
+    const server = new Map<string, LogBody>();
+    const gates: (() => void)[] = [];
+    const send = vi.fn((e: PendingLog) => {
+      server.set(e.id, e.body);
+      return new Promise<PutResult>((resolve) => {
+        gates.push(() => {
+          resolve(OK);
+        });
+      });
+    });
+    return { server, gates, send };
+  }
+
+  it("submit of an edit while the first PUT is in flight: latest body ends on the server, queue empties", async () => {
+    const f = fakeServer();
+    const s = setup(f.send);
+    const id = uuidv7();
+    const p1 = submitLog(id, { ...body(), note: "v1" });
+    await vi.waitFor(() => {
+      expect(f.send).toHaveBeenCalledTimes(1);
+    });
+    const p2 = submitLog(id, { ...body(), note: "v2" }); // 수정: v1 응답 전
+    await vi.waitFor(() => {
+      expect(getPending(id)?.body.note).toBe("v2");
+    });
+    f.gates[0]?.(); // v1 응답 -> v2 를 지우면 안 됨
+    await vi.waitFor(() => {
+      expect(f.send).toHaveBeenCalledTimes(2);
+    });
+    expect((await s.getAll()).map((e) => e.body.note)).toEqual(["v2"]); // 아직 v2 가 남아 있다
+    f.gates[1]?.();
+    await Promise.all([p1, p2]);
+    expect(f.server.get(id)?.note).toBe("v2");
+    expect(await s.getAll()).toEqual([]);
+  });
+
+  it("edit during a flush: flush re-reads the entry and nothing is dropped", async () => {
+    online = false;
+    const f = fakeServer();
+    const s = setup(f.send);
+    const a = uuidv7();
+    const b = uuidv7();
+    await submitLog(a, { ...body(1), note: "a1" });
+    await submitLog(b, { ...body(2), note: "b1" });
+    online = true;
+    const flush = flushQueue();
+    await vi.waitFor(() => {
+      expect(f.send).toHaveBeenCalledTimes(1);
+    });
+    // a 가 나가는 중에 a 와 아직 안 나간 b 를 모두 수정
+    const edA = submitLog(a, { ...body(1), note: "a2" });
+    const edB = submitLog(b, { ...body(2), note: "b2" });
+    await vi.waitFor(() => {
+      expect(getPending(a)?.body.note).toBe("a2");
+      expect(getPending(b)?.body.note).toBe("b2");
+    });
+    // 응답을 하나씩 풀어 준다: a1, b2(수정 즉시 전송), 그리고 a1 응답 뒤 이어서 나가는 a2.
+    for (let i = 0; i < 3; i++) {
+      await vi.waitFor(() => {
+        expect(f.gates.length).toBeGreaterThan(i);
+      });
+      f.gates[i]?.();
+    }
+    await Promise.all([flush, edA, edB]);
+    expect(f.server.get(a)?.note).toBe("a2");
+    expect(f.server.get(b)?.note).toBe("b2");
+    expect(await s.getAll()).toEqual([]);
+  });
+
+  it("a transient failure of the old version does not overwrite the newer edit in the store", async () => {
+    const sent: string[] = [];
+    const send = vi.fn((e: PendingLog) => {
+      sent.push(e.body.note ?? "");
+      return Promise.resolve(OK);
+    });
+    // 첫 요청이 실패하기 전에 수정이 들어오도록 지연
+    let fail: () => void = () => undefined;
+    send.mockImplementationOnce((e: PendingLog) => {
+      sent.push(e.body.note ?? "");
+      return new Promise<PutResult>((_r, rej) => {
+        fail = () => {
+          rej(new ApiError(0, "network", ""));
+        };
+      });
+    });
+    const s = setup(send);
+    const id = uuidv7();
+    const p1 = submitLog(id, { ...body(), note: "old" });
+    await vi.waitFor(() => {
+      expect(send).toHaveBeenCalledTimes(1);
+    });
+    const p2 = submitLog(id, { ...body(), note: "new" });
+    await vi.waitFor(() => {
+      expect(getPending(id)?.body.note).toBe("new");
+    });
+    fail();
+    await Promise.all([p1, p2]);
+    expect((await s.getAll()).map((e) => e.body.note)).toEqual(["new"]);
+    timers[timers.length - 1]?.fn();
+    await vi.waitFor(async () => {
+      expect(await s.getAll()).toEqual([]);
+    });
+    expect(sent).toEqual(["old", "new"]);
+  });
+});
+
+describe("R1-4: failed entries expire after 30 days (S1)", () => {
+  it("on start, failed entries older than 30 days are removed; recent failed and pending stay", async () => {
+    const s = createMemoryStore();
+    const now = Date.parse("2030-06-01T00:00:00Z");
+    const mk = (id: string, status: "pending" | "failed", ageDays: number): PendingLog => ({
+      id,
+      body: body(),
+      createdAt: now - ageDays * 86_400_000,
+      attempts: 1,
+      status,
+      ...(status === "failed" ? { failedAt: now - ageDays * 86_400_000 } : {}),
+    });
+    await s.put(mk("old-failed", "failed", 31));
+    await s.put(mk("new-failed", "failed", 29));
+    await s.put(mk("old-pending", "pending", 90));
+    setup(() => Promise.resolve(OK), s);
+    configureQueue({ store: s, online: () => false, now: () => now });
+    const c = await unsentCounts();
+    expect(c).toEqual({ pending: 1, failed: 1 });
+    expect(listFailed().map((e) => e.id)).toEqual(["new-failed"]);
+    expect((await s.getAll()).map((e) => e.id).sort()).toEqual(["new-failed", "old-pending"]);
+    expect(FAILED_TTL_MS).toBe(30 * 86_400_000);
   });
 });
