@@ -55,8 +55,11 @@ def test_upload_applies_and_records_run(verified: Path, tmp_path: Path):
     assert json.loads(run["verify_json"])["ok"] is True
     # /api/health 의 lastIngestAt 쿼리와 같은 조건
     assert r.query("SELECT finished_at FROM ingest_run WHERE status='ok' ORDER BY id DESC LIMIT 1")
-    # I4 통과 후 verify_ok = 1
-    assert {x["verify_ok"] for x in r.query("SELECT verify_ok FROM report_doc")} == {1}
+    # I4 통과 + 그 문서 계층의 검증기가 통과한 문서만 verify_ok = 1 (R1-7). reports/ 는 검증기 없음 -> 0
+    got = {x["slug"]: x["verify_ok"] for x in r.query("SELECT slug, verify_ok FROM report_doc")}
+    assert got and {1, 0} == set(got.values())
+    assert {x["kind"] for x in r.query("SELECT kind FROM report_doc WHERE verify_ok = 1")} == {"markdown"}
+    assert {x["kind"] for x in r.query("SELECT kind FROM report_doc WHERE verify_ok = 0")} == {"html"}
     # 긴 본문이 나눠 붙은 뒤에도 온전
     assert r.query("SELECT MAX(LENGTH(body)) AS n FROM note_item")[0]["n"] > 20_000
     # family_log 등 비대상 테이블 불변 + SQL 에 한 번도 등장하지 않음

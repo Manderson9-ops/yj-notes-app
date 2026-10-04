@@ -99,18 +99,41 @@ def data_copy(tmp_path: Path) -> Path:
     return dst
 
 
+PASS_VERIFIER = "raise SystemExit(0)\n"
+FAIL_VERIFIER = "raise SystemExit(1)\n"
+
+
+def add_fake_verifiers(data_dir: Path, results: dict[str, str]) -> None:
+    """계층 이름 -> 스크립트 내용. 합성 가짜 검증기(종료 코드만 다르다)."""
+    from tools.ingest.layers import LAYER_VERIFIERS
+
+    for layer, body in results.items():
+        p = data_dir / LAYER_VERIFIERS[layer]
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(body, encoding="utf-8")
+
+
 @pytest.fixture
-def exported(tmp_path: Path, cfg) -> tuple[Path, Generated]:
-    gen = generate(FIXTURE, cfg)
+def verified_data(tmp_path: Path) -> Path:
+    """fixture 복사본 + 통과하는 가짜 검증기(guide·wiki·tracking·evidence). reports/ 는 계층 검증기가 없다."""
+    dst = tmp_path / "data_v"
+    shutil.copytree(FIXTURE, dst)
+    add_fake_verifiers(dst, dict.fromkeys(("guide", "wiki", "tracking", "evidence"), PASS_VERIFIER))
+    return dst
+
+
+@pytest.fixture
+def exported(tmp_path: Path, cfg, verified_data: Path) -> tuple[Path, Generated]:
+    gen = generate(verified_data, cfg)
     out = tmp_path / "out"
     write_output(gen, out)
     return out, gen
 
 
 @pytest.fixture
-def verified(exported, cfg) -> Path:
+def verified(exported, cfg, verified_data: Path) -> Path:
     out, _ = exported
-    checks = verify(FIXTURE, out, cfg)
+    checks = verify(verified_data, out, cfg)
     assert all(c.ok for c in checks), [c for c in checks if not c.ok]
     write_report(out, checks)
     return out

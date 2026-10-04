@@ -127,7 +127,7 @@ def test_whitelist_rejects_other_tables(table: str):
         "VALUES (1, (SELECT 1), 1, 1, 1, 1, 'x');",
         "UPDATE note_item SET body = date || 'x' WHERE report_id = 1;",
         "UPDATE note_item SET body = body || 'x' WHERE date = '2023-01-01';",  # pk 가 아님
-        "UPDATE report_doc SET verify_ok = 1;",  # 마무리 문장은 upload 만 허용
+        "UPDATE report_doc SET verify_ok = 1 WHERE slug = 'a';",  # 마무리 문장은 upload 만 허용
         "PRAGMA foreign_keys = OFF;",
     ],
 )
@@ -137,9 +137,11 @@ def test_whitelist_rejects_forms(sql: str):
 
 
 def test_finalize_statement_only_when_allowed():
-    assert validate_sql("UPDATE report_doc SET verify_ok = 1;", allow_finalize=True) == [
-        ("UPDATE", "report_doc")
-    ]
+    one = "UPDATE report_doc SET verify_ok = 1 WHERE slug = 'a';"
+    assert validate_sql(one, allow_finalize=True) == [("UPDATE", "report_doc")]
+    # R1-7: 전체 일괄 올림(WHERE 없음)은 더 이상 허용하지 않는다
+    with pytest.raises(SqlError):
+        validate_sql("UPDATE report_doc SET verify_ok = 1;", allow_finalize=True)
 
 
 @pytest.mark.parametrize("token", ["BEGIN TRANSACTION", "COMMIT;"])

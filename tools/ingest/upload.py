@@ -139,9 +139,14 @@ def upload(
             bad = _compare(manifest, got)
             if bad:
                 raise UploadError("적재 후 건수 불일치(I7): " + "; ".join(bad))
-            ctl_text = "UPDATE report_doc SET verify_ok = 1;"
-            validate_sql(ctl_text, allow_finalize=True)
-            run_sql(ctl_text)
+            # R1-7: 문서 계층의 검증이 통과한 문서만 verify_ok=1 (전체 일괄 올림 아님)
+            slugs = [str(s) for s in manifest.get("verified_slugs", [])]
+            if slugs:
+                ctl_text = "\n".join(
+                    f"UPDATE report_doc SET verify_ok = 1 WHERE slug = {sql_literal(s)};" for s in slugs
+                )
+                validate_sql(ctl_text, allow_finalize=True)
+                run_sql(ctl_text)
             run_sql(
                 f"UPDATE ingest_run SET status = 'ok', finished_at = {sql_literal(_iso(now))} WHERE id = {run_id};"
             )

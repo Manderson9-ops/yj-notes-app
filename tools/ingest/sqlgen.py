@@ -284,7 +284,7 @@ _RE_UPDATE = re.compile(
     rf"UPDATE ({_IDENT}) SET ({_IDENT}) = ({_IDENT}) \|\| ('[^']*(?:''[^']*)*') "
     rf"WHERE ({_IDENT}) = ({_LIT});"
 )
-_RE_FINALIZE = re.compile(r"UPDATE report_doc SET verify_ok = 1;")
+_RE_FINALIZE = re.compile(rf"UPDATE report_doc SET verify_ok = 1 WHERE slug = ({_LIT});")
 _ALLOWED = set(INSERT_ORDER)
 
 

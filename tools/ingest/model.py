@@ -518,7 +518,9 @@ def git_commit(data_dir: Path) -> str:
     return out if r.returncode == 0 and re.fullmatch(r"[0-9a-f]{7,40}", out) else "unknown"
 
 
-def build_docs(src: Sources, cfg: Config, commit: str) -> list[Row]:
+def build_docs(src: Sources, cfg: Config, commit: str) -> tuple[list[Row], dict[str, str]]:
+    """문서 행과 {slug: 계층(경로 첫 폴더)}. verify_ok 는 여기서 0, export 가 계층별 검증 결과로 정한다."""
+    doc_layers: dict[str, str] = {}
     excluded = set(cfg.docs_exclude)
     picked: dict[str, tuple[Path, str]] = {}
     for rule in cfg.docs:
@@ -538,6 +540,7 @@ def build_docs(src: Sources, cfg: Config, commit: str) -> list[Row]:
             text = raw.decode("utf-8")
         except UnicodeDecodeError as e:
             raise SourceError(f"UTF-8 이 아닙니다: {rel}") from e
+        doc_layers[slug] = rel.split("/", 1)[0]
         mtime = datetime.fromtimestamp(p.stat().st_mtime, UTC).strftime("%Y-%m-%d")
         rows.append(
             {
@@ -547,12 +550,12 @@ def build_docs(src: Sources, cfg: Config, commit: str) -> list[Row]:
                 "r2_key": "",  # 본문은 D1 body 칸(이 값이 빈 문자열이면 R2 가 아님)
                 "generated_at": mtime,
                 "source_commit": commit,
-                "verify_ok": 0,  # upload 가 I4 통과 후 1 로 올린다
+                "verify_ok": 0,  # upload 가 I4 통과 후, 그 문서 계층의 검증이 통과한 문서만 1 로 올린다(R1-7)
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "body": text,
             }
         )
-    return sorted(rows, key=lambda x: str(x["slug"]))
+    return sorted(rows, key=lambda x: str(x["slug"])), doc_layers
 
 
 # ───────────────────────── 전체 ─────────────────────────
@@ -562,6 +565,7 @@ class Built:
     sources: dict[str, str]
     source_commit: str
     birth: date
+    doc_layers: dict[str, str]
 
 
 def build_all(data_dir: Path, cfg: Config) -> Built:
@@ -572,6 +576,7 @@ def build_all(data_dir: Path, cfg: Config) -> Built:
     ids = {str(m["evidence_id"]) for m in milestones}
     commit = git_commit(src.root)
     checkups, measures = build_checkups(src, cfg)
+    docs, doc_layers = build_docs(src, cfg, commit)
     tables = {
         "note_day": days,
         "note_item": items,
@@ -581,6 +586,6 @@ def build_all(data_dir: Path, cfg: Config) -> Built:
         "growth_ref": build_growth(src, cfg),
         "checkup": checkups,
         "measurement": measures,
-        "report_doc": build_docs(src, cfg, commit),
+        "report_doc": docs,
     }
-    return Built(tables, dict(sorted(src.hashes.items())), commit, birth)
+    return Built(tables, dict(sorted(src.hashes.items())), commit, birth, doc_layers)

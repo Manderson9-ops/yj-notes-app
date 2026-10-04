@@ -45,7 +45,7 @@ npm run ingest:status -- --remote          # 원격 건수 vs manifest 건수, �
 - export 는 **결정적**이다: 같은 입력 → 바이트 단위 같은 출력(정렬·LF·고정 id). manifest 에는 시각이 없다. 테스트가 두 번 export 해 바이트를 비교한다.
 - 폴더 구조는 코드 상수가 아니라 기본 패턴 + 저장소 밖 설정 파일(`--config` > 환경변수 `INGEST_CONFIG` > `<DATA_DIR>/ingest.config.json`)이다. 실제 파일명(아이 이름 포함 가능)은 코드·fixture 에 없다.
 - SQL 은 테이블별·**조각**(`NN_<table>.NNN.sql`, 조각당 ≤ 약 200KB·400문장)으로 나뉜다. D1 한도(문장 100KB, 행 2MB)를 넘는 긴 문자열 칸은 `INSERT` 뒤 `UPDATE … SET c = c || '…' WHERE pk = …` 로 40KB 씩 이어 붙인다(적재 후 `SUM(LENGTH(칸))` 를 manifest 와 대조해 온전함을 확인). D1 은 `UNION ALL` 항 수도 제한하므로 건수 조회는 한 행 스칼라 하위 쿼리다.
-- **upload 순서**: `verify.json` 이 통과이고 manifest·SQL 해시가 그대로인지 재확인 → 모든 문장을 화이트리스트 검사(허용 형태: `DELETE FROM t;`, `INSERT INTO t (정의된 칸) VALUES (…);`, 위의 `UPDATE`; 허용 테이블 9개) → `ingest_run(status='running')` → `00_delete.sql`(자식 테이블부터 전체 삭제) → 테이블별 `INSERT` → 건수·글자 수 재확인(I7) → `report_doc.verify_ok = 1`(I4 통과 표시) → `ingest_run(status='ok', finished_at)`(= `/api/health` 의 `lastIngestAt`). 어느 단계든 실패하면 `failed` 로 남기고 멈춘다. 같은 입력으로 다시 실행하면 대상 테이블 전체 교체라 **멱등**(결과 동일, `ingest_run` 행만 늘어남). D1 은 SQL 파일 안 `BEGIN/COMMIT` 을 받지 않으므로 단일 트랜잭션이 아니다: 삭제 이후 실패하면 대상 테이블이 비거나 일부일 수 있다 → 재실행 또는 D1 Time Travel(`09` R-02).
+- **upload 순서**: `verify.json` 이 통과이고 manifest·SQL 해시가 그대로인지 재확인 → 모든 문장을 화이트리스트 검사(허용 형태: `DELETE FROM t;`, `INSERT INTO t (정의된 칸) VALUES (…);`, 위의 `UPDATE`; 허용 테이블 9개) → `ingest_run(status='running')` → `00_delete.sql`(자식 테이블부터 전체 삭제) → 테이블별 `INSERT` → 건수·글자 수 재확인(I7) → `report_doc.verify_ok = 1`(**문서별**: manifest `verified_slugs` — 그 문서가 속한 계층의 검증기가 통과한 문서만, R1-7) → `ingest_run(status='ok', finished_at)`(= `/api/health` 의 `lastIngestAt`). 어느 단계든 실패하면 `failed` 로 남기고 멈춘다. 같은 입력으로 다시 실행하면 대상 테이블 전체 교체라 **멱등**(결과 동일, `ingest_run` 행만 늘어남). D1 은 SQL 파일 안 `BEGIN/COMMIT` 을 받지 않으므로 단일 트랜잭션이 아니다: 삭제 이후 실패하면 대상 테이블이 비거나 일부일 수 있다 → 재실행 또는 D1 Time Travel(`09` R-02).
 - **가족 기록(`family_log`)은 적재 대상이 아니다.** 앱이 정본이며 적재가 절대 지우지 않는다. 화이트리스트(`tools/ingest/sqlgen.py` 의 `TABLES`)에 없는 테이블(`family_log`·`auth_attempt`·`app_setting`·`log_type`·`ingest_run`)을 건드리는 문장은 export·verify·upload 세 곳에서 거부된다(테스트: 적재 중 실행된 모든 SQL 에 이 이름이 없음, 적재 전후 행 동일).
 - 검진(S2)은 `records/영유아검진/*.xlsx`(같은 열의 csv 도 가능)의 시트 `검진결과` 를 읽어 `checkup`·`measurement` 로 적재한다(`source_image_key` = NULL). **원본 사진(jpg)과 `_source/media` 는 이번 범위에서 적재하지 않는다**(R2 `s2/` 는 M4).
 - 문서 원문(`guide/`·`wiki/`·`tracking/` 의 `*.md`, `report/` 의 `*.html`·`*.md`; 빌드 입력 `report/base.html` 제외)은 `report_doc.body` 에 넣는다(마이그레이션 `0004_report_doc_body.sql`, R2 활성화 전 임시 위치). `r2_key` 는 `''`. `sha256` 은 원본 바이트의 해시다.
@@ -62,6 +62,10 @@ npm run ingest:status -- --remote          # 원격 건수 vs manifest 건수, �
 | `growth_ref` | `evidence/growth.csv` | 스키마의 L·M·S·p3·p50·p97 만(`NA` → NULL). 다른 백분위·단위 칸은 담지 않음(필요하면 마이그레이션) |
 | `checkup`·`measurement` | 검진 결과 표 | 값·판독상태·비고를 원문 그대로. `condition_note` = 표의 `근거·비고`. 결과지에 없는 값은 NULL, 판정 문구는 만들지 않음 |
 | `report_doc` | 문서 파일 | 제목 = 마크다운 첫 `# `, HTML `<title>`. `generated_at` = 파일 수정일(UTC), `source_commit` = DATA_DIR 의 git HEAD(없으면 `unknown`) |
+
+### 계층별 검증기 (R1-7)
+- export 가 `DATA_DIR` 안의 `tracking/verify_tracking.py`·`guide/verify_guide.py`·`wiki/verify_wiki.py`·`report/verify_report.py`·`evidence/verify_evidence.py` 를 **적재 도구와 같은 파이썬**으로 한 번씩 실행(실행 폴더 `DATA_DIR`, 제한 300초, 출력 버림, 종료 코드만 사용)하고 `manifest.layers` 에 계층별 `pass|fail|missing|error` 를 남긴다. 검증기가 없거나 `DATA_DIR` 밖을 가리키면 `missing`(통과 아님).
+- 문서의 계층은 경로 첫 폴더. 통과한 계층의 문서만 `verify_ok=1`, 나머지는 0. export 는 실패해도 멈추지 않고 `ingest verify` 가 `[WARN] L1` 로 계층 이름을 알린다(종료 코드는 0).
 
 ### verify 검사 목록
 | ID | 검사 |
