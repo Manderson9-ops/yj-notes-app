@@ -69,6 +69,12 @@ overviewRoutes.get("/api/overview", async (c) => {
     .prepare("SELECT value FROM app_setting WHERE key = 'last_global_lock_at'")
     .first<{ value: string }>();
 
+  // R2-1: 최근 7일 PIN 실패 횟수(auth_attempt 는 30일 보관). ok=0 행만 센다.
+  const fail7 = await db
+    .prepare("SELECT COUNT(*) AS n FROM auth_attempt WHERE ok = 0 AND at > ?1")
+    .bind(new Date(c.get("deps").now() - 7 * 24 * 60 * 60_000).toISOString())
+    .first<{ n: number }>();
+
   const ingestState = await readIngestState(db, c.get("deps").now());
 
   const observedN = observed?.n ?? 0;
@@ -78,7 +84,7 @@ overviewRoutes.get("/api/overview", async (c) => {
     comments: days?.comments ?? 0,
     range: days?.first && days.last ? { from: days.first, to: days.last } : null,
     ingestState,
-    security: { lastGlobalLockAt: lock?.value ?? null },
+    security: { lastGlobalLockAt: lock?.value ?? null, failures7d: fail7?.n ?? 0 },
     lastIngest: ingest
       ? { at: ingest.at, status: ingest.status, commit: ingest.source_commit }
       : null,

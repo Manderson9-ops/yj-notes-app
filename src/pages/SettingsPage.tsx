@@ -15,6 +15,7 @@ export function SettingsPage() {
   const [large, setLarge] = useLargeText();
   const overview = useOverview();
   const lastLock = overview.data?.security.lastGlobalLockAt ?? null;
+  const failures7d = overview.data?.security.failures7d ?? 0;
   const logout = useMutation({
     mutationFn: () => api("DELETE", "/session"),
     onSettled: () => {
@@ -63,11 +64,16 @@ export function SettingsPage() {
           이 기기 로그아웃
         </button>
       </section>
-      {lastLock !== null && (
+      {(lastLock !== null || failures7d > 0) && (
         <section className="settings-section" aria-labelledby="set-security">
           <h2 id="set-security">보안</h2>
-          <p className="muted" data-testid="last-global-lock">
-            최근 전체 잠금: {formatYmdKo(seoulDateOf(lastLock))}
+          {lastLock !== null && (
+            <p className="muted" data-testid="last-global-lock">
+              최근 전체 잠금: {formatYmdKo(seoulDateOf(lastLock))}
+            </p>
+          )}
+          <p className="muted" data-testid="pin-failures-7d">
+            최근 7일 PIN 실패: {failures7d}회
           </p>
         </section>
       )}

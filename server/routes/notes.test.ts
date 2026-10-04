@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Harness } from "../test-utils/harness";
-import { cookieFrom, createHarness, TEST_PIN } from "../test-utils/harness";
+import { cookieFrom, createHarness, START_MS, TEST_PIN } from "../test-utils/harness";
 import { likePattern } from "./notes";
 import {
   noteDaySchema,
@@ -191,7 +191,7 @@ describe("empty database", () => {
       comments: 0,
       range: null,
       ingestState: "idle",
-      security: { lastGlobalLockAt: null },
+      security: { lastGlobalLockAt: null, failures7d: 0 },
       lastIngest: null,
       milestones: { observed: 0, unobserved: 0 },
       recentNotes: [],
@@ -204,8 +204,21 @@ describe("empty database", () => {
       "INSERT INTO app_setting (key, value) VALUES ('last_global_lock_at', '2030-01-01T00:00:29.000Z')",
     );
     const o = overviewSchema.parse(await (await get("/api/overview")).json());
-    expect(o.security).toEqual({ lastGlobalLockAt: "2030-01-01T00:00:29.000Z" });
+    expect(o.security).toEqual({ lastGlobalLockAt: "2030-01-01T00:00:29.000Z", failures7d: 0 });
     expect((await h.handle(new Request("https://app.example.test/api/overview"))).status).toBe(401);
+  });
+
+  it("R2-1: overview counts ok=0 attempts of the last 7 days only", async () => {
+    const ins = h.fake.sqlite.prepare(
+      "INSERT INTO auth_attempt (ip_hash, at, ok) VALUES (?, ?, ?)",
+    );
+    const ago = (d: number) => new Date(START_MS - d * 86_400_000).toISOString();
+    ins.run("a", ago(1), 0);
+    ins.run("b", ago(6.9), 0);
+    ins.run("c", ago(8), 0); // older than 7 days
+    ins.run("d", ago(1), 1); // success is not a failure
+    const o = overviewSchema.parse(await (await get("/api/overview")).json());
+    expect(o.security.failures7d).toBe(2);
   });
 
   it("R1-6: overview reports ingestState from the latest run", async () => {

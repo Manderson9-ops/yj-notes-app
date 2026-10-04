@@ -10,6 +10,8 @@ import { bytesToBase64Url, utf8 } from "./encoding";
 
 export const IP_LIMIT = { maxFailures: 5, windowMs: 15 * 60_000 } as const;
 export const GLOBAL_LIMIT = { maxFailures: 30, windowMs: 60 * 60_000 } as const;
+/** 24시간 누적 전체 실패 한도: 시간당 한도 아래로 천천히 시도하는 공격을 막는다(docs/04 §3). */
+export const GLOBAL_DAY_LIMIT = { maxFailures: 100, windowMs: 24 * 60 * 60_000 } as const;
 export const RETENTION_MS = 30 * 24 * 60 * 60_000;
 
 /** at 컬럼은 고정 폭 ISO(UTC)라 문자열 비교가 시간 순서와 같다. */
@@ -51,7 +53,8 @@ export async function beginAttempt(
         `INSERT INTO auth_attempt (ip_hash, at, ok)
          SELECT ?1, ?2, 0
          WHERE (SELECT COUNT(*) FROM auth_attempt WHERE ip_hash = ?1 AND ok = 0 AND at > ?3) < ?4
-           AND (SELECT COUNT(*) FROM auth_attempt WHERE ok = 0 AND at > ?5) < ?6`,
+           AND (SELECT COUNT(*) FROM auth_attempt WHERE ok = 0 AND at > ?5) < ?6
+           AND (SELECT COUNT(*) FROM auth_attempt WHERE ok = 0 AND at > ?7) < ?8`,
       )
       .bind(
         ipHash,
@@ -60,7 +63,29 @@ export async function beginAttempt(
         IP_LIMIT.maxFailures,
         iso(nowMs - GLOBAL_LIMIT.windowMs),
         GLOBAL_LIMIT.maxFailures,
+        iso(nowMs - GLOBAL_DAY_LIMIT.windowMs),
+        GLOBAL_DAY_LIMIT.maxFailures,
       ),
+    // R2-1: 한도에 도달하는 "그 실패"가 기록되는 순간 전체 잠금 시각을 남긴다(이후 요청 거절을 기다리지 않는다).
+    // 시간당 한도 또는 24시간 한도 중 하나라도 도달했으면 해당 윈도 안 마지막 실패 시각을 쓴다.
+    db
+      .prepare(
+        `INSERT INTO app_setting (key, value)
+         SELECT 'last_global_lock_at', MAX(at) FROM auth_attempt
+         WHERE ok = 0 AND at > ?1 AND ?2 = 1
+         HAVING COUNT(*) >= ?3
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      )
+      .bind(iso(nowMs - GLOBAL_LIMIT.windowMs), 1, GLOBAL_LIMIT.maxFailures),
+    db
+      .prepare(
+        `INSERT INTO app_setting (key, value)
+         SELECT 'last_global_lock_at', MAX(at) FROM auth_attempt
+         WHERE ok = 0 AND at > ?1 AND ?2 = 1
+         HAVING COUNT(*) >= ?3
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      )
+      .bind(iso(nowMs - GLOBAL_DAY_LIMIT.windowMs), 1, GLOBAL_DAY_LIMIT.maxFailures),
     db.prepare("DELETE FROM auth_attempt WHERE at < ?1").bind(iso(nowMs - RETENTION_MS)),
   ]);
 
@@ -71,7 +96,7 @@ export async function beginAttempt(
 }
 
 async function lockRetryAfterSec(db: D1Database, ipHash: string, nowMs: number): Promise<number> {
-  const [ip, global] = await db.batch<CountRow>([
+  const [ip, global, day] = await db.batch<CountRow>([
     db
       .prepare(
         "SELECT COUNT(*) AS c, MAX(at) AS m FROM auth_attempt WHERE ip_hash = ?1 AND ok = 0 AND at > ?2",
@@ -80,6 +105,9 @@ async function lockRetryAfterSec(db: D1Database, ipHash: string, nowMs: number):
     db
       .prepare("SELECT COUNT(*) AS c, MAX(at) AS m FROM auth_attempt WHERE ok = 0 AND at > ?1")
       .bind(iso(nowMs - GLOBAL_LIMIT.windowMs)),
+    db
+      .prepare("SELECT COUNT(*) AS c, MIN(at) AS m FROM auth_attempt WHERE ok = 0 AND at > ?1")
+      .bind(iso(nowMs - GLOBAL_DAY_LIMIT.windowMs)),
   ]);
   let untilMs = nowMs + 1000; // 경쟁으로 잠금이 막 풀린 경우의 최소 안내값
   const consider = (
@@ -93,7 +121,13 @@ async function lockRetryAfterSec(db: D1Database, ipHash: string, nowMs: number):
   consider(ip?.results[0], IP_LIMIT);
   consider(global?.results[0], GLOBAL_LIMIT);
   // R1-3: 전체 잠금이면 잠금을 일으킨 마지막 실패 시각을 남긴다(같은 잠금 중 재시도해도 값이 같다 = 멱등).
+  // (기록 시점에 이미 썼지만, 과거 버전이 남긴 잠금 등을 위해 멱등하게 한 번 더 쓴다.)
   const g = global?.results[0];
+  const d = day?.results[0];
+  // 24시간 한도: 가장 오래된 실패가 창 밖으로 나가면 풀린다.
+  if (d?.m && d.c >= GLOBAL_DAY_LIMIT.maxFailures) {
+    untilMs = Math.max(untilMs, Date.parse(d.m) + GLOBAL_DAY_LIMIT.windowMs);
+  }
   if (g?.m && g.c >= GLOBAL_LIMIT.maxFailures) {
     await db
       .prepare(

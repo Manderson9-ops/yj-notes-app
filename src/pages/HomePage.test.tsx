@@ -12,7 +12,7 @@ const overview = (ingestState: "idle" | "running" | "failed") => ({
   comments: 0,
   range: null,
   ingestState,
-  security: { lastGlobalLockAt: null },
+  security: { lastGlobalLockAt: null, failures7d: 0 },
   lastIngest: null,
   milestones: { observed: 0, unobserved: 0 },
   recentNotes: [],

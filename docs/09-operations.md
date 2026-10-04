@@ -101,7 +101,7 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 
 | ID | 증상 | 조치 |
 |---|---|---|
-| R-01 | 가족이 "PIN 이 안 돼요" | 잠금 여부 확인(`auth_attempt`) → 15분 대기 안내. 전역 잠금이면 공격 의심 → 로그 확인 후 PIN 교체. **먼저 설정 화면의 「최근 전체 잠금」 날짜(= `app_setting.last_global_lock_at`, `GET /api/overview` 의 `security.lastGlobalLockAt`)를 확인**한다(R1-3). **한계**: 외부 알림 채널(메일·푸시)은 없다 — 가족 중 로그인된 사람이 설정 화면에서 보거나 관리자가 D1 을 조회해야 알 수 있다 |
+| R-01 | 가족이 "PIN 이 안 돼요" | 잠금 여부 확인(`auth_attempt`) → 15분 대기 안내. 전역 잠금이면 공격 의심 → 로그 확인 후 PIN 교체. **전체 잠금 기준: 시간당 30회 또는 24시간 100회 실패(R2-1)**. **먼저 설정 화면의 「최근 전체 잠금」 날짜(= `app_setting.last_global_lock_at`, `GET /api/overview` 의 `security.lastGlobalLockAt`)를 확인**한다(R1-3), 같은 곳의 「최근 7일 PIN 실패」 횟수(`security.failures7d`)로 시도 규모를 본다. 반복되면 8자리 이상 PIN 으로 교체를 권한다(`docs/04` §3). **한계**: 외부 알림 채널(메일·푸시)은 없다 — 가족 중 로그인된 사람이 설정 화면에서 보거나 관리자가 D1 을 조회해야 알 수 있다 |
 | R-02 | 적재 실패(`ingest_run.status=failed`) — 홈에 「마지막 갱신이 실패했어요」, 적재 중엔 「자료를 갱신하는 중이에요」 안내가 뜬다(R1-6) | 오류 메시지 확인(자료 내용은 출력되지 않음) → **같은 run 폴더로 `upload` 재실행**(대상 테이블 전체 교체라 멱등) → 그래도 안 되면 D1 Time Travel 로 적재 직전 시점 복원(`wrangler d1 time-travel restore`) → 원인 수정 후 재적재 |
 | R-03 | 503 quota_exceeded | 사용량 확인. 반복되면 원인(루프 요청 등) 수정. 유료 전환은 관리자 결정 |
 | R-04 | 기록이 사라졌다 | `deleted_at` 확인(소프트 삭제 복구) → 없으면 §5-1 의 앱 표 복원(해당 id 만 골라 적용 가능) |
