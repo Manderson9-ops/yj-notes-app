@@ -47,9 +47,10 @@ afterEach(() => {
 describe("HomePage ingest banner (R1-6)", () => {
   it("running: asks to check again later", async () => {
     renderHome("running");
-    expect(
-      await screen.findByText("자료를 갱신하는 중이에요. 잠시 뒤 다시 확인해 주세요."),
-    ).toBeInTheDocument();
+    const first = await screen.findByText("자료를 갱신하는 중이에요.");
+    expect(first.parentElement?.textContent).toBe(
+      "자료를 갱신하는 중이에요. 잠시 뒤 다시 확인해 주세요.",
+    );
   });
   it("failed: says the last update failed", async () => {
     renderHome("failed");
