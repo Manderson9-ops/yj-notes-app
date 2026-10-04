@@ -16,6 +16,9 @@ import sys
 
 APP_TABLES = ("family_log", "family_log_history", "app_setting")
 MAX_STMT = 90_000  # D1 문장 한도(100KB)보다 작게
+# 복구하면 안 되는 app_setting 키: 옛 session_epoch 를 되살리면 폐기된 세션이 다시 유효해지고,
+# last_global_lock_at 은 지난 잠금 기록이라 현재 상태를 오도한다.
+SKIP_SETTING_KEYS = ("session_epoch", "last_global_lock_at")
 
 
 def quote(v):
@@ -32,12 +35,18 @@ def main(src: str, out: str) -> int:
         con.executescript(f.read())
     lines = []
     counts = {}
+    skipped = []
     for t in APP_TABLES:
         cols = [r[1] for r in con.execute(f"PRAGMA table_info({t})")]
         if not cols:
             counts[t] = "없음"
             continue
         rows = con.execute(f"SELECT {', '.join(cols)} FROM {t}").fetchall()
+        if t == "app_setting":
+            key_i = cols.index("key")
+            kept = [r for r in rows if r[key_i] not in SKIP_SETTING_KEYS]
+            skipped = [r[key_i] for r in rows if r[key_i] in SKIP_SETTING_KEYS]
+            rows = kept
         counts[t] = len(rows)
         for r in rows:
             stmt = (
@@ -50,6 +59,8 @@ def main(src: str, out: str) -> int:
     with open(out, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines) + ("\n" if lines else ""))
     print("추출 건수:", counts)
+    if skipped:
+        print("복구에서 제외한 설정 키:", ", ".join(sorted(skipped)))
     return 0
 
 
