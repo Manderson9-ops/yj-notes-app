@@ -63,12 +63,18 @@ overviewRoutes.get("/api/overview", async (c) => {
       note: string | null;
     }>();
 
+  // R1-3: 마지막 전체 잠금 시각(없으면 null). 로그인한 사용자에게만 보인다(이 라우트는 세션 필요).
+  const lock = await db
+    .prepare("SELECT value FROM app_setting WHERE key = 'last_global_lock_at'")
+    .first<{ value: string }>();
+
   const observedN = observed?.n ?? 0;
   const body: Overview = {
     noteDays: days?.n ?? 0,
     reports: days?.reports ?? 0,
     comments: days?.comments ?? 0,
     range: days?.first && days.last ? { from: days.first, to: days.last } : null,
+    security: { lastGlobalLockAt: lock?.value ?? null },
     lastIngest: ingest
       ? { at: ingest.at, status: ingest.status, commit: ingest.source_commit }
       : null,

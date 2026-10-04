@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ThemePicker } from "../components/ThemePicker";
 import { api } from "../lib/api";
+import { formatYmdKo, seoulDateOf } from "../lib/dateFormat";
+import { useOverview } from "../lib/notesApi";
 import { useLargeText } from "../lib/largeText";
 import { clearQueue, unsentCounts } from "../lib/logs/queue";
 import { handleUnauthorized } from "../lib/queryClient";
@@ -11,6 +13,8 @@ import { handleUnauthorized } from "../lib/queryClient";
 export function SettingsPage() {
   const qc = useQueryClient();
   const [large, setLarge] = useLargeText();
+  const overview = useOverview();
+  const lastLock = overview.data?.security.lastGlobalLockAt ?? null;
   const logout = useMutation({
     mutationFn: () => api("DELETE", "/session"),
     onSettled: () => {
@@ -59,6 +63,14 @@ export function SettingsPage() {
           이 기기 로그아웃
         </button>
       </section>
+      {lastLock !== null && (
+        <section className="settings-section" aria-labelledby="set-security">
+          <h2 id="set-security">보안</h2>
+          <p className="muted" data-testid="last-global-lock">
+            최근 전체 잠금: {formatYmdKo(seoulDateOf(lastLock))}
+          </p>
+        </section>
+      )}
       <section className="settings-section" aria-labelledby="set-more">
         <h2 id="set-more">더 보기</h2>
         <Link className="link" to="/settings/design">

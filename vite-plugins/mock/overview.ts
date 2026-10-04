@@ -15,6 +15,7 @@ export const overviewMock: MockModule = {
         from: MOCK_DAYS[0]?.date ?? "2020-03-02",
         to: MOCK_DAYS[MOCK_DAYS.length - 1]?.date ?? "2020-03-02",
       },
+      security: { lastGlobalLockAt: null },
       lastIngest: {
         at: new Date(Date.now() - 3 * 86_400_000).toISOString(),
         status: "ok",

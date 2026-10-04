@@ -83,6 +83,8 @@ export const overviewSchema = z.object({
   reports: z.number().int(),
   comments: z.number().int(),
   range: z.object({ from: dateString, to: dateString }).nullable(),
+  /** R1-3: 마지막 전체 잠금(ISO, UTC). 없으면 null. */
+  security: z.object({ lastGlobalLockAt: z.string().nullable() }),
   lastIngest: z
     .object({ at: z.string(), status: z.enum(["ok", "failed", "running"]), commit: z.string() })
     .nullable(),

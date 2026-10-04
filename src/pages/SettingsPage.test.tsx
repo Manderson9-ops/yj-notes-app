@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,7 +29,8 @@ beforeEach(() => {
   logoutCalls = 0;
   vi.stubGlobal(
     "fetch",
-    vi.fn((_url: string, init?: { method?: string }) => {
+    vi.fn((url: string, init?: { method?: string }) => {
+      if (url.includes("/overview")) return Promise.resolve(new Response("{}", { status: 404 }));
       if (init?.method === "DELETE") logoutCalls += 1;
       return Promise.resolve(new Response(null, { status: 204 }));
     }),
@@ -114,5 +115,56 @@ describe("logout with unsent records", () => {
     });
     expect(await store.getAll()).toEqual([]);
     expect(await unsentCounts()).toEqual({ pending: 0, failed: 0 });
+  });
+});
+
+describe("R1-3: global lock notice", () => {
+  const overviewBody = (lastGlobalLockAt: string | null) => ({
+    noteDays: 0,
+    reports: 0,
+    comments: 0,
+    range: null,
+    security: { lastGlobalLockAt },
+    lastIngest: null,
+    milestones: { observed: 0, unobserved: 0 },
+    recentNotes: [],
+    recentLogs: [],
+  });
+  const renderWith = (lock: string | null) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(overviewBody(lock)), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <MemoryRouter>
+          <SettingsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  };
+
+  it("shows the date of the last global lock", async () => {
+    renderWith("2030-01-01T00:00:29.000Z");
+    expect(await screen.findByText(/최근 전체 잠금: 2030년 1월 1일/)).toBeInTheDocument();
+  });
+
+  it("shows nothing when there was none", async () => {
+    renderWith(null);
+    await screen.findByText("설정");
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalled();
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(screen.queryByText(/최근 전체 잠금/)).toBeNull();
   });
 });

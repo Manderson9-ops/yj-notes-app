@@ -92,6 +92,16 @@ async function lockRetryAfterSec(db: D1Database, ipHash: string, nowMs: number):
   };
   consider(ip?.results[0], IP_LIMIT);
   consider(global?.results[0], GLOBAL_LIMIT);
+  // R1-3: 전체 잠금이면 잠금을 일으킨 마지막 실패 시각을 남긴다(같은 잠금 중 재시도해도 값이 같다 = 멱등).
+  const g = global?.results[0];
+  if (g?.m && g.c >= GLOBAL_LIMIT.maxFailures) {
+    await db
+      .prepare(
+        "INSERT INTO app_setting (key, value) VALUES ('last_global_lock_at', ?1) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .bind(g.m)
+      .run();
+  }
   return Math.max(1, Math.ceil((untilMs - nowMs) / 1000));
 }
 

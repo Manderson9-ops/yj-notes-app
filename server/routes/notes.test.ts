@@ -190,11 +190,21 @@ describe("empty database", () => {
       reports: 0,
       comments: 0,
       range: null,
+      security: { lastGlobalLockAt: null },
       lastIngest: null,
       milestones: { observed: 0, unobserved: 0 },
       recentNotes: [],
       recentLogs: [],
     });
+  });
+
+  it("R1-3: overview exposes last_global_lock_at to authenticated users only", async () => {
+    h.fake.sqlite.exec(
+      "INSERT INTO app_setting (key, value) VALUES ('last_global_lock_at', '2030-01-01T00:00:29.000Z')",
+    );
+    const o = overviewSchema.parse(await (await get("/api/overview")).json());
+    expect(o.security).toEqual({ lastGlobalLockAt: "2030-01-01T00:00:29.000Z" });
+    expect((await h.handle(new Request("https://app.example.test/api/overview"))).status).toBe(401);
   });
 
   it("notes list is empty, not an error", async () => {
