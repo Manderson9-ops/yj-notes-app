@@ -267,6 +267,27 @@ describe("POST /api/session", () => {
       expect((await h.login(TEST_PIN)).status).toBe(429);
     });
 
+    it("R1-2: wrong-length PIN_HASH / short PIN_SALT are config errors: 500, nothing recorded, no lockout", async () => {
+      const { PIN_HASH, PIN_SALT } = h.env;
+      h.env.PIN_HASH = "AAECAwQFBgcICQoLDA0ODw=="; // 16 bytes
+      for (let i = 0; i < 10; i++) expect((await h.login(WRONG)).status).toBe(500);
+      expect(rows()).toBe(0);
+      h.env.PIN_HASH = PIN_HASH;
+      h.env.PIN_SALT = "AAECAwQFBg=="; // 7 bytes
+      for (let i = 0; i < 10; i++) expect((await h.login(TEST_PIN)).status).toBe(500);
+      expect(rows()).toBe(0);
+      h.env.PIN_SALT = PIN_SALT;
+      expect((await h.login(TEST_PIN)).status).toBe(204);
+    });
+
+    it("R1-2: PIN_LENGTH never affects server verification (wrong/odd values cannot lock anyone out)", async () => {
+      for (const len of ["4", "12", "abc", "99", ""]) {
+        h.env.PIN_LENGTH = len;
+        expect((await h.login(TEST_PIN, "192.0.2.77")).status, len).toBe(204);
+      }
+      expect(rows("ok=0")).toBe(0);
+    });
+
     it("missing session_epoch -> 500 even with the right PIN, and no cookie", async () => {
       h.fake.sqlite.exec("DELETE FROM app_setting WHERE key='session_epoch'");
       const res = await h.login(TEST_PIN);
