@@ -119,24 +119,24 @@ describe("logout with unsent records", () => {
 });
 
 describe("R1-3: global lock notice", () => {
-  const overviewBody = (lastGlobalLockAt: string | null) => ({
+  const overviewBody = (lastGlobalLockAt: string | null, failures7d: number) => ({
     noteDays: 0,
     reports: 0,
     comments: 0,
     range: null,
     ingestState: "idle",
-    security: { lastGlobalLockAt },
+    security: { lastGlobalLockAt, failures7d },
     lastIngest: null,
     milestones: { observed: 0, unobserved: 0 },
     recentNotes: [],
     recentLogs: [],
   });
-  const renderWith = (lock: string | null) => {
+  const renderWith = (lock: string | null, failures7d = 3) => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
         Promise.resolve(
-          new Response(JSON.stringify(overviewBody(lock)), {
+          new Response(JSON.stringify(overviewBody(lock, failures7d)), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           }),
@@ -158,7 +158,7 @@ describe("R1-3: global lock notice", () => {
   });
 
   it("shows nothing when there was none", async () => {
-    renderWith(null);
+    renderWith(null, 0);
     await screen.findByText("설정");
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalled();
@@ -166,6 +166,18 @@ describe("R1-3: global lock notice", () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 20));
     });
+    expect(screen.queryByText(/최근 전체 잠금/)).toBeNull();
+    expect(screen.queryByText(/최근 7일 PIN 실패/)).toBeNull();
+  });
+
+  it("R2-1: shows failures in the last 7 days next to the lock line", async () => {
+    renderWith("2030-01-01T00:00:29.000Z", 3);
+    expect(await screen.findByText("최근 7일 PIN 실패: 3회")).toBeInTheDocument();
+  });
+
+  it("R2-1: shows the failure count even without a lock", async () => {
+    renderWith(null, 2);
+    expect(await screen.findByText("최근 7일 PIN 실패: 2회")).toBeInTheDocument();
     expect(screen.queryByText(/최근 전체 잠금/)).toBeNull();
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { countRows, createFakeD1 } from "../test-utils/fake-d1";
 import { START_MS } from "../test-utils/harness";
 import {
+  GLOBAL_DAY_LIMIT,
   GLOBAL_LIMIT,
   IP_LIMIT,
   RETENTION_MS,
@@ -87,6 +88,43 @@ describe("beginAttempt", () => {
     expect(first).toBe(new Date(START_MS + (GLOBAL_LIMIT.maxFailures - 5) * 1000).toISOString());
     expect((await beginAttempt(db, "fresh2", START_MS + 120_000)).allowed).toBe(false);
     expect(read()).toBe(first);
+  });
+
+  const readLock = (sqlite: ReturnType<typeof createFakeD1>["sqlite"]) =>
+    (
+      sqlite.prepare("SELECT value FROM app_setting WHERE key = 'last_global_lock_at'").get() as
+        { value: string } | undefined
+    )?.value;
+
+  it("R2-1: the 30th recorded failure writes last_global_lock_at immediately (no later rejection needed)", async () => {
+    const { db, sqlite } = createFakeD1();
+    for (let i = 0; i < GLOBAL_LIMIT.maxFailures - 1; i++) {
+      await beginAttempt(db, `ip${String(i % 6)}`, START_MS + i * 1000);
+      expect(readLock(sqlite)).toBeUndefined();
+    }
+    const last = START_MS + (GLOBAL_LIMIT.maxFailures - 1) * 1000;
+    expect((await beginAttempt(db, "ip5", last)).allowed).toBe(true);
+    expect(readLock(sqlite)).toBe(new Date(last).toISOString());
+  });
+
+  it("R2-1: 100 failures spread over 24h (under the hourly cap) lock globally until the oldest expires", async () => {
+    const { db, sqlite } = createFakeD1();
+    const step = 14 * 60_000;
+    for (let i = 0; i < GLOBAL_DAY_LIMIT.maxFailures; i++) {
+      const r = await beginAttempt(db, `ip${String(i)}`, START_MS + i * step);
+      expect(r.allowed).toBe(true);
+    }
+    const lastAt = START_MS + (GLOBAL_DAY_LIMIT.maxFailures - 1) * step;
+    expect(readLock(sqlite)).toBe(new Date(lastAt).toISOString());
+    const now = lastAt + step;
+    const blocked = await beginAttempt(db, "brand-new", now);
+    expect(blocked).toEqual({
+      allowed: false,
+      retryAfterSec: (START_MS + GLOBAL_DAY_LIMIT.windowMs - now) / 1000,
+    });
+    // once the oldest failure leaves the 24h window, attempts are allowed again
+    const later = START_MS + GLOBAL_DAY_LIMIT.windowMs;
+    expect((await beginAttempt(db, "brand-new", later)).allowed).toBe(true);
   });
 
   it("retryAfter counts down from the last failure, not from the blocked attempt", async () => {

@@ -86,7 +86,11 @@ export const overviewSchema = z.object({
   /** R1-6: 가장 최근 적재 실행 상태. running=갱신 중, failed=마지막 갱신 실패. */
   ingestState: z.enum(["idle", "running", "failed"]),
   /** R1-3: 마지막 전체 잠금(ISO, UTC). 없으면 null. */
-  security: z.object({ lastGlobalLockAt: z.string().nullable() }),
+  security: z.object({
+    lastGlobalLockAt: z.string().nullable(),
+    /** R2-1: 최근 7일 PIN 실패 횟수. */
+    failures7d: z.number().int(),
+  }),
   lastIngest: z
     .object({ at: z.string(), status: z.enum(["ok", "failed", "running"]), commit: z.string() })
     .nullable(),
