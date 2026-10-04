@@ -12,6 +12,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import Config
+from .layers import VerifierRunner, layer_warnings, run_layer_verifiers, subprocess_runner
 from .model import build_all
 from .sqlgen import (
     INSERT_ORDER,
@@ -86,8 +87,12 @@ class Generated:
         return h.hexdigest()
 
 
-def generate(data_dir: Path, cfg: Config) -> Generated:
+def generate(data_dir: Path, cfg: Config, verifier_runner: VerifierRunner = subprocess_runner) -> Generated:
     built = build_all(data_dir, cfg)
+    # R1-7: 계층별 검증기 실행(없으면 missing). 실패해도 export 는 계속하고 manifest 에 남긴다.
+    layers = run_layer_verifiers(data_dir, verifier_runner)
+    for ly in sorted(set(built.doc_layers.values()) - set(layers)):
+        layers[ly] = {"status": "missing"}  # 검증기가 정해져 있지 않은 폴더의 문서도 통과로 치지 않는다
     files: dict[str, str] = {}
     meta_files: list[dict] = []  # type: ignore[type-arg]
     files["00_delete.sql"] = "\n".join(delete_statements()) + "\n"
@@ -128,6 +133,10 @@ def generate(data_dir: Path, cfg: Config) -> Generated:
         },
         "files": meta_files,
         "sources": built.sources,
+        "layers": layers,
+        "layer_warnings": layer_warnings(layers),
+        # 계층 검증을 통과한 계층에 속한 문서만 upload 가 verify_ok=1 로 올린다
+        "verified_slugs": sorted(s for s, ly in built.doc_layers.items() if layers[ly]["status"] == "pass"),
     }
     return Generated(files, manifest)
 

@@ -4,6 +4,10 @@ import { base64ToBytes, bytesToBase64, utf8 } from "./encoding";
 
 export const PBKDF2_ITERATIONS = 100_000;
 const HASH_BITS = 256;
+const MIN_SALT_BYTES = 8;
+
+/** PIN_HASH/PIN_SALT 설정 오류(틀린 PIN 아님). 로그인 라우트는 시도 기록을 되돌리고 500 으로 응답한다. */
+export class PinConfigError extends Error {}
 
 /** 4~12자리 숫자. 형식 오류는 틀린 PIN 과 같은 일반 401 로 처리한다(형식을 알려주지 않음). */
 const PIN_PATTERN = /^[0-9]{4,12}$/;
@@ -71,8 +75,16 @@ export async function verifyPin(
   saltB64: string,
   expectedHashB64: string,
 ): Promise<boolean> {
+  // 설정 검증(R1-2): 해시 32바이트·소금 8바이트 이상이 아니면 어떤 PIN 도 맞을 수 없다 -> 틀린 PIN 이 아니라
+  // 설정 오류로 던져 호출자가 시도 기록을 되돌리게 한다. (PIN_LENGTH 는 여기서 쓰지 않는다: UI 힌트일 뿐.)
+  const expected = base64ToBytes(expectedHashB64);
+  if (expected.length !== HASH_BITS / 8)
+    throw new PinConfigError("PIN_HASH must decode to 32 bytes");
+  if (base64ToBytes(saltB64).length < MIN_SALT_BYTES) {
+    throw new PinConfigError("PIN_SALT must decode to at least 8 bytes");
+  }
   const formatOk = isValidPinFormat(pin);
   const candidate = await hashPin(formatOk ? pin : DUMMY_PIN, saltB64);
-  const equal = timingSafeEqual(base64ToBytes(candidate), base64ToBytes(expectedHashB64));
+  const equal = timingSafeEqual(base64ToBytes(candidate), expected);
   return formatOk && equal;
 }

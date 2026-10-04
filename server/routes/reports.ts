@@ -32,8 +32,13 @@ export function reportGroup(slug: string): ReportGroup {
   return "report";
 }
 
-/** 목록 카드의 설명을 만들려고 본문 앞부분만 읽는다(HTML 은 스타일이 길어 더 읽는다). */
-const HEAD_SQL = "substr(body, 1, CASE kind WHEN 'html' THEN 30000 ELSE 1500 END) AS head";
+/**
+ * 목록 카드의 설명(R1-10): 적재가 미리 계산해 둔 report_doc.summary 를 쓴다.
+ * summary 가 NULL(이전에 적재된 행)일 때만 본문 앞부분을 읽어 예전 방식으로 만든다(HTML 은 스타일이 길어 더 읽는다).
+ * summary 가 있는 행은 본문(최대 수십 KB)을 읽지 않는다.
+ */
+const HEAD_SQL =
+  "CASE WHEN summary IS NULL THEN substr(body, 1, CASE kind WHEN 'html' THEN 30000 ELSE 1500 END) END AS head, summary";
 
 function toMeta(r: ReportRow) {
   return {
@@ -47,8 +52,9 @@ function toMeta(r: ReportRow) {
   };
 }
 
-function withSummary(r: ReportRow & { head: string }) {
-  return { ...toMeta(r), summary: docSummary(r.kind, r.head) };
+function withSummary(r: ReportRow & { head: string | null; summary: string | null }) {
+  const summary = r.summary ?? docSummary(r.kind, r.head ?? "");
+  return { ...toMeta(r), summary };
 }
 
 const COLUMNS = "slug, title, kind, generated_at, source_commit, verify_ok";
@@ -58,7 +64,7 @@ export const reportRoutes = new Hono<AppEnv>();
 reportRoutes.get("/api/reports", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT ${COLUMNS}, ${HEAD_SQL} FROM report_doc ORDER BY generated_at DESC, slug ASC`,
-  ).all<ReportRow & { head: string }>();
+  ).all<ReportRow & { head: string | null; summary: string | null }>();
   return jsonResponse(200, { items: results.map(withSummary) });
 });
 

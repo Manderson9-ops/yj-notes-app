@@ -28,6 +28,7 @@ class Check:
     title: str
     ok: bool
     detail: str
+    warn: bool = False  # 실패는 아니지만 알려야 하는 항목(종료 코드에 영향 없음)
 
 
 def _sample(items: list[str], n: int = 5) -> str:
@@ -292,6 +293,18 @@ def verify(data_dir: Path, out_dir: Path, cfg: Config) -> list[Check]:
         ", ".join(f"{t}={manifest['tables'][t]}" for t in INSERT_ORDER),
     )
     db.close()
+
+    # L1 계층별 검증기 결과(R1-7): 실패해도 verify 는 통과하되 WARN 으로 계층 이름을 알린다
+    warns = [str(w) for w in manifest.get("layer_warnings", [])]
+    checks.append(
+        Check(
+            "L1",
+            "원본 계층별 검증기(verify_*.py) 결과 — 통과 못 한 계층의 문서는 verify_ok=0",
+            True,
+            ", ".join(warns) if warns else "모든 계층 통과",
+            warn=bool(warns),
+        )
+    )
     return checks
 
 
@@ -299,7 +312,9 @@ def write_report(out_dir: Path, checks: list[Check]) -> dict:  # type: ignore[ty
     rep = {
         "manifest_sha256": hashlib.sha256((out_dir / MANIFEST).read_bytes()).hexdigest(),
         "ok": all(c.ok for c in checks),
-        "checks": [{"id": c.id, "title": c.title, "ok": c.ok, "detail": c.detail} for c in checks],
+        "checks": [
+            {"id": c.id, "title": c.title, "ok": c.ok, "detail": c.detail, "warn": c.warn} for c in checks
+        ],
     }
     (out_dir / VERIFY).write_bytes((json.dumps(rep, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
     return rep

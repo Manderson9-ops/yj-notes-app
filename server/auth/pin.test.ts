@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { base64ToBytes, base64UrlToBytes, bytesToBase64, bytesToBase64Url, utf8 } from "./encoding";
 import {
   PBKDF2_ITERATIONS,
+  PinConfigError,
   hashPin,
   isPinConfigured,
   isValidPinFormat,
@@ -112,5 +113,24 @@ describe("isPinConfigured", () => {
     expect(isPinConfigured({ PIN_HASH: "", PIN_SALT: "b" })).toBe(false);
     expect(isPinConfigured({ PIN_HASH: "a" })).toBe(false);
     expect(isPinConfigured({ PIN_HASH: 1, PIN_SALT: "b" })).toBe(false);
+  });
+});
+
+describe("verifyPin config validation (R1-2)", () => {
+  it("throws PinConfigError when the expected hash is not 32 bytes", async () => {
+    const short = bytesToBase64(new Uint8Array(16));
+    await expect(verifyPin("123456", SALT, short)).rejects.toBeInstanceOf(PinConfigError);
+    await expect(verifyPin("123456", SALT, bytesToBase64(new Uint8Array(33)))).rejects.toThrow(
+      PinConfigError,
+    );
+  });
+  it("throws PinConfigError when the salt decodes to fewer than 8 bytes", async () => {
+    await expect(
+      verifyPin("123456", bytesToBase64(new Uint8Array(7)), VECTOR),
+    ).rejects.toBeInstanceOf(PinConfigError);
+  });
+  it("still works with an 8-byte salt", async () => {
+    const salt = bytesToBase64(new Uint8Array(8).fill(1));
+    expect(await verifyPin("123456", salt, await hashPin("123456", salt))).toBe(true);
   });
 });

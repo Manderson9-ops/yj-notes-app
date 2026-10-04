@@ -59,6 +59,8 @@ def cmd_export(args: argparse.Namespace) -> int:
     for k, n in gen.manifest["counts"].items():
         print(f"  {k}: {n}")
     print(f"  날짜 범위: {gen.manifest['date_range']['min']} ~ {gen.manifest['date_range']['max']}")
+    for w in gen.manifest["layer_warnings"]:
+        print(f"  경고(계층 검증): {w}")
     return 0
 
 
@@ -69,7 +71,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
     checks = verify(data_dir, out, cfg)
     write_report(out, checks)
     for c in checks:
-        print(f"[{'OK' if c.ok else 'FAIL'}] {c.id} {c.title} - {c.detail}")
+        tag = "FAIL" if not c.ok else ("WARN" if c.warn else "OK")
+        print(f"[{tag}] {c.id} {c.title} - {c.detail}")
     ok = all(c.ok for c in checks)
     print("verify " + ("통과" if ok else "실패") + f": {out}")
     return 0 if ok else 1

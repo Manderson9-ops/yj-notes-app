@@ -69,6 +69,26 @@ describe("beginAttempt", () => {
     );
   });
 
+  it("R1-3: global lock records last_global_lock_at once (idempotent); IP-only lock does not", async () => {
+    const { db, sqlite } = createFakeD1();
+    const read = () =>
+      (
+        sqlite.prepare("SELECT value FROM app_setting WHERE key = 'last_global_lock_at'").get() as
+          { value: string } | undefined
+      )?.value;
+    for (let i = 0; i < 5; i++) await beginAttempt(db, "ipX", START_MS);
+    expect((await beginAttempt(db, "ipX", START_MS)).allowed).toBe(false);
+    expect(read()).toBeUndefined(); // per-IP lock only
+    for (let i = 0; i < GLOBAL_LIMIT.maxFailures - 5; i++) {
+      await beginAttempt(db, `ip${String(i % 6)}`, START_MS + (i + 1) * 1000);
+    }
+    expect((await beginAttempt(db, "fresh", START_MS + 60_000)).allowed).toBe(false);
+    const first = read();
+    expect(first).toBe(new Date(START_MS + (GLOBAL_LIMIT.maxFailures - 5) * 1000).toISOString());
+    expect((await beginAttempt(db, "fresh2", START_MS + 120_000)).allowed).toBe(false);
+    expect(read()).toBe(first);
+  });
+
   it("retryAfter counts down from the last failure, not from the blocked attempt", async () => {
     const { db } = createFakeD1();
     for (let i = 0; i < 5; i++) await beginAttempt(db, "ip1", START_MS);

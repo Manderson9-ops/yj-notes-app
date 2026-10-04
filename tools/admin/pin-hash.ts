@@ -7,7 +7,10 @@ import { createInterface } from "node:readline";
 
 /** server/auth/pin.ts 와 같은 값이어야 한다(pin-hash.test.ts 가 서버 구현과 일치를 검증). */
 export const PBKDF2_ITERATIONS = 100_000;
-export const PIN_PATTERN = /^[0-9]{4,12}$/;
+/** 관리자 도구는 서버(4~12 허용)보다 엄격하게 6~12자리만 만든다(R1-1: 4자리는 1만 가지뿐이라 잠금 정책만으로는 약하다). */
+export const PIN_PATTERN = /^[0-9]{6,12}$/;
+export const PIN_TOO_SHORT_MESSAGE =
+  "PIN 은 숫자 6~12자리여야 합니다. 4~5자리는 경우의 수가 너무 적어(1만~10만 가지) 시도 제한만으로는 안전하지 않습니다. 생일·전화번호 뒷자리 같은 짐작 가능한 숫자는 피하고 무작위 숫자를 쓰세요.";
 export const PROJECT_NAME = "yj-notes-app";
 
 export function computePinHash(pin: string, salt: Buffer): string {
@@ -96,9 +99,9 @@ async function ask(prompt: string, warned: { value: boolean }): Promise<string> 
 
 async function main(): Promise<void> {
   const warned = { value: false };
-  const pin = await ask("새 PIN (숫자 4~12자리): ", warned);
+  const pin = await ask("새 PIN (무작위 숫자 6~12자리, 생일 금지): ", warned);
   if (!PIN_PATTERN.test(pin)) {
-    console.error("PIN 은 숫자 4~12자리여야 합니다.");
+    console.error(PIN_TOO_SHORT_MESSAGE);
     process.exitCode = 1;
     return;
   }

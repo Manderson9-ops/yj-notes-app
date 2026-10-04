@@ -4,7 +4,7 @@
 - 인증: `/api/session`(POST/GET), `/api/health` 외 **전부 세션 필요**. 없으면 `401 {"error":"auth_required"}`
 - 쓰기 요청: `Content-Type: application/json` 필수, `Origin` 이 자기 도메인이어야 함(아니면 `403`)
 - 오류 형식: `{"error": "<code>", "message": "<사람이 읽는 한국어>"}` — 자료 내용·SQL·스택을 넣지 않는다
-- 요청·응답 스키마는 `server/schemas/*.ts`(zod) 가 정본. 이 문서는 요약.
+- 요청·응답 스키마의 정본(zod, R1-10 에서 실제 위치로 정정): 응답 모양은 `src/lib/schemas.ts`(세션)·`src/lib/notesSchemas.ts`(알림장·overview)·`src/lib/logs/schemas.ts`(가족 기록)·`src/features/library/api.ts`(자료실), 서버 입력 검증은 각 `server/routes/*.ts` 와 `server/logs/definition.ts`. 이 문서는 요약.
 
 ## 인증
 
@@ -13,7 +13,7 @@
 | POST | `/session` | `{pin}` | `204` + 쿠키 / `401 invalid_pin` / `429 locked {retryAfterSec}` |
 | GET | `/session` | — | `{authenticated: bool, pinLength?: 4~12}` — `pinLength` 는 서버 `PIN_LENGTH` 가 유효할 때만, 세션 유무와 무관하게 포함(로그인 화면이 점 개수·자동 전송 시점에 사용). 없으면 클라이언트는 4~12자리 + '확인' 방식 |
 | DELETE | `/session` | — | `204` (이 기기 로그아웃) |
-| GET | `/health` | — | `{ok, version, lastIngestAt}` — 자료 없음 |
+| GET | `/health` | — | `{ok, version, lastIngestAt, updating}` — 자료 없음. `updating` 은 최근 적재가 `running`(6시간 이내)일 때만 true(R1-6) |
 
 ## 대시보드
 
@@ -25,6 +25,8 @@
 { noteDays, reports, comments,
   range: {from,to} | null,                       // 알림장 날짜 범위
   lastIngest: {at, status:'ok', commit} | null,  // 마지막 성공 적재(finished_at, 없으면 started_at)
+  ingestState: 'idle'|'running'|'failed',        // R1-6: 가장 최근 ingest_run 상태(running 6시간 초과는 failed 로 본다)
+  security: {lastGlobalLockAt: string | null},   // R1-3: 마지막 전체 잠금(ISO UTC)
   milestones: {observed, unobserved},            // observation 에 나온 이정표 수 / 나머지
   recentNotes: [{date, ageMonths, firstLine, nComments}] ×3,   // 홈 카드용(문서 초안에 없던 필드)
   recentLogs: [{id, type, typeLabel, occurredOn, recorder, note}] ×5  // family_log, 삭제 제외
@@ -58,7 +60,7 @@
 | GET | `/checkups` | `{items:[{id, roundLabel, examDate, ageMonths, overall, remarks, devResult, imageUrl, measurements:[{id, measure, measuredOn, value, sheetPct, readStatus, note}]}]}` 최신순. 결과지 문구·백분위는 원본 그대로(판정 문구 생성 금지). 검진에 속하지 않은 가정 측정값은 제외. `imageUrl` 은 사진 지원 전까지 항상 `null` |
 | GET | `/checkups/:id` | 위 항목 1건. 없으면 `404` |
 | GET | `/growth?measure=height_cm\|weight_kg\|head_cm\|bmi` | `{measure, sex, referenceSource, points:[{id, date, ageMonths, value, sheetPct, recalcPct, readStatus, note, fromCheckup}], reference:[{ageMonth, p3, p50, p97}]}`. `ageMonths` = `app_setting.child_birth_date` 기준 만 개월(없으면 검진 회차의 개월 수, 그것도 없으면 `null`). `sheetPct` 는 결과지 값 그대로, `recalcPct` 는 기준표 L/M/S 로 다시 계산한 참고값(그 개월 행에 LMS 가 있을 때만, 아니면 `null`). 다른 `measure` 는 `400` |
-| GET | `/files/*` | R2 객체 스트리밍(허용 접두어 `s2/checkup/` 만, 그 밖은 `404`). R2(`FILES`) 바인딩이 없는 동안(M4 전)은 `501 not_implemented` |
+| GET | `/files/*` | R2 객체 스트리밍(허용 접두어 `s2/checkup/` 만, 그 밖은 `404`). **Content-Type 허용 목록(R1-9)**: `image/jpeg`·`image/png`·`image/webp`·`application/pdf` 만 내보내고 그 밖(없음 포함)은 `415 unsupported_media_type`. 응답에 `Content-Disposition: inline; filename="<basename>"` 와 `nosniff`. R2(`FILES`) 바인딩이 없는 동안(M4 전)은 `501 not_implemented` |
 
 ## 가족 기록 (F2)
 

@@ -267,6 +267,27 @@ describe("POST /api/session", () => {
       expect((await h.login(TEST_PIN)).status).toBe(429);
     });
 
+    it("R1-2: wrong-length PIN_HASH / short PIN_SALT are config errors: 500, nothing recorded, no lockout", async () => {
+      const { PIN_HASH, PIN_SALT } = h.env;
+      h.env.PIN_HASH = "AAECAwQFBgcICQoLDA0ODw=="; // 16 bytes
+      for (let i = 0; i < 10; i++) expect((await h.login(WRONG)).status).toBe(500);
+      expect(rows()).toBe(0);
+      h.env.PIN_HASH = PIN_HASH;
+      h.env.PIN_SALT = "AAECAwQFBg=="; // 7 bytes
+      for (let i = 0; i < 10; i++) expect((await h.login(TEST_PIN)).status).toBe(500);
+      expect(rows()).toBe(0);
+      h.env.PIN_SALT = PIN_SALT;
+      expect((await h.login(TEST_PIN)).status).toBe(204);
+    });
+
+    it("R1-2: PIN_LENGTH never affects server verification (wrong/odd values cannot lock anyone out)", async () => {
+      for (const len of ["4", "12", "abc", "99", ""]) {
+        h.env.PIN_LENGTH = len;
+        expect((await h.login(TEST_PIN, "192.0.2.77")).status, len).toBe(204);
+      }
+      expect(rows("ok=0")).toBe(0);
+    });
+
     it("missing session_epoch -> 500 even with the right PIN, and no cookie", async () => {
       h.fake.sqlite.exec("DELETE FROM app_setting WHERE key='session_epoch'");
       const res = await h.login(TEST_PIN);
@@ -374,7 +395,12 @@ describe("GET /api/health", () => {
   it("is public, returns version and null lastIngestAt with no ingest", async () => {
     const res = await h.handle(new Request(`${ORIGIN}/api/health`));
     expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ ok: true, version: "dev", lastIngestAt: null });
+    expect(await json(res)).toEqual({
+      ok: true,
+      version: "dev",
+      lastIngestAt: null,
+      updating: false,
+    });
     expectHeaders(res);
   });
 
@@ -389,12 +415,41 @@ describe("GET /api/health", () => {
       ok: true,
       version: "1.2.3",
       lastIngestAt: "2030-01-02T01:00:00Z",
+      updating: true,
     });
+  });
+
+  it("R1-6: updating is true only while the latest run is running (and not stale)", async () => {
+    const get = async () =>
+      (await json<{ updating: boolean }>(await h.handle(new Request(`${ORIGIN}/api/health`))))
+        .updating;
+    insertRun(1, "ok", "2030-01-01T01:00:00Z");
+    expect(await get()).toBe(false);
+    insertRun(2, "running", null);
+    expect(await get()).toBe(true);
+    h.fake.sqlite.exec(
+      "UPDATE ingest_run SET status = 'ok', finished_at = '2030-01-01T02:00:00Z' WHERE id = 2",
+    );
+    expect(await get()).toBe(false);
+    insertRun(3, "failed", "2030-01-01T03:00:00Z");
+    expect(await get()).toBe(false);
+  });
+
+  it("R1-6: a run stuck in running for over 6 hours stops showing as updating", async () => {
+    insertRun(1, "running", null); // started_at 2030-01-01T00:00:00Z
+    h.deps.now = () => START_MS + 7 * 3_600_000;
+    const res = await h.handle(new Request(`${ORIGIN}/api/health`));
+    expect((await json<{ updating: boolean }>(res)).updating).toBe(false);
   });
 
   it("exposes no data beyond ok/version/lastIngestAt", async () => {
     const res = await h.handle(new Request(`${ORIGIN}/api/health`));
-    expect(Object.keys(await json<object>(res)).sort()).toEqual(["lastIngestAt", "ok", "version"]);
+    expect(Object.keys(await json<object>(res)).sort()).toEqual([
+      "lastIngestAt",
+      "ok",
+      "updating",
+      "version",
+    ]);
   });
 });
 

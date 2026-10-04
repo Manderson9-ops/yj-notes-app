@@ -5,6 +5,8 @@ import type { AppEnv } from "../app";
 import { errorResponse } from "../http/errors";
 
 const ALLOWED_PREFIX = "s2/checkup/";
+/** 내보낼 수 있는 형식(R1-9). 그 밖의 Content-Type 은 열지 않는다(스크립트가 실릴 수 있는 형식 차단). */
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const SAFE_KEY = /^[A-Za-z0-9][A-Za-z0-9_./-]{0,200}$/;
 
 export const fileRoutes = new Hono<AppEnv>();
@@ -25,10 +27,18 @@ fileRoutes.get("/api/files/*", async (c) => {
   }
   const obj = await files.get(key);
   if (!obj) return errorResponse(404, "not_found", "찾을 수 없어요.");
+  // 매개변수(; charset=…)를 뗀 형식이 허용 목록에 있어야 한다. 없거나 다르면 415(내용은 내보내지 않는다).
+  const type = (obj.httpMetadata?.contentType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+  if (!ALLOWED_TYPES.has(type)) {
+    return errorResponse(415, "unsupported_media_type", "열 수 없는 파일 형식이에요.");
+  }
+  // 키는 SAFE_KEY 로 영문·숫자·_ . / - 만 허용했으므로 파일 이름에 따옴표·줄바꿈이 들어갈 수 없다.
+  const filename = key.slice(key.lastIndexOf("/") + 1);
   return new Response(obj.body, {
     status: 200,
     headers: {
-      "Content-Type": obj.httpMetadata?.contentType ?? "application/octet-stream",
+      "Content-Type": type,
+      "Content-Disposition": `inline; filename="${filename}"`,
       "X-Content-Type-Options": "nosniff",
     },
   });

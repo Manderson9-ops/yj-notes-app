@@ -55,8 +55,11 @@ def test_upload_applies_and_records_run(verified: Path, tmp_path: Path):
     assert json.loads(run["verify_json"])["ok"] is True
     # /api/health 의 lastIngestAt 쿼리와 같은 조건
     assert r.query("SELECT finished_at FROM ingest_run WHERE status='ok' ORDER BY id DESC LIMIT 1")
-    # I4 통과 후 verify_ok = 1
-    assert {x["verify_ok"] for x in r.query("SELECT verify_ok FROM report_doc")} == {1}
+    # I4 통과 + 그 문서 계층의 검증기가 통과한 문서만 verify_ok = 1 (R1-7). reports/ 는 검증기 없음 -> 0
+    got = {x["slug"]: x["verify_ok"] for x in r.query("SELECT slug, verify_ok FROM report_doc")}
+    assert got and {1, 0} == set(got.values())
+    assert {x["kind"] for x in r.query("SELECT kind FROM report_doc WHERE verify_ok = 1")} == {"markdown"}
+    assert {x["kind"] for x in r.query("SELECT kind FROM report_doc WHERE verify_ok = 0")} == {"html"}
     # 긴 본문이 나눠 붙은 뒤에도 온전
     assert r.query("SELECT MAX(LENGTH(body)) AS n FROM note_item")[0]["n"] > 20_000
     # family_log 등 비대상 테이블 불변 + SQL 에 한 번도 등장하지 않음
@@ -224,11 +227,11 @@ def test_sanitize_error_hides_sql_fragments():
 
 
 def test_upload_stops_before_touching_db_when_migration_missing(verified: Path, tmp_path: Path):
-    """0004 가 d1_migrations 에 없으면 DB 를 건드리지 않고 안내와 함께 멈춘다(ingest_run 도 남기지 않는다)."""
+    """0007 이 d1_migrations 에 없으면 DB 를 건드리지 않고 안내와 함께 멈춘다(ingest_run 도 남기지 않는다)."""
     r = SqliteRunner(tmp_path / "d1.sqlite")
-    r.run("DELETE FROM d1_migrations WHERE name LIKE '0004%'")
+    r.run("DELETE FROM d1_migrations WHERE name LIKE '0007%'")
     r.trace.clear()
-    with pytest.raises(UploadError, match=r"0004_report_doc_body\.sql.*db:migrate"):
+    with pytest.raises(UploadError, match=r"0007_report_doc_summary\.sql.*db:migrate"):
         upload(verified, r, log=lambda _: None)
     assert r.query("SELECT COUNT(*) AS n FROM ingest_run")[0]["n"] == 0
     assert not [s for s in r.trace if "INSERT INTO" in s or "DELETE FROM" in s]

@@ -8,7 +8,7 @@
 | preview | PR 미리보기 | `yj-notes-db-preview` | `yj-notes-private-preview` | fixtures 만 |
 | production | `yj-notes-app` (production 브랜치 `main`) | `yj-notes-db` (ID 는 `wrangler.toml`) | `yj-notes-private` — **M4 활성화 예정**(R2 미사용, 바인딩 주석 처리) | 실제(S1/S2) |
 
-- 미리보기 환경에는 **실제 자료를 절대 적재하지 않는다**(PR 미리보기 주소는 추측 가능). 미리보기 자원은 M2 이후 만들며 그때까지 `wrangler.toml` 의 `env.preview` 는 주석 처리.
+- 미리보기 환경에는 **실제 자료를 절대 적재하지 않는다**(PR 미리보기 주소는 추측 가능). 미리보기 자원은 M2 이후 만든다. **R1-8**: `wrangler.toml` 의 `[env.preview]` 는 운영 D1 에 묶이지 않도록 별도 D1(`yj-notes-db-preview`)을 명시하며, 실제 자원을 만들기 전까지 `database_id` 는 존재하지 않는 자리표시자(`0000…`)다 — 미리보기는 DB 에 닿지 못해 실패할 뿐 운영 자료에 닿지 않는다. 자원을 만든 뒤 그 ID 로 바꾼다(운영 ID 재사용은 `tests/security/deploy-config.test.ts` 가 막는다). 또 `deploy.yml` 의 수동 실행(`workflow_dispatch`)은 `main` 브랜치에서 실행했을 때만 배포한다(다른 브랜치는 건너뜀).
 
 ## 2. 비밀값
 
@@ -23,6 +23,7 @@
 - `PIN_LENGTH`(선택, 4~12): 로그인 화면이 이 자릿수에서 자동 전송한다. 비밀은 아니지만 운영 값은 Pages secret 으로 둔다(저장소·`wrangler.toml` 에 쓰지 않음). 그 밖의 값·미설정이면 4~12자리 + '확인' 방식.
 - 배포 토큰과 적재 토큰을 **분리**한다. GitHub 에는 D1·R2 권한이 없는 토큰만 둔다.
 - **PIN 자릿수 설정(관리자)**: PIN 을 바꾸거나 처음 정할 때 자릿수도 맞춘다. `npx wrangler pages secret put PIN_LENGTH --project-name yj-notes-app` (예: 6 입력) 후 **재배포**해야 반영된다. 자릿수와 실제 PIN 길이가 다르면 로그인할 수 없으니 `PIN_HASH`·`PIN_SALT` 와 같은 순서로 함께 바꾼다.
+- **PIN 규칙(R1-1)**: PIN 은 **무작위 6자리 이상**(6~12)이어야 하고 생일·전화번호는 안 된다. `pin:hash` 는 6자리 미만을 거부한다.
 - PIN 해시 생성: `npm run pin:hash` (로컬에서 입력, 화면 출력만, 파일 저장 안 함). 출력에는 `PIN_SALT`·`PIN_HASH` 와 함께 **입력한 PIN 의 자릿수**(`PIN_LENGTH=<n>`, PIN 자체는 아님)와 세 값의 등록 명령이 나온다.
 - **경고: `PIN_LENGTH` 가 실제 PIN 길이와 다르면 아무도 로그인할 수 없다**(자동 전송 화면이 틀린 자리에서 보내거나 끝내 보내지 않는다). `PIN_SALT`·`PIN_HASH`·`PIN_LENGTH` 를 함께 등록하고 **재배포**한다. 화면은 PIN 이 연달아 3번 틀리면 「자릿수 설정을 관리자에게 물어봐 주세요」 라고 알린다(잠금과는 별개). R-01 에서 먼저 이 설정을 확인한다.
 
@@ -52,7 +53,7 @@ npm run ingest:verify                     # 통과해야 다음으로
 npm run ingest:upload -- --remote --yes
 npm run ingest:status -- --remote         # matches_manifest: true
 ```
-- 새 마이그레이션이 있으면 먼저 `npm run db:migrate:prod`(순서는 §3-1d). `upload` 는 시작 전에 필요한 마이그레이션(`0004_report_doc_body.sql` 이상: 문서 원문 `body` 칸)이 적용됐는지 확인하고, 안 됐으면 명확한 오류로 멈춘다.
+- 새 마이그레이션이 있으면 먼저 `npm run db:migrate:prod`(순서는 §3-1d). `upload` 는 시작 전에 필요한 마이그레이션(`0007_report_doc_summary.sql` 이상: 문서 원문 `body` 칸(0004)과 목록 설명 `summary` 칸(0007))이 적용됐는지 확인하고, 안 됐으면 명확한 오류로 멈춘다.
 - 출력은 `%LOCALAPPDATA%\yj-notes\ingest\<run-id>\`(저장소 밖, S1·S2 포함). 적재가 끝나면 오래된 run 폴더는 지워도 된다.
 - `--remote` 는 `--yes` 없이는 동작하지 않는다. 개발·검증은 `--local` 로(`npm run db:migrate:local` 이 선행).
 - Python 3.11+ 가 필요하다(런타임 패키지 없음). 없으면 `INGEST_PYTHON` 에 경로를 지정한다.
@@ -67,7 +68,7 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 - 로컬 개발은 `--remote` 대신 `--local`. 합성 값은 `fixtures/seed/library_health.sql` 에만 있다.
 
 ### 3-1d. 이번 배포 순서 (0004·0005·0006 + 실제 자료, 관리자)
-운영 D1 에는 아직 `0004_report_doc_body.sql`(문서 원문 칸), `0005_log_schema_and_history.sql`(기록 스키마·이력), `0006_*`(기록 선택지 라벨 정리, 저장 값은 그대로)이 없다. **아래 순서를 지킨다**(마이그레이션 → 자료 → 설정값 → 코드 → 확인). 코드를 먼저 올리면 새 칸이 없어 화면이 오류가 난다.
+운영 D1 에는 아직 `0004_report_doc_body.sql`(문서 원문 칸), `0007_report_doc_summary.sql`(목록 설명 칸, R1-10), `0005_log_schema_and_history.sql`(기록 스키마·이력), `0006_*`(기록 선택지 라벨 정리, 저장 값은 그대로)이 없다. **아래 순서를 지킨다**(마이그레이션 → 자료 → 설정값 → 코드 → 확인). 코드를 먼저 올리면 새 칸이 없어 화면이 오류가 난다.
 
 | # | 명령 (관리자 PC, `DATA_DIR`·적재 토큰 환경) | 확인 |
 |---|---|---|
@@ -100,8 +101,8 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 
 | ID | 증상 | 조치 |
 |---|---|---|
-| R-01 | 가족이 "PIN 이 안 돼요" | 잠금 여부 확인(`auth_attempt`) → 15분 대기 안내. 전역 잠금이면 공격 의심 → 로그 확인 후 PIN 교체 |
-| R-02 | 적재 실패(`ingest_run.status=failed`) | 오류 메시지 확인(자료 내용은 출력되지 않음) → **같은 run 폴더로 `upload` 재실행**(대상 테이블 전체 교체라 멱등) → 그래도 안 되면 D1 Time Travel 로 적재 직전 시점 복원(`wrangler d1 time-travel restore`) → 원인 수정 후 재적재 |
+| R-01 | 가족이 "PIN 이 안 돼요" | 잠금 여부 확인(`auth_attempt`) → 15분 대기 안내. 전역 잠금이면 공격 의심 → 로그 확인 후 PIN 교체. **먼저 설정 화면의 「최근 전체 잠금」 날짜(= `app_setting.last_global_lock_at`, `GET /api/overview` 의 `security.lastGlobalLockAt`)를 확인**한다(R1-3). **한계**: 외부 알림 채널(메일·푸시)은 없다 — 가족 중 로그인된 사람이 설정 화면에서 보거나 관리자가 D1 을 조회해야 알 수 있다 |
+| R-02 | 적재 실패(`ingest_run.status=failed`) — 홈에 「마지막 갱신이 실패했어요」, 적재 중엔 「자료를 갱신하는 중이에요」 안내가 뜬다(R1-6) | 오류 메시지 확인(자료 내용은 출력되지 않음) → **같은 run 폴더로 `upload` 재실행**(대상 테이블 전체 교체라 멱등) → 그래도 안 되면 D1 Time Travel 로 적재 직전 시점 복원(`wrangler d1 time-travel restore`) → 원인 수정 후 재적재 |
 | R-03 | 503 quota_exceeded | 사용량 확인. 반복되면 원인(루프 요청 등) 수정. 유료 전환은 관리자 결정 |
 | R-04 | 기록이 사라졌다 | `deleted_at` 확인(소프트 삭제 복구) → 없으면 주간 백업에서 해당 id 복원 |
 | R-05 | 유출 의심 | `04` §6 절차 |
