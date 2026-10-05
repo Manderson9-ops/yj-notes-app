@@ -20,7 +20,7 @@
 
 ## 2. 토큰 계약
 
-모든 테마는 아래 토큰을 **라이트·다크 둘 다** 정의한다(다크는 `[data-scheme="dark"]` 규칙). 새 토큰은 이 표에 먼저 추가한다. 실제 값은 §6-1. 크레용 전용 `--lift`(누르는 것의 오프셋 그림자)·`--band`(카드 띠 높이)는 계약 밖.
+모든 테마는 아래 토큰을 **라이트·다크 둘 다** 정의한다(다크는 `[data-scheme="dark"]` 규칙). 새 토큰은 이 표에 먼저 추가한다. 실제 값은 §6-1. `--c-line` = 안 눌리는 카드·표 테두리(바탕·면 위 3:1), `--c-divider` = 장식 구분선(옅음, 기준 밖), `--c-meta` = 날짜·메타 글자(기본 테마는 보조 글자색, 크레용·숲은 흙색; 화면 코드는 테마를 모르고 토큰만 씀). 크레용 전용 `--lift`(누르는 것의 오프셋 그림자)·`--band`(카드 띠 높이)는 계약 밖.
 
 | 그룹 | 토큰 | 용도 |
 |---|---|---|
@@ -42,7 +42,7 @@
 
 | ID | 기준 | 확인 방법 |
 |---|---|---|
-| TH-1 | 6 조합 모두(T-D1 기준) `fg` ≥ 12:1, `muted`·`earth`·`link` ≥ 7:1 (각각 bg·surface·surface-2 위), `on-accent/accent` ≥ 6.5, `on-accent-soft/accent-soft`·`on-badge/badge` ≥ 7, 상태색/상태 바탕 ≥ 7 (`accent` 글자 ≥ 4.5) | `src/styles/contrast.test.ts` 가 CSS 를 읽어 계산. 단색 토큰 쌍 + **배경 층 최악 지점**: `--tex-bg` 의 rgba/hex 색 정지점을 `--c-bg` 위에 최대 알파로 합성(겹친 경우 포함)하고, 그 위에 종이 결 최악(실측 a·(1−v) 최대 .354 / a·v 최대 .727 × opacity)을 더해 fg ≥ 12, muted·link·earth ≥ 7, accent ≥ 4.5, border ≥ 3 을 확인. 수채 번짐(`--blob-alpha`) 위 fg ≥ 12·muted ≥ 7, 테마 전용 쌍(크레용 `on-hl/hl`)도 확인. 대조군 테스트 포함 |
+| TH-1 | 6 조합 모두(T-D1 기준) `line` ≥ 3:1 (bg·surface 위), `meta` ≥ 7:1, `fg` ≥ 12:1, `muted`·`earth`·`link` ≥ 7:1 (각각 bg·surface·surface-2 위), `on-accent/accent` ≥ 6.5, `on-accent-soft/accent-soft`·`on-badge/badge` ≥ 7, 상태색/상태 바탕 ≥ 7 (`accent` 글자 ≥ 4.5) | `src/styles/contrast.test.ts` 가 CSS 를 읽어 계산. 단색 토큰 쌍 + **배경 층 최악 지점**: `--tex-bg` 의 rgba/hex 색 정지점을 `--c-bg` 위에 최대 알파로 합성(겹친 경우 포함)하고, 그 위에 종이 결 최악(실측 a·(1−v) 최대 .354 / a·v 최대 .727 × opacity)을 더해 fg ≥ 12, muted·link·earth ≥ 7, accent ≥ 4.5, border ≥ 3 을 확인. 수채 번짐(`--blob-alpha`) 위 fg ≥ 12·muted ≥ 7, 테마 전용 쌍(크레용 `on-hl/hl`)도 확인. 대조군 테스트 포함 |
 | TH-2 | UI 경계·포커스 링 대비 ≥ 3:1 (`border` 가 bg·surface·surface-2 위) | 같은 테스트 |
 | TH-10 | 선명하게 보기(`data-contrast="high"`) 6 조합: `fg` ≥ 15:1, `muted` ≥ 10:1, `border` ≥ 7:1, `line` ≥ 3:1, link·accent·earth ≥ 7:1, 질감·오프셋 그림자 없음 | 같은 테스트 + `e2e/a11y.spec.ts` 의 미리보기 6장(`preview-<테마>-<scheme>-high.png`) axe 0 |
 | TH-3 | axe serious/critical 0 (6 조합 × PIN·홈·설정·미리보기, 밝기는 `yj.scheme` 로 지정) | `e2e/a11y.spec.ts` |
@@ -142,20 +142,22 @@
 | 토큰 | 기본 라이트 | 기본 다크 | 크레용 라이트 | 크레용 다크 | 숲 라이트 | 숲 다크 |
 |---|---|---|---|---|---|---|
 | `--c-bg` | `#f6f7f9` | `#121316` | `#fffdf5` | `#1b1715` | `#f4efe1` | `#111a18` |
-| `--c-surface` | `#ffffff` | `#1c1e22` | `#ffffff` | `#28221f` | `#fffdf6` | `#1a2623` |
-| `--c-surface-2` | `#e8edf5` | `#26292e` | `#d7edf8` | `#332b28` | `#dceaf0` | `#21302c` |
-| `--c-fg` | `#16181c` | `#f1f2f5` | `#2a1f1c` | `#f8f2e9` | `#1b2721` | `#faf5e8` |
+| `--c-surface` | `#ffffff` | `#1f2228` | `#ffffff` | `#2b2421` | `#fffdf6` | `#1f2e2a` |
+| `--c-surface-2` | `#e8edf5` | `#2a2e35` | `#d7edf8` | `#372e2a` | `#dceaf0` | `#233430` |
+| `--c-fg` | `#16181c` | `#f1f2f5` | `#2a1f1c` | `#fffaf0` | `#1b2721` | `#fffbef` |
 | `--c-muted` | `#454a52` | `#bcc1ca` | `#54443d` | `#d6cabd` | `#3d4943` | `#c4ccc0` |
 | `--c-border` | `#737984` | `#828995` | `#2a1f1c` | `#9b8c80` | `#7a6b50` | `#80948a` |
-| `--c-line` | `#c4c9d1` | `#3d4148` | `#8a7a70` | `#4b413b` | `#cdbfa5` | `#35443f` |
+| `--c-line` | `#848f9f` | `#666d79` | `#8a7a70` | `#7d6d63` | `#9e8558` | `#607b72` |
+| `--c-divider` | `#c4c9d1` | `#3d4148` | `#b5a79c` | `#4b413b` | `#cdbfa5` | `#35443f` |
 | `--c-accent` | `#1553b8` | `#a8c7fa` | `#04609e` | `#93d1fb` | `#2a6249` | `#98d1ab` |
 | `--c-on-accent` | `#ffffff` | `#0a2350` | `#ffffff` | `#0f1f2b` | `#ffffff` | `#0d1e16` |
-| `--c-accent-soft` | `#d8e5fb` | `#1f3a63` | `#ffe600` | `#4a3f12` | `#d7e8d8` | `#244437` |
+| `--c-accent-soft` | `#d8e5fb` | `#1f3a63` | `#fff1a8` | `#4a3f12` | `#d7e8d8` | `#244437` |
 | `--c-on-accent-soft` | `#0c3a85` | `#dce8ff` | `#2a1f1c` | `#ffec8f` | `#163a2a` | `#ddf0e3` |
 | `--c-link` | `#134aa5` | `#a8c7fa` | `#035083` | `#93d1fb` | `#1c4965` | `#a8d2ea` |
 | `--c-badge` | `#ffe08a` | `#4a3f17` | `#ffe600` | `#4a3f12` | `#f2d58a` | `#463e1c` |
 | `--c-on-badge` | `#1b1d21` | `#ffe7a3` | `#2a1f1c` | `#ffec8f` | `#1d2a24` | `#f6e3a8` |
 | `--c-earth` | `#54452f` | `#dcc8aa` | `#5e3f2a` | `#e2cfb6` | `#5c3e22` | `#dfc6a0` |
+| `--c-meta` | `#454a52` | `#bcc1ca` | `#5e3f2a` | `#e2cfb6` | `#5c3e22` | `#dfc6a0` |
 | `--c-shadow` | `#141e32` | `#000000` | `#2a1f1c` | `#000000` | `#28495f` | `#000000` |
 | `--c-warn` | `#853d00` | `#ffb066` | `#7a4300` | `#ffc978` | `#6e4300` | `#f2c46d` |
 | `--c-warn-bg` | `#fdf0dc` | `#33250f` | `#fff1d6` | `#3a2a12` | `#f7e8c4` | `#2e2614` |
@@ -165,8 +167,11 @@
 | `--c-ok-bg` | `#e4f4ea` | `#16291f` | `#e3f4e8` | `#18301f` | `#ddebdd` | `#16291f` |
 | `--c-info` | `#1d4e9a` | `#9cc2ff` | `#1f3a5f` | `#b9d3f0` | `#1f4a66` | `#9cc9e3` |
 | `--c-info-bg` | `#e8f0fc` | `#17233a` | `#eef3f8` | `#1c2633` | `#e4eef2` | `#16262e` |
+| `--bw` | `1.5px` | `(상속)` | `2px` | `2px` | `1.5px` | `(상속)` |
+| `--shadow` | `0 1px 3px rgba(20, 30, 50, 0.12)` | `none` | `none` | `none` | `0 2px 10px rgba(40, 73, 95, 0.14)` | `none` |
 
-- 기본 모양: 기본 `--bw` 1px, `--shadow` 라이트 `0 1px 3px rgba(20,30,50,.12)`·다크 `none`. 크레용 `--bw` 2px, `--lift`(오프셋 그림자, 누르는 것 전용) 라이트 `2px 2px 0`·다크 `none`, 카드 띠 `--band` 라이트 10px·다크 6px. 숲 `--shadow` 라이트 `0 2px 10px rgba(40,73,95,.14)`·다크 `none`.
+- 카드 규칙(모든 테마 공통): 안 눌리는 카드는 `--c-line` 테두리만(그림자 없음). 눌리는 카드(`a.card`, `.card:has(> a)`)는 `--c-border` 테두리 + 화살표(+ 크레용만 `--lift`). 선택된 줄·칩은 바깥 링 없이 테두리 자체를 강조색 3px(크레용은 강조색 손그림 선) + 점/체크 + 굵은 글씨 + 중간 톤 면.
+- 기본 모양: 기본·숲 `--bw` 1.5px(선명하게 보기에서는 2px), `--shadow` 라이트 `0 1px 3px rgba(20,30,50,.12)`·다크 `none`. 크레용 `--bw` 2px, `--lift`(오프셋 그림자, 누르는 것 전용) 라이트 `2px 2px 0`·다크 `none`, 카드 띠 `--band` 라이트 10px·다크 6px. 숲 `--shadow` 라이트 `0 2px 10px rgba(40,73,95,.14)`·다크 `none`.
 - 크레용 다크 추가: `--c-hl #5b2f39`, `--c-on-hl #ffd9df`, `--c-band-sky #3d6f8c`, `--c-deco-2 #8a4b58`, `--c-deco-3 #8a7524`, 손그림 외곽선 SVG 색 `#9b8c80`(선 굵기 2.4, 라이트 2.6).
 - 숲 다크: `--tex-bg` 워시 알파를 줄였고(.35 / .2), 종이 결 opacity 와 수채 번짐 알파도 낮췄다(§6-4).
 
@@ -206,3 +211,11 @@
 ### 6-5. 참고
 
 Material Design dark theme(표면 #121212 계열, 본문 15.8:1, 채도 낮은 강조색, 높을수록 밝은 면), Material 3 tone 기반 surface container, KRDS 색상·선명한 화면 모드(본문 약 15:1, 고도 단계, 색 외 단서), WCAG 2.2(1.4.3 · 1.4.6 AAA 7:1 · 1.4.11 비텍스트 3:1), 고령자 모바일 지침(PMC 2021: 높은 대비, 누르는 것과 아닌 것의 분명한 경계, 모호한 아이콘 피하기).
+
+### 6-6. 2차 개선 (T-D1-7~, 독립 검토 8.2/10 반영)
+
+- `--c-line` 을 카드 가장자리로 올렸다(바탕·면 위 3:1). 옛 옅은 값은 새 `--c-divider` 로 옮겨 목록 줄·헤더·탭바 선에 쓴다. 다크 면 단계를 키웠다(기본 `#1f2228`/`#2a2e35`, 크레용 `#2b2421`/`#372e2a`, 숲 `#1f2e2a`/`#233430`).
+- 값 조정(본문 12:1 유지): 크레용 다크 `--c-fg` `#f8f2e9`→`#fffaf0`, 숲 다크 `--c-fg` `#faf5e8`→`#fffbef`, 숲 다크 surface-2 `#283a35`(제안)→`#233430`, 숲 다크 수채 번짐 알파 .015/.01. 크레용 라이트 `--c-accent-soft` `#ffe600`→`#fff1a8`(노랑 `#ffe600` 은 배지·형광펜에만).
+- 선명하게 보기: 테마별 accent-soft(`#dfe6f5`/`#2e3340` 기본, `#dcedf8`/`#24343f` 크레용, `#dcece1`/`#24382f` 숲), 꺼진 단추는 opacity 없이 점선 + 보조 글자색, `--bw` 2px.
+- 「선명하게 보기」는 라디오 줄과 같은 모양의 진짜 스위치(트랙·손잡이, 「켜짐/꺼짐」 글자, `role="switch"` + `aria-checked`). 설정·미리보기 순서: 화면 테마 → 화면 밝기 → 선명하게 보기.
+- `html { scroll-padding-bottom }` 로 따라오는(sticky) 탭바에 가려지지 않게 한다.
