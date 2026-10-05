@@ -104,7 +104,16 @@ describe("권장 단계 보정(공격·4주 이상·퇴행·말 더듬)", () => 
       expect(s.level, b).toBe(9);
       expect(s.min).toBe(9);
     }
-    expect(suggestLevel("그냥 걱정돼요", none, ["skill_loss"]).level).toBe(9);
+    // 확장 모델의 domain 추정만으로는 9 로 올리지 않는다(동생 생긴 뒤 아기처럼 구는 흔한 모습 오분류 방지).
+    expect(suggestLevel("그냥 걱정돼요", none, ["skill_loss"]).level).toBeLessThan(9);
+    expect(
+      suggestLevel("동생 이야기를 꺼내면 아기처럼 말하고 안아달라고만 해요", none, ["skill_loss"])
+        .level,
+    ).toBeLessThan(9);
+    expect(
+      suggestLevel("예전엔 두 단어로 말하던 걸 요즘은 거의 안 하고 손짓만 해요", none).level,
+    ).toBe(9);
+    expect(suggestLevel("전에는 혼자 걷던 계단을 이제 안 해요", none).level).toBe(9);
     expect(levelProblem(8, suggestLevel("퇴행했어요", none), "")?.severity).toBe("hard");
     expect(levelProblem(9, suggestLevel("퇴행했어요", none), "")).toBeNull();
   });
