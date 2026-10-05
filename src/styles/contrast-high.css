@@ -105,7 +105,17 @@
 
 /* 크레용: 손그림 외곽선(색이 고정된 SVG)·형광펜 띠를 끄고 곧은 단색 테두리로 */
 :root[data-contrast="high"][data-theme="crayon"]
-  :is(.btn, .btn-primary, a.card, .card:has(> a), .field, .theme-option, .chip, .key, .empty) {
+  :is(
+    .btn,
+    .btn-primary,
+    :where(a).card,
+    .card:has(> :where(a)),
+    .field,
+    .theme-option,
+    .chip,
+    .key,
+    .empty
+  ) {
   border-image: none;
   border-style: solid;
   border-color: var(--c-border);

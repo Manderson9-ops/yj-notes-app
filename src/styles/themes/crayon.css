@@ -340,7 +340,17 @@
    border-width 는 --bw + 1px: 면 가장자리를 선 바깥쪽 흔들림보다 1px 더 안으로 들인다.
    그림자는 box-shadow(CSS filter 금지: docs/design/theme-system.md 렌더 비용 규칙) ---- */
 :root[data-theme="crayon"]
-  :is(.btn, .btn-primary, a.card, .card:has(> a), .field, .theme-option, .chip, .key, .empty) {
+  :is(
+    .btn,
+    .btn-primary,
+    :where(a).card,
+    .card:has(> :where(a)),
+    .field,
+    .theme-option,
+    .chip,
+    .key,
+    .empty
+  ) {
   --face: var(--c-surface);
   border-width: calc(var(--bw) + 1px);
   background-color: transparent;
@@ -362,7 +372,8 @@
 :root[data-theme="crayon"] .empty {
   --face: var(--c-hl);
 }
-:root[data-theme="crayon"] :is(.btn, .btn-primary, a.card, .card:has(> a), .field, .theme-option) {
+:root[data-theme="crayon"]
+  :is(.btn, .btn-primary, :where(a).card, .card:has(> :where(a)), .field, .theme-option) {
   border-image-source: var(--bi-rect);
   border-image-slice: 20;
   border-image-width: 20px;
