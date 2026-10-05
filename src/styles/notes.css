@@ -226,6 +226,7 @@ mark {
 }
 .note-comment[data-who="parent"] {
   border-left-color: var(--c-accent);
+  border-left-width: 6px;
   background: var(--c-accent-soft);
   color: var(--c-on-accent-soft);
 }

@@ -59,8 +59,10 @@ export function LibraryIcon() {
 export function SettingsIcon() {
   return (
     <Icon>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" />
+      {/* 조절 막대(슬라이더): 해·톱니처럼 보이지 않게 */}
+      <path d="M3 7h9M18 7h3M3 17h3M12 17h9" />
+      <circle cx="15" cy="7" r="2.5" />
+      <circle cx="9" cy="17" r="2.5" />
     </Icon>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { WarnIcon } from "./icons";
 
 /**
  * 앱 안 확인 대화상자(브라우저 기본 confirm 은 쓰지 않는다). <dialog> 모달: 포커스 가두기·Esc 닫기는 브라우저가 한다.
@@ -54,6 +55,7 @@ export function ConfirmDialog({
           </button>
         ) : null}
         <button type="button" className="btn btn-danger" disabled={busy} onClick={onConfirm}>
+          <WarnIcon />
           {confirmLabel}
         </button>
       </div>

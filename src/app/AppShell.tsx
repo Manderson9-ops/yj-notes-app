@@ -17,8 +17,9 @@ export function AppShell() {
       <header className="shell-header">
         <p className="app-title">가족 기록</p>
         <ThemeDecor slot="header" />
-        <NavLink to="/settings" className="icon-btn" aria-label="설정">
+        <NavLink to="/settings" className="icon-btn">
           <SettingsIcon />
+          <span>설정</span>
         </NavLink>
       </header>
       <main className="shell-main">
