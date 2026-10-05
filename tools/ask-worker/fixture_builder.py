@@ -61,6 +61,11 @@ CREATE VIEW v_behavior_guide AS SELECT i.intervention_id, d.domain_ko, i.target_
 CREATE VIEW v_age_norms AS SELECT n.norm_id, d.domain_ko, n.age_min_months, n.age_max_months, n.typical_behavior_ko,
   n.warning_sign_ko FROM behavior_norms n JOIN ref_behavior_domains d ON n.domain_id = d.domain_id;
 INSERT INTO ref_behavior_domains VALUES ('FEEDING', '식사', '합성');
+INSERT INTO ref_behavior_domains VALUES ('SLEEP', '수면', '합성');
+INSERT INTO behavior_interventions VALUES ('SYN-IV-02', 'FEEDING', '밥 안 먹음', 'S1', 'AVOID',
+  '밥을 억지로 먹이지 않아요', '합성 근거', 'n/a', 'WEAK', '합성 한계 둘', '강요하면 거부가 늘 수 있어요', 'q', 'CONFIRMED');
+INSERT INTO behavior_interventions VALUES ('SYN-IV-03', 'SLEEP', '밥 먹다 졸음', 'S1', 'DO',
+  '식사 뒤 조용히 쉬어요', '합성 근거', 'n/a', 'WEAK', '합성 한계 셋', '없음', 'q', 'CONFIRMED');
 INSERT INTO behavior_interventions VALUES ('SYN-IV-01', 'FEEDING', '밥 안 먹음', 'S1', 'DO',
   '식사 시간을 일정하게 하고 간식 간격을 늘려요', '합성 근거', 'n/a', 'MODERATE', '합성 한계', '강요 금지', 'q', 'CONFIRMED');
 INSERT INTO behavior_norms VALUES ('SYN-NM-01', 'FEEDING', 24, 48, '편식이 흔하게 나타나요', '체중이 계속 줄면 상담', 'r', 'S1', 'q', 'CONFIRMED');

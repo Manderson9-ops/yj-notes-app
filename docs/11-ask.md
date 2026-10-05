@@ -17,7 +17,7 @@
    ◀── 접수 + 즉시 결과(비슷한 알림장·자료, AI 없음) + 위급 신호 여부
                                       ◀── 10초마다 POST /api/worker/ask/claim ─── (원자적으로 집음, 리스 5분)
                                       ◀── progress answering → 근거 묶음 → claude(Opus) 답 작성
-                                      ◀── progress reviewing → 독립 검토(점수) → <9.5 면 1회 재작성
+                                      ◀── progress reviewing → 독립 검토(지적 목록 → 코드가 점수 계산) → <9.5 면 지적만 고치는 재작성 1회
                                       ◀── POST /answer (스키마 검증 422)  → ask_answer, status=done
  5초마다 조회 ◀─ 접수 → 작성 중 → 검토 중 → 완료(답변 카드)
 ```
@@ -65,18 +65,41 @@
 |---|---|---|
 | `level` | 정수 1~10 | 요청의 `level` 과 같아야 함 |
 | `levelTitle` | 문자열 ≤40 | 화면은 정본 제목(10단계 표)을 쓴다 |
-| `levelReason` | 문자열 ≤600 | 왜 이 단계인지 |
-| `summary` | 문자열 ≤600 | 상황 요약(질문 재진술) |
-| `fromRecords` | 0~6개 `{date: YYYY-MM-DD, what, source: 알림장·관찰·검진·가족기록}` | 기록에서 본 것 |
-| `evidence` | 1~6개 `{ref, point, grade?}` | `ref` = DB 근거 id(claim id, guide 절 등) |
-| `tryNow` | 2~4개 `{action, say?}` | 지금 해 볼 것, 할 말 예시(`say`)는 강조 표시 |
-| `avoid` | 1~4개 문자열 | 피할 것 |
-| `observe` | `{what, howLong, how}` | 관찰 방법 |
-| `upIf` / `downIf` | 각 1~4개 문자열 | 단계가 올라가는/내려가는 신호 |
-| `forAsker` | 선택 | 질문자(조부모 등) 맞춤 한 줄 |
-| `limits` | 선택 | 근거 부족·알림장 한계 |
+| `levelReason` | 문자열 ≤220 | 왜 이 단계인지(월령 한 번 언급) |
+| `summary` | 문자열 ≤120 | 상황 요약(질문 재진술) |
+| `fromRecords` | 0~4개 `{date: YYYY-MM-DD, what ≤140, link ≤80, source: 알림장·관찰·검진·가족기록}` | 기록에서 본 것. `link` 는 필수: 이 기록이 질문과 어떻게 이어지는지 |
+| `evidence` | 1~6개 `{ref ≤120, point ≤200, grade? ≤40}` | `ref` = DB 근거 id(claim id, guide 절 등) |
+| `tryNow` | 1~3개 `{action ≤160, say? ≤80, basis ≤120}` | 지금 해 볼 것. `basis` 는 필수: 근거 묶음의 `ref`, 또는 정확히 `일반 권고`(묶음에 없는 일반 조언 — 화면에 작은 「일반 권고」 표시). 실제 개수는 아래 단계별 틀 |
+| `avoid` | 1~3개 문자열 ≤100 | 피할 것 |
+| `observe` | `{what ≤100, howLong ≤40, how ≤200}` | 관찰 방법 |
+| `upIf` / `downIf` | 각 1~3개 문자열 ≤120 | 단계가 올라가는/내려가는 신호 |
+| `forAsker` | 선택 ≤160 | 질문자(조부모 등) 맞춤 한 줄 |
+| `limits` | 선택 ≤160 | 근거 부족·알림장 한계 |
 
-모든 문자열은 1~600자(근거 `ref` 120자, `levelTitle` 40자), 추가 키 금지(`additionalProperties: false`), 직렬화 JSON ≤ 60 KB.
+추가 키 금지(`additionalProperties: false`), 문자열은 1자 이상, 직렬화 JSON ≤ 60 KB(스키마 최대로 채워도 한도 안).
+
+### 3-1. 단계별 답변 틀
+
+`shared/ask-levels.ts` 의 `LEVEL_TEMPLATES` 가 정본이다. 워커 프롬프트(「단계별 답변 틀」)와 결정적 검사가 같은 정의를 쓴다. 틀을 어기면 코드가 정확한 문장으로 재작성에 알린다.
+
+| 단계 | 해 볼 것(`tryNow`) | `observe.howLong` | 올라가는 신호에 연락처 |
+|---|---|---|---|
+| 1~2 | 1~2개 | 며칠 지켜보기 | 선택 |
+| 3 | 2개 | 며칠 지켜보기 | 선택 |
+| 4 | 2개 | 3~4일 | 필수 |
+| 5 | 2~3개 | 1주 | 필수 |
+| 6~7 | 2~3개 | 2주 | 필수 |
+| 8~9 | 2~3개 | 진료·상담 전까지 | 필수 |
+| 10 | 1~3개(급한 순서) | 지금 | 필수 |
+
+연락처는 `upIf` 항목 중 하나에 소아과·어린이집 선생님·발달 상담·119 같은 말이 있어야 한다. 모델이 개수를 초과하면 앞쪽(우선순위 높은 것)만 남겨 재작성 한 번을 아낀다.
+
+### 3-2. 워커 품질 흐름
+
+1. 근거 묶음(현재 월령 포함) → 작성 → **결정적 검사**(스키마, 금지어, redFlag→10단계, 단계 틀, `evidence.ref`·`tryNow.basis`·날짜가 묶음에 실재).
+2. 검사를 통과하면 **검토**: 검토자는 점수를 내지 않고 지적 `{category, where, fix}` 목록만 낸다. 점수 = 10 − 감점(factual 1.0, ungrounded 0.5, safety 0.5, template 0.4, record_link 0.3, over_interpretation 0.3, style 0.1씩 합 0.3까지)을 **코드가** 계산한다.
+3. 점수가 9.5 미만이면 **지적만 고치는 재작성 1회**("이것만 고치고 나머지는 그대로") → 재검토. 재검토는 이전 지적이 고쳐졌는지 확인하고, 새 지적은 factual·ungrounded·safety 만 받는다(문체 트집 방지).
+4. 더 높은 점수를 게시한다. 9.5 미만이면 앱이 「품질 검사 기준보다 낮아 참고용이에요」를 보인다. 하한(기본 8.5) 미만이면 `low_score` 로 실패(나중에 다시 시도).
 
 ## 4. 리드타임 목표
 

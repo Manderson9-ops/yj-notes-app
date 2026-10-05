@@ -46,6 +46,7 @@ export function makePipelineDeps(
           dataDir: pack.dataDir,
           cacheDir: pack.cacheDir,
           ...(pack.ingestRoot ? { ingestRoot: pack.ingestRoot } : {}),
+          ...(cfg.birthDate ? { birthDate: cfg.birthDate } : {}),
         },
         question,
         signal,
@@ -87,6 +88,7 @@ function opt(args: string[], name: string): string | undefined {
 async function dryRun(args: string[]): Promise<number> {
   const cfgFile = opt(args, "--config");
   const cfg = loadConfig({ requireToken: false, ...(cfgFile ? { file: cfgFile } : {}) });
+  process.env.YJ_TODAY = "2020-03-06"; // 합성 픽스처 날짜에 맞춘다(월령 계산)
   const fx = makeFixture(cfg.pythonBin);
   const cacheDir = join(fx.root, "cache");
   const deps = makePipelineDeps(cfg, { dataDir: fx.dataDir, ingestRoot: fx.ingestRoot, cacheDir });

@@ -15,15 +15,15 @@
     "levelReason": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 600
+      "maxLength": 220
     },
     "summary": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 600
+      "maxLength": 120
     },
     "fromRecords": {
-      "maxItems": 6,
+      "maxItems": 4,
       "type": "array",
       "items": {
         "type": "object",
@@ -35,7 +35,12 @@
           "what": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 600
+            "maxLength": 140
+          },
+          "link": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
           },
           "source": {
             "type": "string",
@@ -50,6 +55,7 @@
         "required": [
           "date",
           "what",
+          "link",
           "source"
         ],
         "additionalProperties": false
@@ -70,7 +76,7 @@
           "point": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 600
+            "maxLength": 200
           },
           "grade": {
             "type": "string",
@@ -86,8 +92,8 @@
       }
     },
     "tryNow": {
-      "minItems": 2,
-      "maxItems": 4,
+      "minItems": 1,
+      "maxItems": 3,
       "type": "array",
       "items": {
         "type": "object",
@@ -95,28 +101,34 @@
           "action": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 600
+            "maxLength": 160
           },
           "say": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 600
+            "maxLength": 80
+          },
+          "basis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           }
         },
         "required": [
-          "action"
+          "action",
+          "basis"
         ],
         "additionalProperties": false
       }
     },
     "avoid": {
       "minItems": 1,
-      "maxItems": 4,
+      "maxItems": 3,
       "type": "array",
       "items": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 600
+        "maxLength": 100
       }
     },
     "observe": {
@@ -125,17 +137,17 @@
         "what": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 600
+          "maxLength": 100
         },
         "howLong": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 600
+          "maxLength": 40
         },
         "how": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 600
+          "maxLength": 200
         }
       },
       "required": [
@@ -147,33 +159,33 @@
     },
     "upIf": {
       "minItems": 1,
-      "maxItems": 4,
+      "maxItems": 3,
       "type": "array",
       "items": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 600
+        "maxLength": 120
       }
     },
     "downIf": {
       "minItems": 1,
-      "maxItems": 4,
+      "maxItems": 3,
       "type": "array",
       "items": {
         "type": "string",
         "minLength": 1,
-        "maxLength": 600
+        "maxLength": 120
       }
     },
     "forAsker": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 600
+      "maxLength": 160
     },
     "limits": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 600
+      "maxLength": 160
     }
   },
   "required": [

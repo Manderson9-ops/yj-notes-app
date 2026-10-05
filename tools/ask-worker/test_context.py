@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 import context
@@ -20,7 +21,11 @@ def env(tmp_path: Path) -> dict[str, Path]:
     return {"data": Path(paths["dataDir"]), "ingest": Path(paths["ingestRoot"]), "cache": tmp_path / "cache"}
 
 
+TODAY = date(2020, 3, 6)  # 합성 픽스처의 가장 최근 알림장(2020-03-05) 바로 다음 날
+
+
 def pack(env: dict[str, Path], q: str = "테스트아이가 밥을 안 먹어요", **kw):
+    kw.setdefault("today", TODAY)
     return context.build_pack(env["data"], env["ingest"], env["cache"], q, **kw)
 
 
@@ -29,7 +34,7 @@ def test_pack_has_all_sections_and_refs(env):
     text = out["pack"]
     for head in ("## A. 아이 요약", "## B-1.", "## B-2.", "## B-3."):
         assert head in text
-    assert "월령: 30개월" in text
+    assert "현재 월령: 30개월" in text
     for ref in ("note:2020-03-02", "SYN-IV-01", "SYN-CL-01", "checkup:1", "SYN-MS-01"):
         assert ref in out["refs"]
         assert f"[ref: {ref}]" in text
@@ -129,3 +134,48 @@ def test_cli_stdout_json_and_errors(env):
         check=False,
     )
     assert bad.returncode == 2 and json.loads(bad.stdout) == {"error": "bad_input"}
+
+
+def test_months_between_and_age_sources():
+    assert context.months_between(date(2017, 9, 1), date(2020, 3, 1)) == 30
+    assert context.months_between(date(2017, 9, 2), date(2020, 3, 1)) == 29  # 아직 채우지 못한 달
+    assert context.months_between(date(2020, 3, 1), date(2020, 1, 1)) == 0
+    summary = {"ageMonths": 30, "latestNote": "2020-03-05"}
+    assert context.current_age(summary, date(2020, 3, 6))[0] == 30
+    assert context.current_age(summary, date(2020, 6, 5))[0] == 33  # 알림장 이후 지난 달을 더한다
+    assert context.current_age(summary, date(2020, 6, 5), date(2017, 9, 1))[0] == 33  # 생년월일이 우선
+    assert context.current_age({}, date(2020, 3, 6)) == (None, "")
+
+
+def test_section_a_states_current_age_with_birth_date_or_notes(env):
+    assert "현재 월령: 30개월" in pack(env)["pack"]
+    out = pack(env, birth=date(2017, 12, 1))  # 생년월일 기준: 27개월
+    assert "현재 월령: 27개월" in out["pack"]
+    assert "생년월일로 계산" in out["pack"]
+    assert "2017" not in out["pack"]  # 생년월일 자체는 묶음에 싣지 않는다
+
+
+def test_cached_summary_does_not_freeze_age(env):
+    pack(env)  # 캐시 생성
+    later = pack(env, today=date(2020, 6, 5))
+    assert later["cacheHit"] is True
+    assert "현재 월령: 33개월" in later["pack"]
+
+
+def test_age_line_always_present(env):
+    assert "현재 월령:" in pack(env, today=date(2030, 1, 1))["pack"]
+
+
+def test_interventions_first_same_domain_and_at_least_two(env):
+    out = pack(env)
+    text = out["pack"]
+    iv = [r for r in out["refs"] if r.startswith("SYN-IV-")]
+    assert len(iv) >= 2
+    assert {"SYN-IV-01", "SYN-IV-02"} <= set(iv)  # 같은 영역(식사)의 DO·AVOID
+    assert text.index("[ref: SYN-IV-01]") < text.index("[ref: SYN-IV-03]")  # 맞는 영역이 먼저
+    assert text.index("[ref: SYN-IV-02]") < text.index("[ref: SYN-NM-01]")  # 규준보다 실천이 먼저
+    assert "실천(AVOID" in text and "금기" in text and "한계" in text
+
+
+def test_budget_still_respected_with_more_items(env):
+    assert pack(env)["tokens"] <= context.MAX_TOKENS

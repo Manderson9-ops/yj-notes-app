@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,9 +38,14 @@ const ANSWER = {
   levelTitle: "예시",
   levelReason: "방법을 바꿔 보며 1주 적어 봐요",
   summary: "합성 요약이에요",
-  fromRecords: [{ date: "2020-01-15", what: "합성 알림장", source: "알림장" }],
+  fromRecords: [
+    { date: "2020-01-15", what: "합성 알림장", link: "질문과 이어져요", source: "알림장" },
+  ],
   evidence: [{ ref: "SYN-1", point: "합성 근거", grade: "B" }],
-  tryNow: [{ action: "안아 주기", say: "많이 속상했구나" }, { action: "잠시 쉬기" }],
+  tryNow: [
+    { action: "안아 주기", say: "많이 속상했구나", basis: "SYN-1" },
+    { action: "잠시 쉬기", basis: "일반 권고" },
+  ],
   avoid: ["혼내기"],
   observe: { what: "횟수", howLong: "1주", how: "적어 두기" },
   upIf: ["늘어요"],
@@ -235,6 +240,21 @@ describe("AskDetailPage (진행·답변·의견)", () => {
       .getByRole("list", { name: "진행 단계" })
       .querySelector("[aria-current='step']");
     expect(now?.textContent).toContain("검토 중");
+  });
+
+  it("근거 묶음에 없는 방법(basis 「일반 권고」)에만 작은 태그가 붙고, 기록은 질문과의 연결을 보여 준다", async () => {
+    routes["GET /ask/7"] = () =>
+      json(
+        200,
+        detail("done", { answer: { level: 5, answer: ANSWER, createdAt: "x", totalMs: 1 } }),
+      );
+    renderAt("/ask/7");
+    const card = await screen.findByRole("article", { name: "답변" });
+    const tags = within(card).getAllByTestId("ask-general");
+    expect(tags).toHaveLength(1); // ANSWER 는 basis 가 ref 인 것 1개, 「일반 권고」 1개
+    expect(tags[0]?.textContent.trim()).toBe("일반 권고");
+    expect(tags[0]?.closest("li")?.textContent).toContain("잠시 쉬기");
+    expect(card.textContent).toContain("질문과 이어져요");
   });
 
   it("품질 점수가 9.5 미만이면 참고용 안내를 보이고, 이상이거나 없으면 보이지 않는다", async () => {

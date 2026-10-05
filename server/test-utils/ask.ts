@@ -42,9 +42,19 @@ export function syntheticAnswer(level = 5, over: Partial<Answer> = {}): Answer {
     levelTitle: "방법 바꾸며 1주 기록",
     levelReason: "합성 예시 이유예요.",
     summary: "테스트아이가 합성 상황에서 자주 보이는 행동이에요.",
-    fromRecords: [{ date: "2020-01-15", what: "합성 알림장 예시", source: "알림장" }],
+    fromRecords: [
+      {
+        date: "2020-01-15",
+        what: "합성 알림장 예시",
+        link: "합성 질문과 이어져요",
+        source: "알림장",
+      },
+    ],
     evidence: [{ ref: "E-SYN-1", point: "합성 근거 예시", grade: "B" }],
-    tryNow: [{ action: "먼저 안아 주기", say: "많이 속상했구나" }, { action: "잠시 쉬기" }],
+    tryNow: [
+      { action: "먼저 안아 주기", say: "많이 속상했구나", basis: "E-SYN-1" },
+      { action: "잠시 쉬기", basis: "일반 권고" },
+    ],
     avoid: ["큰 소리로 혼내기"],
     observe: { what: "횟수", howLong: "1주", how: "하루 한 번 적기" },
     upIf: ["하루 5번 이상으로 늘어요"],

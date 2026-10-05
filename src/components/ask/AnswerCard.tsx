@@ -1,5 +1,5 @@
 // font-subset: skip (본문 글만: 장식 글꼴 대상이 아니다 — tools/fonts/collect.ts)
-import type { Answer } from "../../../shared/ask-schema";
+import { GENERAL_BASIS, type Answer } from "../../../shared/ask-schema";
 import { LevelBadge } from "./LevelBadge";
 
 /**
@@ -43,6 +43,8 @@ export function AnswerCard({
                 </span>
                 <br />
                 {r.what}
+                <br />
+                <span className="meta ask-link">{r.link}</span>
               </li>
             ))}
           </ul>
@@ -68,6 +70,12 @@ export function AnswerCard({
         {answer.tryNow.map((t, i) => (
           <li key={String(i)}>
             {t.action}
+            {t.basis === GENERAL_BASIS ? (
+              <span className="meta ask-general" data-testid="ask-general">
+                {" "}
+                일반 권고
+              </span>
+            ) : null}
             {t.say ? <q className="ask-say">{t.say}</q> : null}
           </li>
         ))}

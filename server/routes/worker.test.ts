@@ -210,7 +210,7 @@ describe("answer", () => {
     const good = workerAnswerBody(5);
     const bad: unknown[] = [
       { ...good, answer: { ...good.answer, summary: undefined } },
-      { ...good, answer: { ...good.answer, summary: "가".repeat(601) } },
+      { ...good, answer: { ...good.answer, summary: "가".repeat(121) } },
       { ...good, answer: { ...good.answer, tryNow: [{ action: "하나" }] } },
       { ...good, answer: { ...good.answer, evidence: [] } },
       { ...good, answer: { ...good.answer, upIf: ["a", "b", "c", "d", "e"] } },
@@ -265,38 +265,37 @@ describe("answer", () => {
     ).toBe(200);
   });
 
-  it("60KB 를 넘으면 422", async () => {
+  it("스키마 최대 크기 답도 60KB 한도 안이다(서버 크기 검사는 방어용으로 남긴다)", async () => {
     const id = await inProgress();
     const max = syntheticAnswer(5, {
-      levelReason: "가".repeat(600),
-      summary: "가".repeat(600),
-      fromRecords: Array.from({ length: 6 }, () => ({
+      levelReason: "가".repeat(220),
+      summary: "가".repeat(120),
+      fromRecords: Array.from({ length: 4 }, () => ({
         date: "2020-01-15",
-        what: "가".repeat(600),
+        what: "가".repeat(140),
+        link: "가".repeat(80),
         source: "알림장" as const,
       })),
       evidence: Array.from({ length: 6 }, () => ({
         ref: "가".repeat(120),
-        point: "가".repeat(600),
+        point: "가".repeat(200),
         grade: "B",
       })),
-      tryNow: Array.from({ length: 4 }, () => ({
-        action: "가".repeat(600),
-        say: "가".repeat(600),
+      tryNow: Array.from({ length: 3 }, () => ({
+        action: "가".repeat(160),
+        say: "가".repeat(80),
+        basis: "가".repeat(120),
       })),
-      avoid: Array.from({ length: 4 }, () => "가".repeat(600)),
-      upIf: Array.from({ length: 4 }, () => "가".repeat(600)),
-      downIf: Array.from({ length: 4 }, () => "가".repeat(600)),
-      observe: { what: "가".repeat(600), howLong: "가".repeat(600), how: "가".repeat(600) },
-      forAsker: "가".repeat(600),
-      limits: "가".repeat(600),
+      avoid: Array.from({ length: 3 }, () => "가".repeat(100)),
+      upIf: Array.from({ length: 3 }, () => "가".repeat(120)),
+      downIf: Array.from({ length: 3 }, () => "가".repeat(120)),
+      observe: { what: "가".repeat(100), howLong: "가".repeat(40), how: "가".repeat(200) },
+      forAsker: "가".repeat(160),
+      limits: "가".repeat(160),
     });
     const bytes = new TextEncoder().encode(JSON.stringify(max)).byteLength;
-    expect(bytes).toBeGreaterThan(60 * 1024); // 스키마가 허용하는 최대 글자 수는 한도를 넘는다 -> 서버가 한 번 더 막는다
-    const res = await post(id, { ...workerAnswerBody(5), answer: max });
-    expect(res.status).toBe(422);
-    expect((await res.json<{ code?: string }>()).code).toBe("too_large");
-    expect(q(id)?.status).toBe("reviewing");
+    expect(bytes).toBeLessThan(60 * 1024);
+    expect((await post(id, { ...workerAnswerBody(5), answer: max })).status).toBe(200);
   });
 
   it("진행 중이 아니면 409 (대기·완료·지운 질문), 두 번 올려도 한 번만 저장", async () => {

@@ -60,6 +60,8 @@ export interface WorkerConfig {
   pythonBin: string;
   claudeBin: string;
   dataDir: string;
+  /** 선택: 월령 계산용 생년월일(YYYY-MM-DD). 비밀(S1)이라 worker.env 에만 둔다. */
+  birthDate: string;
   pollMs: number;
   targetScore: number;
   minPublishScore: number;
@@ -118,6 +120,9 @@ export function loadConfig(opts: LoadOptions = {}): WorkerConfig {
     pythonBin: f.PYTHON_BIN ?? env.PYTHON_BIN ?? "python",
     claudeBin: f.CLAUDE_BIN ?? env.CLAUDE_BIN ?? "claude",
     dataDir: f.DATA_DIR ?? env.DATA_DIR ?? "",
+    birthDate: /^\d{4}-\d{2}-\d{2}$/.test(f.CHILD_BIRTH_DATE ?? "")
+      ? (f.CHILD_BIRTH_DATE ?? "")
+      : "",
     pollMs: num(f.ASK_POLL_MS, 10_000, 2_000, 120_000),
     targetScore: 9.5,
     minPublishScore: num(f.ASK_MIN_PUBLISH_SCORE, 8.5, 0, 10),

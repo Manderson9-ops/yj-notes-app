@@ -160,7 +160,15 @@ describe("eval 통계", () => {
   const run = (level: number, score: number) => ({
     level,
     score,
-    rubric: { evidence: 3, records: 2, actionable: 2, safety: 1.5, tone: 1.5 },
+    deductions: {
+      factual: 0,
+      ungrounded: 0.5,
+      safety: 0,
+      template: 0,
+      record_link: 0,
+      over_interpretation: 0,
+      style: 0.1,
+    },
     totalMs: 60_000,
   });
   const items: EvalItem[] = [
@@ -179,7 +187,8 @@ describe("eval 통계", () => {
       inconsistentIds: ["g2"],
     });
     expect(s.avgScore).toBe(9.45);
-    expect(s.rubricAvg.evidence).toBe(3);
+    expect(s.deductionsAvg.ungrounded).toBe(0.5);
+    expect(s.deductionsAvg.factual).toBe(0);
   });
   it("markdown 에 질문 본문이 없고 id·점수만", () => {
     const md = renderMarkdown(summarize(items), items, "2020-03-05");

@@ -1,13 +1,16 @@
-// 골든 세트 평가: npm run ask-worker:eval -- --set <golden.jsonl> --out <결과 폴더> [--runs 2] [--limit N]
+// 골든 세트 평가: npm run ask-worker:eval -- --set <golden.jsonl> --out <결과 폴더> [--runs 2] [--limit N] [--save-answers]
 // golden.jsonl 한 줄: {"id":"g01","question":"...","askedBy":"..."?,"redFlag":false?}
-// 저장소 안 경로는 거부한다. 결과(JSON + markdown)에는 질문·답변 본문을 쓰지 않는다(id·점수·시간만).
+// 저장소 안 경로는 거부한다. 결과(JSON + markdown)에는 질문·답변 본문을 쓰지 않는다(id·점수·시간·감점 범주만).
+// 질문마다 결과 파일을 통째로 다시 쓴다(중간에 멈춰도 그때까지의 결과가 남는다).
+// --save-answers: 독립 검토용으로 답변 본문과 검토 지적(범주·위치·수정안)을 answers-<시각>.json 에 저장한다(S1, 저장소 밖).
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { answerQuestion } from "./pipeline.ts";
+import type { ReviewIssue } from "./answer-schema.ts";
 import { assertOutsideRepo, loadConfig } from "./config.ts";
 import { renderMarkdown, summarize, type EvalItem } from "./eval-stats.ts";
+import { answerQuestion } from "./pipeline.ts";
 import { makePipelineDeps } from "./worker.ts";
 
 const lineSchema = z.object({
@@ -29,12 +32,22 @@ function opt(args: string[], name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
+export interface SavedAnswer {
+  id: string;
+  run: number;
+  level: number;
+  score: number;
+  rewrites: number;
+  issues: ReviewIssue[];
+  answer: unknown;
+}
+
 export async function main(args: string[]): Promise<number> {
   const setPath = opt(args, "--set");
   const outDir = opt(args, "--out");
   if (!setPath || !outDir) {
     console.error(
-      "사용: ask-worker:eval -- --set <golden.jsonl> --out <결과 폴더> [--runs 2] [--limit N]",
+      "사용: ask-worker:eval -- --set <golden.jsonl> --out <결과 폴더> [--runs 2] [--limit N] [--save-answers]",
     );
     return 1;
   }
@@ -44,11 +57,25 @@ export async function main(args: string[]): Promise<number> {
   if (!cfg.dataDir) throw new Error("DATA_DIR 가 필요해요");
   const runs = Math.max(1, Math.min(3, Number(opt(args, "--runs") ?? 2)));
   const limit = Number(opt(args, "--limit") ?? Infinity);
+  const saveAnswers = args.includes("--save-answers");
+  const saved: SavedAnswer[] = [];
   const golden = parseGolden(readFileSync(setPath, "utf8")).slice(0, limit);
   const deps = makePipelineDeps(cfg, { dataDir: cfg.dataDir, cacheDir: join(cfg.home, "cache") });
   const items: EvalItem[] = [];
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  mkdirSync(outDir, { recursive: true });
+  const flush = () => {
+    const summary = summarize(items);
+    writeFileSync(join(outDir, `eval-${stamp}.json`), JSON.stringify({ summary, items }, null, 2));
+    writeFileSync(join(outDir, `eval-${stamp}.md`), renderMarkdown(summary, items, stamp));
+    if (saveAnswers) {
+      writeFileSync(join(outDir, `answers-${stamp}.json`), JSON.stringify(saved, null, 2));
+    }
+    return summary;
+  };
   for (const g of golden) {
     const item: EvalItem = { id: g.id, runs: [] };
+    items.push(item);
     for (let n = 0; n < runs; n++) {
       try {
         const r = await answerQuestion(deps, {
@@ -59,26 +86,33 @@ export async function main(args: string[]): Promise<number> {
         item.runs.push({
           level: r.level,
           score: r.reviewScore,
-          rubric: r.rubric,
+          deductions: r.deductions,
           totalMs: r.workMs,
         });
+        if (saveAnswers) {
+          saved.push({
+            id: g.id,
+            run: n,
+            level: r.level,
+            score: r.reviewScore,
+            rewrites: r.rewrites,
+            issues: r.issues,
+            answer: r.answer,
+          });
+        }
       } catch (e) {
         item.error = e instanceof Error ? e.message.slice(0, 40) : "error";
         break;
       }
     }
     console.log(
-      `${g.id}: ${item.error ? `실패 ${item.error}` : item.runs.map((r) => `L${r.level}/${r.score}`).join(" ")}`,
+      `${g.id}: ${item.error ? `실패 ${item.error}` : item.runs.map((r) => `L${String(r.level)}/${String(r.score)}`).join(" ")}`,
     );
-    items.push(item);
+    flush();
   }
-  const summary = summarize(items);
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  mkdirSync(outDir, { recursive: true });
-  writeFileSync(join(outDir, `eval-${stamp}.json`), JSON.stringify({ summary, items }, null, 2));
-  writeFileSync(join(outDir, `eval-${stamp}.md`), renderMarkdown(summary, items, stamp));
+  const summary = flush();
   console.log(
-    `평균 ${summary.avgScore}, 최저 ${summary.minScore}, 단계 일관성 ${summary.levelConsistent}/${summary.levelChecked}`,
+    `평균 ${String(summary.avgScore)}, 최저 ${String(summary.minScore)}, 단계 일관성 ${String(summary.levelConsistent)}/${String(summary.levelChecked)}`,
   );
   console.log(`결과 저장: ${outDir}`);
   return 0;

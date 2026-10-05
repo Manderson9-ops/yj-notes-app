@@ -38,6 +38,8 @@ export interface PackOptions {
   dataDir: string;
   ingestRoot?: string;
   cacheDir: string;
+  /** 아이 생년월일(YYYY-MM-DD, 선택). 있으면 월령을 이것으로 계산한다. */
+  birthDate?: string;
   timeoutMs?: number;
 }
 
@@ -53,7 +55,12 @@ export function buildPack(
       shell: false,
       windowsHide: true,
       stdio: ["pipe", "pipe", "ignore"],
-      env: { ...process.env, PYTHONUTF8: "1", PYTHONDONTWRITEBYTECODE: "1" },
+      env: {
+        ...process.env,
+        PYTHONUTF8: "1",
+        PYTHONDONTWRITEBYTECODE: "1",
+        ...(o.birthDate ? { YJ_CHILD_BIRTH_DATE: o.birthDate } : {}),
+      },
       ...(signal ? { signal } : {}),
     });
     const out: Buffer[] = [];

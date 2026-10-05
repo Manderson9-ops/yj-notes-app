@@ -21,40 +21,66 @@ export type AskStatus = (typeof ASK_STATUSES)[number];
 
 export const RECORD_SOURCES = ["알림장", "관찰", "검진", "가족기록"] as const;
 
+/** tryNow.basis 에 근거 묶음 ref 대신 쓰는 값: 묶음에 없는 일반적인 권고임을 밝힌다(화면에 작은 「일반 권고」 표시). */
+export const GENERAL_BASIS = "일반 권고";
+
+/** 길이 상한: 가족이 한눈에 읽도록 짧게 묶는다(프롬프트·결정적 검사·화면 공용). */
+export const ASK_LIMITS = {
+  summary: 120,
+  levelReason: 220,
+  tryAction: 160,
+  tryNowSay: 80,
+  avoidItem: 100,
+  signalItem: 120,
+  limits: 160,
+  recordWhat: 140,
+  recordLink: 80,
+  point: 200,
+} as const;
+
 export const AnswerSchema = z.strictObject({
   level: z.number().int().min(1).max(10),
   levelTitle: text(40),
-  levelReason: text(),
-  summary: text(),
+  levelReason: text(ASK_LIMITS.levelReason),
+  summary: text(ASK_LIMITS.summary),
   fromRecords: z
     .array(
       z.strictObject({
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-        what: text(),
+        what: text(ASK_LIMITS.recordWhat),
+        /** 이 기록이 질문과 어떻게 이어지는지(필수). */
+        link: text(ASK_LIMITS.recordLink),
         source: z.enum(RECORD_SOURCES),
       }),
     )
-    .max(6),
+    .max(4),
   evidence: z
     .array(
       z.strictObject({
         ref: text(120),
-        point: text(),
+        point: text(ASK_LIMITS.point),
         grade: text(40).optional(),
       }),
     )
     .min(1)
     .max(6),
   tryNow: z
-    .array(z.strictObject({ action: text(), say: text().optional() }))
-    .min(2)
-    .max(4),
-  avoid: z.array(text()).min(1).max(4),
-  observe: z.strictObject({ what: text(), howLong: text(), how: text() }),
-  upIf: z.array(text()).min(1).max(4),
-  downIf: z.array(text()).min(1).max(4),
-  forAsker: text().optional(),
-  limits: text().optional(),
+    .array(
+      z.strictObject({
+        action: text(ASK_LIMITS.tryAction),
+        say: text(ASK_LIMITS.tryNowSay).optional(),
+        /** 근거 묶음 ref 또는 정확히 「일반 권고」. */
+        basis: text(120),
+      }),
+    )
+    .min(1)
+    .max(3),
+  avoid: z.array(text(ASK_LIMITS.avoidItem)).min(1).max(3),
+  observe: z.strictObject({ what: text(100), howLong: text(40), how: text(200) }),
+  upIf: z.array(text(ASK_LIMITS.signalItem)).min(1).max(3),
+  downIf: z.array(text(ASK_LIMITS.signalItem)).min(1).max(3),
+  forAsker: text(160).optional(),
+  limits: text(ASK_LIMITS.limits).optional(),
 });
 export type Answer = z.infer<typeof AnswerSchema>;
 

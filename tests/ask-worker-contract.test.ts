@@ -58,10 +58,8 @@ function fakeClaude(opts: { failWith?: string; firstLevelWrong?: boolean } = {})
     if (req.systemPromptFile === REVIEW_PROMPT_FILE) {
       return Promise.resolve({
         output: {
-          score: 9.7,
-          rubric: { evidence: 3, records: 2, actionable: 2, safety: 1.5, tone: 1.5 },
-          levelConsistent: true,
-          issues: [],
+          issues: [{ category: "style", where: "limits", fix: "조금 줄여요" }],
+          previousStatus: [],
         },
         ms: 1,
         model: "claude-opus-5-5",
@@ -111,12 +109,12 @@ describe("워커 클라이언트 ↔ 실제 앱 계약", () => {
     const d = await detail(id);
     expect(d.status).toBe("done");
     expect(d.answer?.level).toBe(4);
-    expect(d.answer?.reviewScore).toBe(9.7);
+    expect(d.answer?.reviewScore).toBe(9.9);
     expect(stages).toEqual(["pack", "generate", "review"]);
     const saved = h.fake.sqlite
       .prepare("SELECT review_score, model, work_ms FROM ask_answer WHERE question_id = ?")
       .get(id) as unknown as { review_score: number; model: string; work_ms: number };
-    expect(saved).toMatchObject({ review_score: 9.7, model: "claude-opus-5-5" });
+    expect(saved).toMatchObject({ review_score: 9.9, model: "claude-opus-5-5" });
     expect(saved.work_ms).toBeGreaterThanOrEqual(0);
     // 대기 질문이 없으면 204 → claimed false
     expect((await handleOne(loopDeps(fakeClaude()), new AbortController().signal)).claimed).toBe(

@@ -44,13 +44,27 @@ function answerFor(level: number, askedBy: string) {
     levelReason: reasons[level] ?? "합성 예시",
     summary: "테스트아이가 밥 먹을 때 숟가락을 던진다는 질문이에요 (합성 예시)",
     fromRecords: [
-      { date: "2020-01-14", what: "간식 시간에 숟가락을 놓았어요 (합성)", source: "알림장" },
-      { date: "2020-01-10", what: "식사 중 앉아 있는 시간이 길어졌어요 (합성)", source: "관찰" },
+      {
+        date: "2020-01-14",
+        what: "간식 시간에 숟가락을 놓았어요 (합성)",
+        link: "던지는 모습과 이어져요",
+        source: "알림장",
+      },
+      {
+        date: "2020-01-10",
+        what: "식사 중 앉아 있는 시간이 길어졌어요 (합성)",
+        link: "앉아 있는 힘이 늘고 있어요",
+        source: "관찰",
+      },
     ],
     evidence: [{ ref: "SYN-001", point: "이 또래에서 자주 보이는 행동이에요 (합성)", grade: "B" }],
     tryNow: [
-      { action: "먹는 양보다 앉아 있는 시간을 칭찬해 주세요", say: "앉아서 잘 먹고 있네" },
-      { action: "던지면 조용히 치우고 한 번 더 알려 주세요" },
+      {
+        action: "먹는 양보다 앉아 있는 시간을 칭찬해 주세요",
+        say: "앉아서 잘 먹고 있네",
+        basis: "SYN-001",
+      },
+      { action: "던지면 조용히 치우고 한 번 더 알려 주세요", basis: "일반 권고" },
     ],
     avoid: ["큰 소리로 혼내기 (합성)"],
     observe: { what: "던지는 횟수", howLong: "1주", how: "하루 한 번 적어 두기" },

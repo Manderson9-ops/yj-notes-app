@@ -1,8 +1,13 @@
-// 골든 세트 평가 통계(순수 함수) — 질문 본문·답변 본문은 담지 않는다(id·숫자만).
+// 골든 세트 평가 통계(순수 함수) — 질문 본문·답변 본문은 담지 않는다(id·숫자·범주만).
+import { ISSUE_CATEGORIES, type IssueCategory } from "./answer-schema.ts";
+
+export type Deductions = Record<IssueCategory, number>;
+
 export interface EvalRun {
   level: number;
   score: number;
-  rubric: { evidence: number; records: number; actionable: number; safety: number; tone: number };
+  /** 지적 범주별 감점 */
+  deductions: Deductions;
   totalMs: number;
 }
 
@@ -17,7 +22,8 @@ export interface EvalSummary {
   failed: string[];
   avgScore: number;
   minScore: number;
-  rubricAvg: EvalRun["rubric"];
+  /** 지적 범주별 평균 감점 */
+  deductionsAvg: Deductions;
   levelConsistent: number; // |Δlevel| ≤ 1 인 질문 수
   levelChecked: number;
   inconsistentIds: string[];
@@ -38,19 +44,15 @@ export function summarize(items: EvalItem[]): EvalSummary {
     const levels = i.runs.map((r) => r.level);
     if (Math.max(...levels) - Math.min(...levels) > 1) inconsistent.push(i.id);
   }
-  const key = (k: keyof EvalRun["rubric"]) => r2(mean(runs.map((r) => r.rubric[k])));
+  const deductionsAvg = Object.fromEntries(
+    ISSUE_CATEGORIES.map((c) => [c, r2(mean(runs.map((r) => r.deductions[c])))]),
+  ) as Deductions;
   return {
     questions: items.length,
     failed: items.filter((i) => Boolean(i.error) || i.runs.length === 0).map((i) => i.id),
     avgScore: r2(mean(runs.map((r) => r.score))),
     minScore: runs.length ? Math.min(...runs.map((r) => r.score)) : 0,
-    rubricAvg: {
-      evidence: key("evidence"),
-      records: key("records"),
-      actionable: key("actionable"),
-      safety: key("safety"),
-      tone: key("tone"),
-    },
+    deductionsAvg,
     levelConsistent: checked - inconsistent.length,
     levelChecked: checked,
     inconsistentIds: inconsistent,
@@ -74,11 +76,11 @@ export function renderMarkdown(s: EvalSummary, items: EvalItem[], when: string):
     `- 단계 일관성(같은 질문 2회, |Δ| ≤ 1): ${s.levelConsistent}/${s.levelChecked}`,
     `- 평균 소요: ${Math.round(s.avgMs / 1000)}s`,
     "",
-    "## 항목별 평균",
+    "## 지적 범주별 평균 감점",
     "",
-    "| 근거(3) | 기록(2) | 실행(2) | 안전(1.5) | 말투(1.5) |",
-    "|---|---|---|---|---|",
-    `| ${s.rubricAvg.evidence} | ${s.rubricAvg.records} | ${s.rubricAvg.actionable} | ${s.rubricAvg.safety} | ${s.rubricAvg.tone} |`,
+    `| ${ISSUE_CATEGORIES.join(" | ")} |`,
+    `|${ISSUE_CATEGORIES.map(() => "---").join("|")}|`,
+    `| ${ISSUE_CATEGORIES.map((c) => String(s.deductionsAvg[c])).join(" | ")} |`,
     "",
     "## 질문별",
     "",

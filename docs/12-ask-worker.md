@@ -17,7 +17,7 @@
 | `tools/ask-worker/eval.ts` | 골든 세트 평가 |
 
 흐름: claim → progress(answering) → 근거 묶음 → 작성(claude) → 결정적 검사 → progress(reviewing) → 검토(claude)
-→ 점수 < 9.5 또는 단계 불일치면 지적을 넣어 **최대 2회** 재작성·재검토(가장 높은 점수 채택) → answer 업로드. 9.5 미만으로 게시된 답은 `reviewScore` 로 서버에 저장되고, 앱이 「품질 검사 기준보다 낮아 참고용이에요」를 작게 보여 준다.
+→ 점수 < 9.5 면 지적만 고치는 재작성 **1회**·재검토(더 높은 점수 채택) → answer 업로드. 결정적 검사에서 걸리면 검토를 건너뛰고 바로 재작성한다. 품질 정책 상세는 docs/11 §3-2. 9.5 미만으로 게시된 답은 `reviewScore` 로 서버에 저장되고, 앱이 「품질 검사 기준보다 낮아 참고용이에요」를 작게 보여 준다.
 실패하면 `fail(code)` 로 되돌린다(3회 실패 시 서버가 failed 처리). 코드: `pack_failed`, `claude_exit`, `timeout`,
 `checks_failed`, `low_score`(게시 하한 8.5 미만), `review_invalid`, `upload_<HTTP>`, `worker_stopped`, `internal_error`.
 
@@ -44,6 +44,7 @@ APP_ORIGIN=https://<앱 주소>
 ASK_WORKER_TOKEN=<1번에서 만든 토큰>
 DATA_DIR=<DATA_DIR 경로>
 # 선택
+# CHILD_BIRTH_DATE=YYYY-MM-DD   (선택: 월령을 생년월일로 계산. 없으면 가장 최근 알림장 월령에 지난 달을 더해 계산. 근거 묶음 맨 위에 현재 월령 으로 들어간다)
 # CLAUDE_BIN=C:\Users\<이름>\.local\bin\claude.exe
 # PYTHON_BIN=C:\...\python.exe
 # ASK_POLL_MS=10000
@@ -104,8 +105,7 @@ overview 에 7일 중앙값(`medianTotalMs7d`)을 낸다.
     Where-Object event -eq answered | ForEach-Object ms | Sort-Object |
     ForEach-Object -Begin { $a = @() } -Process { $a += $_ } -End { "n=$($a.Count) p50=$($a[[int]($a.Count*0.5)]) p90=$($a[[int]($a.Count*0.9)])" }
   ```
-- 합성 드라이런 1회 실측(Opus, 합성 픽스처): 근거 묶음 약 0.4초, 작성 약 25초, 검토 약 14초, 재작성 약 19초, 재검토 약 19초(합계 약 77초).
-  claim 대기(최대 10초)와 PC 부하에 따라 달라진다. 재작성이 없는 경우 약 40초.
+- 합성 드라이런 실측(Opus, 합성 픽스처, 재작성 없음): 근거 묶음 0.2초, 작성 약 24초, 검토 약 10초, 합계 약 35초(점수 9.7). 재작성이 들어가면 재작성 약 20초 + 재검토 약 12초가 더해져 최대 약 70초. claim 대기(최대 10초)와 PC 부하에 따라 달라진다.
 
 ## 7. 문제 해결
 
