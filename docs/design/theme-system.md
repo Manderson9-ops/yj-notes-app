@@ -219,3 +219,11 @@ Material Design dark theme(표면 #121212 계열, 본문 15.8:1, 채도 낮은 �
 - 선명하게 보기: 테마별 accent-soft(`#dfe6f5`/`#2e3340` 기본, `#dcedf8`/`#24343f` 크레용, `#dcece1`/`#24382f` 숲), 꺼진 단추는 opacity 없이 점선 + 보조 글자색, `--bw` 2px.
 - 「선명하게 보기」는 라디오 줄과 같은 모양의 진짜 스위치(트랙·손잡이, 「켜짐/꺼짐」 글자, `role="switch"` + `aria-checked`). 설정·미리보기 순서: 화면 테마 → 화면 밝기 → 선명하게 보기.
 - `html { scroll-padding-bottom }` 로 따라오는(sticky) 탭바에 가려지지 않게 한다.
+
+### 6-7. 3차 개선 (T-D1-11~)
+
+- 눌리는 카드(`a.card`, `.card:has(> a)`)는 테두리 2px `--c-border` + 화살표 + 약한 들림 그림자(기본·숲: `--c-shadow` 22%, 크레용: `--lift`), 안 눌리는 카드는 1.5px `--c-line`·그림자 없음. 크레용은 눌리는 카드만 손그림 선(3px). 모든 테마에서 눌리는 카드가 더 굵다는 것을 `e2e/theme.spec.ts` 가 계산된 스타일로 확인한다.
+- 선명하게 보기에서 고른 줄·칩은 손그림 선(`border-image`) 없이 강조색 3px 곧은 테두리(크레용 회귀 수정). `e2e/a11y.spec.ts` 가 6조합에서 `border-image-source: none`, 두께 ≥ 3px, 색 = `--c-accent` 를 확인한다.
+- 스위치는 공용 `SettingSwitch`(큰 글씨·선명하게 보기): 최소 높이 64px, 도움말은 `--c-muted`, 켜짐/꺼짐 글자는 트랙 아래에 쌓는다. 설정·미리보기 모두 화면 테마 → 화면 밝기 → 「글자·선명도」 순서.
+- 꺼진 `.btn`/`.btn-primary` 는 모든 모드에서 opacity 없이 점선 테두리 + `--c-muted` 글자. 크레용 라이트 `--c-badge` `#ffe600`→`#ffe27a`(`--c-accent-soft` `#fff1a8` 과 구분).
+- 설정 화면 스크린샷은 전체 페이지.
