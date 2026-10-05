@@ -16,7 +16,6 @@
     },
     "levelTitle": {
       "type": "string",
-      "minLength": 1,
       "maxLength": 40
     },
     "levelReason": {

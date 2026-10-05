@@ -262,7 +262,7 @@ describe("AskDetailPage (진행·답변·의견)", () => {
     const NB = {
       kind: "not_behavior",
       level: 1,
-      levelTitle: "아주 흔한 발달 과정",
+      levelTitle: "",
       levelReason: "이곳은 아이의 행동 걱정을 묻는 곳이에요",
       summary: "아이와 상관없는 질문이에요",
       fromRecords: [],

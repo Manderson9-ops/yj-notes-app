@@ -58,7 +58,8 @@ const detailSchema = z.object({
   redFlag: z.boolean(),
   answer: z
     .object({
-      level: z.number().int(),
+      /** not_behavior 답은 null(단계를 보이지 않는다) */
+      level: z.number().int().nullable(),
       answer: AnswerSchema,
       createdAt: z.string(),
       totalMs: z.number().nullable(),

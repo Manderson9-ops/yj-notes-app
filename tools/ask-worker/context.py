@@ -36,7 +36,11 @@ MAX_TOKENS = 16_000
 SUMMARY_TOKENS = 6_000
 NOTE_EXCERPTS = 8
 EVIDENCE_ROWS = 8
-AGE_EDGE = 2  # 연령대 경계 ±2개월
+AGE_EDGE = 2  # 다음 연령대 시작 2개월 전부터 이웃 규준을 함께 본다(상한 이후에는 쓰지 않는다)
+INTERNAL_BRACKET_NOTE = (
+    "[내부 규칙 — 가족에게 보이는 글에 쓰지 않아요] 월령이 다음 연령대 직전이라 규준이 둘 들어 있어요. "
+    "판단은 더 보수적인(더 일찍 확인을 권하는) 쪽을 따르되, 이 규칙과 경계 이야기는 summary·levelReason·limits 어디에도 적지 않아요."
+)
 GUIDE_SECTIONS = 3
 RECENT_DAYS = 30
 
@@ -245,6 +249,18 @@ def _hits(text: str, kws: list[str]) -> int:
     return sum(1 for k in kws if k.lower() in low)
 
 
+def norm_band(age: int | None, amin: int, amax: int, has_next: bool) -> str | None:
+    """규준 연령대 판정: 현재 월령이 [amin, amax) 안이면 in(마지막 연령대는 amax 포함),
+    다음 연령대 시작 2개월 전부터는 upcoming, 그 밖은 None. amax 이상이고 다음 연령대가 있으면 그 연령대만 쓴다."""
+    if age is None:
+        return "in"
+    if amin <= age < amax or (age == amax and not has_next):
+        return "in"
+    if amin - AGE_EDGE <= age < amin:
+        return "upcoming"
+    return None
+
+
 def search_evidence(
     data_dir: Path,
     kws: list[str],
@@ -284,20 +300,24 @@ def search_evidence(
                     f" / 한계 {clip(lim, 140)} / 금기 {clip(contra, 140)}"
                 )
                 ivs.append((s + (1000 if by_topic else 0), str(iid), txt, str(dom)))
-        nms: list[tuple[int, str, str, str, int, int]] = []
-        for nid, dom, amin, amax, typ, warn in _rows(
+        norm_rows = _rows(
             conn,
             "SELECT norm_id, domain_ko, age_min_months, age_max_months, typical_behavior_ko, warning_sign_ko FROM v_age_norms",
-        ):
-            # 연령대 경계(±2개월)에서는 이웃 규준도 함께 본다
-            if age is not None and not (amin - AGE_EDGE <= age <= amax + AGE_EDGE):
+        )
+        starts = {
+            (str(r[1]), r[2]) for r in norm_rows
+        }  # (영역, 시작 월령): 다음 연령대가 있는지 알아보는 데 쓴다
+        nms: list[tuple[int, str, str, str, int, int, str]] = []
+        for nid, dom, amin, amax, typ, warn in norm_rows:
+            band = norm_band(age, amin, amax, (str(dom), amax) in starts)
+            if band is None:
                 continue
             blob = f"{dom} {typ} {warn}".lower()
             s = sum(1 for k in lows if k in blob)
             by_topic = bool(norm_prefix) and str(nid).startswith(norm_prefix)
             if s or by_topic:
                 txt = f"월령 규준({dom}, {amin}~{amax}개월) 흔한 모습 {clip(typ, 200)} / 상담 신호 {clip(warn, 160)}"
-                nms.append((s + (1000 if by_topic else 0), str(nid), txt, str(dom), amin, amax))
+                nms.append((s + (1000 if by_topic else 0), str(nid), txt, str(dom), amin, amax, band))
         cls: list[tuple[int, str, str]] = []
         for cid, dom, claim, grade, nl in _rows(
             conn, "SELECT claim_id, domain, claim_ko, evidence_grade, not_licensed_ko FROM claims"
@@ -316,7 +336,7 @@ def search_evidence(
     nms.sort(key=lambda t: (-t[0], abs((t[4] + t[5]) / 2 - age) if age is not None else 0, t[1]))
     cls.sort(key=lambda t: (-t[0], t[1]))
     picked = [(i, t) for _s, i, t, _d in ivs[:5]]
-    picked += [(i, t) for _s, i, t, _d, _a, _b in nms[:3]]
+    picked += [(i, t) for _s, i, t, _d, _a, _b, _band in nms[:3]]
     picked += [(i, t) for _s, i, t in cls[:2]]
     picked = picked[:limit]
     chosen = {i for i, _ in picked}
@@ -325,14 +345,11 @@ def search_evidence(
             break
         if i not in chosen:
             picked.append((i, t))
-    shown_norms = [n for n in nms[:3] if n[1] in {i for i, _ in picked}]
-    near_edge = age is not None and any(
-        min(abs(age - n[4]), abs(age - n[5])) <= AGE_EDGE for n in shown_norms
-    )
-    if near_edge and len({(n[4], n[5]) for n in shown_norms}) > 1:
-        notes.append(
-            "월령이 연령대 경계(±2개월)라 규준이 둘 이상이에요. 더 보수적인(더 일찍 상담·확인을 권하는) 쪽을 따르고, 그렇게 골랐다고 limits 에 한 줄 적어요."
-        )
+    shown_ids = {i for i, _ in picked}
+    shown_norms = [n for n in nms[:3] if n[1] in shown_ids]
+    # 다음 연령대가 곧 시작될 때(시작 2개월 전)만, 두 규준이 실제로 함께 들어갔을 때 내부 규칙을 붙인다.
+    if any(n[6] == "upcoming" for n in shown_norms) and any(n[6] == "in" for n in shown_norms):
+        notes.append(INTERNAL_BRACKET_NOTE)
     return picked[:limit], notes
 
 
@@ -418,6 +435,19 @@ def build_pack(
         "인용은 각 항목 앞 대괄호의 ref 값만 그대로 쓰세요. 아래에 없는 근거는 만들지 마세요.\n"
     )
     a_text = summary["text"].replace("{{AGE}}", age_line)
+    sev = {
+        k: (str(exp.get(k)).strip() if exp.get(k) else "")
+        for k in ("frequency", "duration", "impact", "aggression")
+    }
+    sev_text = ""
+    if expansion is not None:
+        names = {"frequency": "빈도", "duration": "지속", "impact": "영향", "aggression": "공격성"}
+        got = [f"{names[k]}: {v}" for k, v in sev.items() if v]
+        sev_text = "## A-2. 질문에 나온 빈도·지속·영향\n" + (
+            "\n".join(f"- {g}" for g in got)
+            if got
+            else "- 질문에 빈도·지속·영향·공격성이 따로 적혀 있지 않아요(4단계 이상은 기록이 반복을 보여 줄 때만)."
+        )
 
     def lines_for(title: str, items: list[tuple[str, str]], extra: list[str]) -> list[tuple[str, str]]:
         out: list[tuple[str, str]] = []
@@ -438,7 +468,7 @@ def build_pack(
 
     # 예산: 넘으면 전수 검색 발췌(뒤쪽 낮은 순위) → 가이드 → 근거 DB 순으로 뒤에서부터 덜어 낸다(각 구역 머리말은 남긴다).
     def total_text() -> str:
-        return "\n".join([head, a_text, render(search_part), render(ev_part), render(guide_part)])
+        return "\n".join([head, a_text, sev_text, render(search_part), render(ev_part), render(guide_part)])
 
     min_keep = {id(search_part): 2, id(ev_part): 1, id(guide_part): 1}
     while est_tokens(total_text()) > max_tokens:
@@ -450,7 +480,7 @@ def build_pack(
             break
     for sec in (ev_part, guide_part, search_part):
         refs.extend(r for r, _t in sec if r)
-    parts = [head, a_text, render(search_part)]
+    parts = [head, a_text, *([sev_text] if sev_text else []), render(search_part)]
     if any(r for r, _t in ev_part):
         parts.append(render(ev_part))
     if any(r for r, _t in guide_part):

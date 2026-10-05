@@ -148,7 +148,16 @@ export async function answerQuestion(
   const packed = await stage("pack", () =>
     deps.buildPack(q.body, signal, exp?.ok ? exp.expansion : undefined),
   );
-  let info: PackInfo & { tokens: number } = { ...packed, isBehavior: pq.isBehavior };
+  const e = exp?.ok ? exp.expansion : undefined;
+  let info: PackInfo & { tokens: number } = {
+    ...packed,
+    isBehavior: pq.isBehavior,
+    domains: e?.domains,
+    severity: e
+      ? { frequency: e.frequency, duration: e.duration, impact: e.impact, aggression: e.aggression }
+      : undefined,
+    askedBy: q.askedBy,
+  };
   if (q.redFlag && deps.emergencyMd) {
     const em = buildEmergencySection(deps.emergencyMd, detectRedFlag(q.body).rules);
     info = { ...info, pack: `${info.pack}\n${em.text}`, refs: [...info.refs, ...em.refs] };

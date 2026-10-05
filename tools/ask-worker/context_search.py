@@ -17,91 +17,10 @@ KEEP_SHORT = {"밥", "잠", "떼", "폰"}
 MAX_EXCERPTS = 25
 EXCERPT_CHARS = 200
 
-# 주제 지도: words 는 질문·확장 낱말에서 주제를 알아보는 말, int/norm 은 근거 DB id 접두어,
-# guide 는 (가이드 파일 번호 접두어, 절 번호 목록; None 이면 낱말로 고른다), dbwords 는 근거 DB 본문에서 더 찾을 말.
-TOPICS: dict[str, dict] = {
-    "feeding": {
-        "label": "식사",
-        "words": ["밥", "식사", "먹", "편식", "반찬", "간식", "급식", "우유", "숟가락", "뱉"],
-        "int": ["INT-FEED", "INT-MEAL"],
-        "norm": ["NORM-FEED", "NORM-MEAL"],
-        "guide": [("05", ["3", "3-1"])],
-        "note": "가족 저녁 식사 기록은 앱의 가족 기록(records/식사기록)에 있을 수 있어요. 이 묶음에는 없으니 있다고 단정하지 않고, 가이드의 기존 가족 계획을 먼저 보세요.",
-    },
-    "sleep": {
-        "label": "수면",
-        "words": ["잠", "수면", "낮잠", "밤잠", "깨", "재우", "새벽"],
-        "int": ["INT-SLEEP"],
-        "norm": ["NORM-SLEEP"],
-        "guide": [],
-        "note": "",
-    },
-    "tantrum": {
-        "label": "떼쓰기",
-        "words": ["떼", "울화", "고집", "짜증", "드러눕", "소리"],
-        "int": ["INT-TANTRUM"],
-        "norm": ["NORM-TANTRUM"],
-        "guide": [],
-        "note": "",
-    },
-    "fear": {
-        "label": "무서움·불안",
-        "words": ["무서", "겁", "불안", "낯가", "울음", "놀라"],
-        "int": ["INT-FEAR"],
-        "norm": ["NORM-FEAR"],
-        "guide": [],
-        "note": "",
-    },
-    "fluency": {
-        "label": "말 더듬",
-        "words": ["더듬", "말막", "말이막", "버벅", "반복해서말"],
-        "int": ["INT-FLUENCY"],
-        "norm": ["NORM-FLUENCY"],
-        "guide": [],
-        "note": "말 더듬은 근거 DB 의 금기·한계에 적힌 전문가(언어재활사)를 upIf 에 이름으로 적어요.",
-    },
-    "media": {
-        "label": "영상·화면",
-        "words": ["영상", "폰", "스마트폰", "유튜브", "tv", "태블릿", "화면"],
-        "int": ["INT-MEDIA"],
-        "norm": ["NORM-MEDIA"],
-        "guide": [],
-        "note": "",
-    },
-    "skill_loss": {
-        "label": "하던 것을 못 함(퇴행)",
-        "words": ["퇴행", "못하게", "못 하게", "잃", "예전엔", "하던", "안 하게"],
-        "int": [],
-        "norm": [],
-        "guide": [("04", None)],
-        "dbwords": ["lost skills", "퇴행", "잃", "기술을 잃"],
-        "note": "하던 말·행동을 잃는 것은 CDC 「lost skills」 규칙과 가이드 04 로 다뤄요. 「일반 권고」가 아니라 이 묶음의 ref 를 basis 로 써요.",
-    },
-    "aggression": {
-        "label": "공격 행동",
-        "words": ["때리", "물기", "던지", "깨물", "밀"],
-        "int": ["INT-AGGR"],
-        "norm": [],
-        "guide": [],
-        "note": "",
-    },
-    "toileting": {
-        "label": "배변",
-        "words": ["배변", "기저귀", "변기", "오줌", "응가"],
-        "int": ["INT-TOILET"],
-        "norm": [],
-        "guide": [],
-        "note": "",
-    },
-    "separation": {
-        "label": "헤어짐·분리",
-        "words": ["분리", "등원", "헤어", "어린이집가기싫"],
-        "int": ["INT-SEPAR"],
-        "norm": [],
-        "guide": [],
-        "note": "",
-    },
-}
+# 주제 지도(topics.json — 워커 TS 검사와 같은 파일을 쓴다): words 는 질문·확장 낱말에서 주제를 알아보는 말,
+# int/norm 은 근거 DB id 접두어, guide 는 [가이드 파일 번호 접두어, 절 번호 목록(null 이면 낱말로 고름)],
+# dbwords 는 근거 DB 본문에서 더 찾을 말, note 는 묶음에 붙는 주제 안내.
+TOPICS: dict[str, dict] = json.loads(Path(__file__).with_name("topics.json").read_text("utf-8"))
 
 
 def detect_topics(question: str, domains: list[str], keywords: list[str]) -> list[str]:
@@ -288,7 +207,7 @@ def render_search_section(res: dict) -> list[tuple[str, str]]:
         f"알림장 전체 {res['days']}일, 글 {res['texts']}건(본문·교사 댓글·부모 댓글)을 낱말로 전수 검색했어요. "
         f"걸린 글은 서로 다른 {res['total']}건. 낱말별 건수: {counts}. "
         f"아래는 가장 관련 높은 {len(res['items'])}건이에요. 각 글의 [작성자][장소][글 종류] 표시 그대로만 써요"
-        "(교사 글을 가족 글로, 어린이집 일을 집 일로 쓰지 않아요). 이 목록에 있는 주제를 「기록이 없어요」라고 하지 않아요."
+        "(교사 글을 가족 글로, 어린이집 일을 집 일로 쓰지 않아요). 이 목록에 있는 주제를 「기록이 없어요」라고 하지 않아요. 건수·날짜는 내부 판단용이라 가족에게 보이는 글에 쓰지 않아요."
     )
     lines: list[tuple[str, str]] = [("", head)]
     for it in res["items"]:

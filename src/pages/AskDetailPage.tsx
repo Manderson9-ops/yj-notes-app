@@ -293,7 +293,7 @@ function Body({
           <h2 id="ask-answer">답변</h2>
           {detail.answer ? (
             <AnswerCard
-              level={detail.answer.level}
+              level={detail.answer.level ?? detail.answer.answer.level}
               answer={detail.answer.answer}
               reviewScore={detail.answer.reviewScore}
             />

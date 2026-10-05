@@ -1,5 +1,6 @@
-// 위급 질문(redFlag)에 붙이는 응급처치 틀. 정본은 prompts/emergency.md(공식 지침 요약)이고, 질문의 위급 규칙(server/ask/redflags.ts)에
-// 맞는 절(A~G)만 근거 묶음에 덧붙인다. 출처 ref(EMERG-KDCA-2025, EMERG-KDCA-CHOKE)는 tryNow.basis 로 쓸 수 있다.
+// 위급 질문(redFlag)에 붙이는 응급처치 틀. 정본은 prompts/emergency.md(공식 지침 요약)이고 파일을 고치지 않는다.
+// 절 제목의 「(ref …)」 에서 ref 를 읽어, 질문의 위급 규칙(server/ask/redflags.ts)에 맞는 절만 근거 묶음에 덧붙인다.
+// 그 절의 ref 만 tryNow.basis 로 쓸 수 있다(질문 상황과 다른 절은 인용 금지).
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,16 +12,15 @@ export const EMERGENCY_FILE = join(
 );
 export const loadEmergencyMd = (): string => readFileSync(EMERGENCY_FILE, "utf8");
 
-export const EMERGENCY_REFS = ["EMERG-KDCA-2025", "EMERG-KDCA-CHOKE"] as const;
-
-/** redflags.ts 규칙 번호 → 응급 절. (규칙 번호는 RED_FLAG_PATTERNS 의 순서) */
+/** redflags.ts 규칙 번호 → 응급 절. (규칙 번호는 RED_FLAG_PATTERNS 의 순서)
+ *  숨·호흡·막힘·파래짐·삼킴→A, 의식·깨워도·반응·고열·탈수→B, 경련→C, 약·독→D, 외상·출혈→E, 자해·학대→F, 갑자기 못 함→G */
 const RULE_SECTIONS: Record<number, readonly string[]> = {
-  0: ["A", "B"],
-  1: ["B"],
-  2: ["B"],
-  3: ["B"],
-  4: ["B"],
-  5: ["A", "B"],
+  0: ["A"],
+  1: ["A"],
+  2: ["A"],
+  3: ["A"],
+  4: ["A"],
+  5: ["A"],
   6: ["B"],
   7: ["B"],
   8: ["B"],
@@ -47,24 +47,45 @@ export function sectionsForRules(rules: readonly number[]): string[] {
 
 export interface EmergencySection {
   text: string;
+  /** 포함된 절의 ref(허용 basis). */
   refs: string[];
   sections: string[];
 }
 
-/** emergency.md 에서 머리말(원칙·출처)과 필요한 절만 골라 묶음에 붙일 글을 만든다. */
+/** 「## C. 경련 (ref EMERG-SEIZURE)」 → ["EMERG-SEIZURE"] */
+export function refsOfHeading(heading: string): string[] {
+  const m = /\(ref\s+([^)]+)\)/.exec(heading);
+  return m?.[1]
+    ? m[1]
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s !== "")
+    : [];
+}
+
+/** emergency.md 에서 머리말(원칙)과 필요한 절만 골라, 포함된 절의 ref 만 달아 묶음에 붙일 글을 만든다. */
 export function buildEmergencySection(md: string, rules: readonly number[]): EmergencySection {
   const sections = sectionsForRules(rules);
   const parts = md.split(/^## /m);
-  const head = (parts[0] ?? "").replace(/^# .*\n/, "").trim();
-  const body = parts
-    .slice(1)
-    .filter((p) => sections.includes((p[0] ?? "").toUpperCase()))
-    .map((p) => `## ${p.trim()}`);
-  const text = [
-    "## 위급 처치 틀 (위급 신호가 있는 질문에만 붙어요)",
-    "[ref: EMERG-KDCA-2025] [ref: EMERG-KDCA-CHOKE]",
-    head,
-    ...body,
-  ].join("\n");
-  return { text, refs: [...EMERGENCY_REFS], sections };
+  const rawHead = (parts[0] ?? "").replace(/^# .*\n/, "");
+  const picked = parts.slice(1).filter((p) => sections.includes((p[0] ?? "").toUpperCase()));
+  const refs = [...new Set(picked.flatMap((p) => refsOfHeading(p.split("\n")[0] ?? "")))];
+  // 머리말의 출처 목록은 이번에 포함된 ref 것만 남긴다
+  const head = rawHead
+    .split("\n")
+    .filter((l) => {
+      const m = /^- (EMERG-[A-Z0-9-]+):/.exec(l);
+      return m?.[1] ? refs.includes(m[1]) : true;
+    })
+    .join("\n")
+    .trim();
+  const body = picked.map((p) => {
+    const [first = "", ...rest] = p.trim().split("\n");
+    const tag = refsOfHeading(first)
+      .map((r) => `[ref: ${r}]`)
+      .join(" ");
+    return [`## ${first}`, tag, ...rest].filter((x) => x !== "").join("\n");
+  });
+  const text = ["## 위급 처치 틀 (위급 신호가 있는 질문에만 붙어요)", head, ...body].join("\n");
+  return { text, refs, sections };
 }

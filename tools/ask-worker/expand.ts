@@ -29,13 +29,28 @@ export const expansionSchema = z.strictObject({
   domains: z.array(z.enum(TOPIC_DOMAINS)).max(3),
   topic: z.string().max(40),
   isBehaviorQuestion: z.boolean(),
+  /** 질문에 적힌 빈도·지속·영향·공격성(없으면 null). 단계 보정에 쓴다. */
+  frequency: z.string().max(40).nullable(),
+  duration: z.string().max(40).nullable(),
+  impact: z.string().max(60).nullable(),
+  aggression: z.string().max(40).nullable(),
 });
 export type Expansion = z.infer<typeof expansionSchema>;
 
 export const EXPANSION_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["keywords", "synonyms", "domains", "topic", "isBehaviorQuestion"],
+  required: [
+    "keywords",
+    "synonyms",
+    "domains",
+    "topic",
+    "isBehaviorQuestion",
+    "frequency",
+    "duration",
+    "impact",
+    "aggression",
+  ],
   properties: {
     keywords: {
       type: "array",
@@ -50,6 +65,10 @@ export const EXPANSION_JSON_SCHEMA = {
     domains: { type: "array", maxItems: 3, items: { type: "string", enum: [...TOPIC_DOMAINS] } },
     topic: { type: "string", maxLength: 40 },
     isBehaviorQuestion: { type: "boolean" },
+    frequency: { type: ["string", "null"], maxLength: 40 },
+    duration: { type: ["string", "null"], maxLength: 40 },
+    impact: { type: ["string", "null"], maxLength: 60 },
+    aggression: { type: ["string", "null"], maxLength: 40 },
   },
 } as const;
 
@@ -60,6 +79,10 @@ export const EMPTY_EXPANSION: Expansion = {
   domains: [],
   topic: "",
   isBehaviorQuestion: true,
+  frequency: null,
+  duration: null,
+  impact: null,
+  aggression: null,
 };
 
 export const EXPAND_PROMPT_FILE = join(

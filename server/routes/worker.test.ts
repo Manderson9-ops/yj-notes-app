@@ -298,6 +298,46 @@ describe("answer", () => {
     expect((await post(id, { ...workerAnswerBody(5), answer: max })).status).toBe(200);
   });
 
+  it("not_behavior 답: DB 에는 level 1 로 두고 API(상세·목록)는 level 을 숨긴다, behavior 는 그대로", async () => {
+    const nb = {
+      kind: "not_behavior" as const,
+      level: 1,
+      levelTitle: "",
+      levelReason: "이곳은 아이의 행동·발달 걱정을 묻는 곳이에요",
+      summary: "아이와 상관없는 질문이에요",
+      fromRecords: [],
+      evidence: [],
+      tryNow: [],
+      avoid: [],
+      upIf: [],
+      downIf: [],
+      forAsker: "엄마께: 아이 걱정을 적어 주세요",
+    };
+    const id = await inProgress();
+    expect((await post(id, { ...workerAnswerBody(1), level: 1, answer: nb })).status).toBe(200);
+    expect(rows<{ level: number }>(h, "SELECT level FROM ask_answer")[0]?.level).toBe(1);
+    const detail = await (
+      await sessionCall(h, cookie, "GET", `/api/ask/${String(id)}`)
+    ).json<{
+      answer: { level: number | null; answer: { kind: string; levelTitle: string } };
+    }>();
+    expect(detail.answer.level).toBeNull();
+    expect(detail.answer.answer).toMatchObject({ kind: "not_behavior", levelTitle: "" });
+    const list = await (
+      await sessionCall(h, cookie, "GET", "/api/ask")
+    ).json<{
+      items: { id: number; level?: number }[];
+    }>();
+    expect(list.items.find((x) => x.id === id)).not.toHaveProperty("level");
+    const id2 = await inProgress("합성 두 번째 질문");
+    expect((await post(id2, workerAnswerBody(5))).status).toBe(200);
+    const list2 = await (
+      await sessionCall(h, cookie, "GET", "/api/ask")
+    ).json<{
+      items: { id: number; level?: number }[];
+    }>();
+    expect(list2.items.find((x) => x.id === id2)?.level).toBe(5);
+  });
   it("진행 중이 아니면 409 (대기·완료·지운 질문), 두 번 올려도 한 번만 저장", async () => {
     const pending = await ask("대기 질문");
     expect((await post(pending, workerAnswerBody(5))).status).toBe(409);

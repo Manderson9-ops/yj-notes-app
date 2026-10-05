@@ -7,6 +7,7 @@ import { GENERAL_BASIS } from "../../shared/ask-schema.ts";
 import { answerSchema, type Answer } from "./answer-schema.ts";
 import { levelTitle } from "./levels.ts";
 import type { SearchSummary } from "./pack.ts";
+import { refDomain, textMatchesDomain } from "./topics.ts";
 
 export interface PackInfo {
   pack: string;
@@ -15,6 +16,19 @@ export interface PackInfo {
   search?: SearchSummary;
   /** 질문 확장이 판단한 행동 질문 여부(확장 실패면 undefined → 검사 안 함). */
   isBehavior?: boolean | undefined;
+  /** 질문 확장이 뽑은 주제 영역(없으면 근거-행동 주제 대조를 건너뛴다). */
+  domains?: string[] | undefined;
+  /** 질문에 적힌 빈도·지속·영향·공격성(확장 실패면 undefined → 단계 보정 검사 안 함). */
+  severity?: Severity | undefined;
+  /** 질문자 호칭(엄마·아빠·할머니…): summary 에서 3인칭으로 부르지 않는지 본다. */
+  askedBy?: string | undefined;
+}
+
+export interface Severity {
+  frequency: string | null;
+  duration: string | null;
+  impact: string | null;
+  aggression: string | null;
 }
 
 export interface CheckResult {
@@ -43,6 +57,15 @@ const HONORIFIC = /아버님|어머님|할머님|할아버님/;
 /** 「기록이 없어요」류 주장. */
 const NOTHING = /기록이\s*없|기록에\s*없|근거가\s*없|묶음에\s*없|확인되지\s*않/;
 const NO_BASIS = /근거가\s*(?:없|부족)/;
+/** 가족에게 보이는 글에 쓰면 안 되는 내부 규칙·검색 표현과 검색 건수. */
+const INTERNAL_PHRASE =
+  /보수적인\s*쪽|더\s*일찍\s*확인을\s*권하는\s*쪽|월령\s*규준\s*경계|규준이\s*둘|연령대\s*경계|내부\s*규칙|전수\s*검색/;
+const SEARCH_COUNT = /\d+\s*건/;
+/** 질문과 관련 없는 기록을 「관련 없다」고 적어 두는 말. */
+const UNRELATED = /직접\s*관련(?:은|이)?\s*없|관련\s*없|관련이\s*적|관련은\s*적|상관\s*없/;
+/** summary·levelReason 의 질환·병 낱말(위급 질문 제외). 병원은 해당하지 않는다. */
+const ILLNESS = /질환|(?:^|[^가-힣])병(?:이|을|에|은|는|도|일|인|으로|명|증|리|세|$|[^가-힣])/;
+const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** 119 안내에 처치를 미루는 말(구체 처치 동사가 없을 때만 문제). */
 const DEFER_119 = /119[^.。\n]*안내(?:에|를)\s*따/;
 const FIRST_AID_VERB = /두드리|밀어|압박|눕|지혈|눌러|치우|옆으로|돌려|꺼내|기침|뒤집/;
@@ -110,7 +133,7 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
   const maxTry = LEVEL_TEMPLATES[stripped.level]?.tryNow[1] ?? stripped.tryNow.length;
   const answer: Answer = {
     ...stripped,
-    levelTitle: levelTitle(stripped.level),
+    levelTitle: stripped.kind === "not_behavior" ? "" : levelTitle(stripped.level),
     tryNow: stripped.tryNow.slice(0, maxTry),
   };
   const issues: string[] = [];
@@ -123,6 +146,26 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
   if (strings.some((s) => HONORIFIC.test(s))) {
     issues.push(
       "가족 호칭은 아버님·어머님 대신 적힌 역할 그대로(엄마·아빠·할머니·할아버지)로 써요",
+    );
+  }
+  if (strings.some((s) => INTERNAL_PHRASE.test(s) || SEARCH_COUNT.test(s))) {
+    issues.push(
+      "내부 규칙(보수적인 쪽 등)과 검색 건수(「N건」)는 가족에게 보이는 글에 쓰지 않아요: 지우고 내용만 말해요",
+    );
+  }
+  if (!redFlag && [answer.summary, answer.levelReason].some((s) => ILLNESS.test(s))) {
+    issues.push("summary·levelReason 에 질환·병 같은 말을 쓰지 않아요(진단처럼 읽혀요)");
+  }
+  const asker = (info.askedBy ?? "").trim();
+  if (
+    asker !== "" &&
+    asker.length <= 12 &&
+    new RegExp(`(?<![가-힣])${escapeRe(asker)}\\s*(?:는|은|가|이|께서)(?![가-힣])`).test(
+      answer.summary,
+    )
+  ) {
+    issues.push(
+      `summary 는 질문하신 분께 2인칭으로 써요(「${asker}가/는」처럼 3인칭으로 부르지 않아요: 「~하셨어요」)`,
     );
   }
   if (info.isBehavior === false && answer.kind === "behavior" && !redFlag) {
@@ -183,6 +226,58 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
   if (answer.tryNow.some((t) => t.action.trim() === ""))
     issues.push("tryNow.action 이 비어 있어요");
 
+  // 관련 없는 기록은 넣지 않는다
+  for (const r of answer.fromRecords) {
+    if (UNRELATED.test(r.link) || UNRELATED.test(r.what)) {
+      issues.push(
+        `fromRecords ${r.date}: 질문과 관련 없는 기록은 빼요(link 에 「관련 없다」고 적지 말고 항목을 지워요)`,
+      );
+    }
+  }
+
+  // 단계 보정: 4단계 이상은 질문이 빈도·지속·영향·공격성을 적었거나(위급 제외) 기록이 반복을 보여 줄 때만
+  const sev = info.severity;
+  if (sev && !redFlag && answer.level >= 4) {
+    const stated = [sev.frequency, sev.duration, sev.impact, sev.aggression].some(
+      (v) => v !== null && v.trim() !== "",
+    );
+    if (!stated) {
+      const repeats = (info.search?.dates.length ?? 0) >= 2;
+      if (answer.level >= 5 || !repeats) {
+        issues.push(
+          "질문에 빈도·지속·영향·공격성이 적혀 있지 않으면 단계는 3 이하여야 해요(기록이 반복을 보이면 4단계까지, levelReason 에 그렇다고 적어요)",
+        );
+      } else if (!/기록|알림장|반복/.test(answer.levelReason)) {
+        issues.push(
+          "4단계는 질문에 빈도·지속이 없으니 levelReason 에 기록이 반복을 보인다고 적어요",
+        );
+      }
+    }
+  }
+
+  // 근거–행동 주제 대조: 그 ref 가 직접 뒷받침하는 행동에만 basis 로 쓴다
+  if (info.domains !== undefined) {
+    const wanted = new Set(info.domains);
+    for (const t of answer.tryNow) {
+      const d = refDomain(t.basis.trim());
+      if (d === null || wanted.has(d)) continue;
+      if (textMatchesDomain(`${t.action} ${t.say ?? ""}`, d)) continue;
+      issues.push(
+        `[over_interpretation] tryNow.basis ${t.basis.slice(0, 40)} 는 ${d} 주제 근거인데 이 행동·질문과 맞지 않아요 — 직접 뒷받침하는 행동에만 쓰고 아니면 「${GENERAL_BASIS}」`,
+      );
+    }
+  }
+
+  // 식사: 가이드 05 §3-1 의 기존 2주 저녁 기록을 쓰게 안내한다(새 기록을 시작하지 않는다)
+  if (
+    info.domains?.includes("feeding") === true &&
+    [...refs].some((r) => /^guide:05.*#§3-1$/.test(r)) &&
+    !strings.some((x) => x.includes("식사기록"))
+  ) {
+    issues.push(
+      "가이드 §3-1 의 기존 2주 저녁 기록(records/식사기록)을 이어서 쓰도록 안내해요(새 기록을 시작하지 않아요)",
+    );
+  }
   // 전수 검색에 걸린 주제를 「기록이 없어요」라고 하는지
   const s = info.search;
   if (s) {
@@ -215,7 +310,10 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
         "응급 처치를 「119 안내에 따라」로 미루지 말고 지금 할 처치를 먼저(119 신고는 동시에, 스피커폰) 적어요",
       );
     }
-    if (refs.has("EMERG-KDCA-2025") && !answer.tryNow.some((t) => t.basis.startsWith("EMERG-"))) {
+    if (
+      [...refs].some((r) => r.startsWith("EMERG-")) &&
+      !answer.tryNow.some((t) => t.basis.startsWith("EMERG-"))
+    ) {
       issues.push("위급 처치의 basis 는 묶음의 EMERG-… ref 로 써요");
     }
   }

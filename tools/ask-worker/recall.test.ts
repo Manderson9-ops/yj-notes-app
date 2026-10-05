@@ -206,7 +206,7 @@ describe("kind: not_behavior", () => {
   const nb = (over: object = {}) => ({
     kind: "not_behavior",
     level: 1,
-    levelTitle: "x",
+    levelTitle: "",
     levelReason: "이곳은 아이의 행동·발달 걱정을 묻는 곳이에요",
     summary: "아이와 상관없는 질문이에요",
     fromRecords: [],
@@ -240,5 +240,224 @@ describe("kind: not_behavior", () => {
     const r = checkAnswer(nb(), info(), true);
     expect(r.issues.join()).toContain("kind");
     expect(r.issues.join()).toContain("level 10");
+  });
+});
+
+describe("가족에게 보이는 글: 내부 규칙·검색 건수·말씨", () => {
+  it("내부 규칙 표현과 검색 건수를 지적한다", () => {
+    for (const bad of [
+      "더 보수적인 쪽을 따랐어요",
+      "더 일찍 확인을 권하는 쪽이에요",
+      "월령 규준 경계라서요",
+      "알림장에서 484건이 보였어요",
+      "전수 검색 결과예요",
+    ]) {
+      const r = checkAnswer(goodAnswer({ limits: bad }), info(), false);
+      expect(r.issues.join(), bad).toContain("내부 규칙");
+    }
+    expect(checkAnswer(goodAnswer({ limits: "집 상황은 알 수 없어요" }), info(), false).ok).toBe(
+      true,
+    );
+  });
+  it("질환·병은 위급이 아닐 때 summary·levelReason 에서 지적, 병원은 허용", () => {
+    expect(
+      checkAnswer(
+        goodAnswer({ summary: "질환이 있는지 걱정하셨어요" }),
+        info(),
+        false,
+      ).issues.join(),
+    ).toContain("질환·병");
+    expect(
+      checkAnswer(goodAnswer({ levelReason: "큰 병일까 걱정돼요" }), info(), false).issues.join(),
+    ).toContain("질환·병");
+    expect(
+      checkAnswer(goodAnswer({ summary: "병원에 가야 할지 물으셨어요" }), info(), false).ok,
+    ).toBe(true);
+    const red = goodAnswer({
+      level: 10,
+      summary: "병이 났을 수 있어 바로 119에 전화하세요",
+      upIf: ["119"],
+    });
+    expect(checkAnswer(red, info(), true).issues.join()).not.toContain("질환·병");
+  });
+  it("summary 는 질문자를 3인칭으로 부르지 않는다(2인칭)", () => {
+    const withAsker = info({ askedBy: "엄마" });
+    expect(
+      checkAnswer(
+        goodAnswer({ summary: "엄마는 점심이 걱정이세요" }),
+        withAsker,
+        false,
+      ).issues.join(),
+    ).toContain("2인칭");
+    expect(
+      checkAnswer(
+        goodAnswer({ summary: "엄마가 점심을 걱정하세요" }),
+        withAsker,
+        false,
+      ).issues.join(),
+    ).toContain("2인칭");
+    expect(
+      checkAnswer(goodAnswer({ summary: "점심을 반만 먹어서 걱정하셨어요" }), withAsker, false).ok,
+    ).toBe(true);
+    expect(checkAnswer(goodAnswer({ summary: "시엄마는 걱정하셨어요" }), withAsker, false).ok).toBe(
+      true,
+    ); // 부분 일치는 아님
+    expect(checkAnswer(goodAnswer({ summary: "아빠가 밥을 먹여요" }), withAsker, false).ok).toBe(
+      true,
+    ); // 다른 사람
+  });
+});
+
+describe("단계 보정(질문에 빈도·지속·영향이 있어야 4단계 이상)", () => {
+  const none = { frequency: null, duration: null, impact: null, aggression: null };
+  const two = { dates: ["2020-03-04", "2020-03-02"] };
+  const withSearch = (severity: typeof none, dates: string[] = []) =>
+    info({
+      severity,
+      search: { total: dates.length, shown: dates.length, dates, keywords: {}, ints: [] },
+    });
+  it("모두 null 이면 4단계 이상을 지적한다(기록 반복이 없을 때)", () => {
+    const r = checkAnswer(goodAnswer({ level: 4 }), withSearch(none), false);
+    expect(r.issues.join()).toContain("3 이하");
+    expect(checkAnswer(goodAnswer({ level: 3 }), withSearch(none), false).ok).toBe(true);
+    expect(checkAnswer(goodAnswer({ level: 5 }), withSearch(none), false).issues.join()).toContain(
+      "3 이하",
+    );
+  });
+  it("기록이 반복을 보이면 4단계는 허용(levelReason 에 기록 반복을 적을 때만), 5단계 이상은 불가", () => {
+    const rep = withSearch(none, two.dates);
+    const noMention = goodAnswer({ level: 4, levelReason: "30개월이고 잘 지내요" });
+    expect(checkAnswer(noMention, rep, false).issues.join()).toContain("기록이 반복");
+    const mention = goodAnswer({ level: 4, levelReason: "30개월이고 기록에서 반복돼요" });
+    expect(checkAnswer(mention, rep, false).ok).toBe(true);
+    expect(checkAnswer(goodAnswer({ level: 5 }), rep, false).issues.join()).toContain("3 이하");
+  });
+  it("질문에 빈도·지속·영향·공격성 중 하나라도 있으면 4단계 이상 허용", () => {
+    for (const k of ["frequency", "duration", "impact", "aggression"] as const) {
+      const sev = { ...none, [k]: "있음" };
+      expect(checkAnswer(goodAnswer({ level: 5 }), withSearch(sev), false).ok, k).toBe(true);
+    }
+  });
+  it("위급 질문과 확장 실패(severity 없음)에는 적용하지 않는다", () => {
+    expect(checkAnswer(goodAnswer({ level: 10, upIf: ["119"] }), withSearch(none), true).ok).toBe(
+      true,
+    );
+    expect(checkAnswer(goodAnswer({ level: 6 }), info(), false).ok).toBe(true);
+  });
+});
+
+describe("근거–행동 주제 대조(basis)", () => {
+  const withDomains = (domains: string[]) =>
+    info({
+      domains,
+      refs: [
+        "note:2020-03-02",
+        "SYN-IV-01",
+        "INT-FEED-01",
+        "INT-FEAR-01",
+        "NORM-MEDIA-01",
+        "guide:05-식사#§3",
+        "guide:04-퇴행#1",
+      ],
+    });
+  const act = (action: string, basis: string) =>
+    goodAnswer({
+      tryNow: [
+        { action, basis },
+        { action: "둘째 행동이에요", basis: "일반 권고" },
+      ],
+    });
+  it("질문 주제와 같은 주제 ref 는 통과", () => {
+    expect(
+      checkAnswer(act("정해진 자리에서 먹어요", "INT-FEED-01"), withDomains(["feeding"]), false).ok,
+    ).toBe(true);
+    expect(
+      checkAnswer(act("가족 계획대로 해요", "guide:05-식사#§3"), withDomains(["feeding"]), false)
+        .ok,
+    ).toBe(true);
+  });
+  it("다른 주제 ref 를 끌어오면 over_interpretation 으로 지적", () => {
+    const r = checkAnswer(act("밤에 안아 줘요", "INT-FEAR-01"), withDomains(["feeding"]), false);
+    expect(
+      r.issues.some((i) => i.startsWith("[over_interpretation] tryNow.basis INT-FEAR-01")),
+    ).toBe(true);
+    const media = checkAnswer(
+      act("정해진 시간만 봐요", "NORM-MEDIA-01"),
+      withDomains(["feeding"]),
+      false,
+    );
+    expect(media.issues.join()).toContain("media 주제");
+  });
+  it("행동 글이 그 주제 낱말을 직접 담으면 통과", () => {
+    const r = checkAnswer(
+      act("영상은 식사 전에 꺼요", "NORM-MEDIA-01"),
+      withDomains(["feeding"]),
+      false,
+    );
+    expect(r.issues.some((i) => i.startsWith("[over_interpretation]"))).toBe(false);
+  });
+  it("주제를 모르는 ref(note·SYN)와 「일반 권고」, 확장 실패는 검사하지 않는다", () => {
+    expect(checkAnswer(act("무엇이든", "SYN-IV-01"), withDomains(["feeding"]), false).ok).toBe(
+      true,
+    );
+    expect(
+      checkAnswer(
+        act("밤에 안아 줘요", "INT-FEAR-01"),
+        info({ refs: ["INT-FEAR-01", "SYN-IV-01", "note:2020-03-02", "note:2020-03-04"] }),
+        false,
+      ).ok,
+    ).toBe(true);
+  });
+});
+
+describe("관련 없는 기록 · 식사 가이드 기록", () => {
+  it("link·what 에 「관련 없다」류가 있으면 항목을 빼라고 알린다", () => {
+    for (const link of ["직접 관련은 없지만 참고해요", "관련 없어요", "관련이 적어요"]) {
+      const r = checkAnswer(
+        goodAnswer({ fromRecords: [{ date: "2020-03-02", what: "점심", link, source: "알림장" }] }),
+        info(),
+        false,
+      );
+      expect(r.issues.join(), link).toContain("관련 없는 기록은 빼요");
+    }
+  });
+  it("가이드 §3-1 이 묶음에 있는 식사 질문은 기존 식사기록을 언급해야 한다", () => {
+    const refs = ["note:2020-03-02", "SYN-IV-01", "guide:05-식사#§3-1"];
+    const base = info({ domains: ["feeding"], refs });
+    expect(checkAnswer(goodAnswer(), base, false).issues.join()).toContain("식사기록");
+    const ok = goodAnswer({
+      observe: {
+        what: "먹은 양",
+        howLong: "3~4일",
+        how: "이미 쓰는 2주 저녁 기록(records/식사기록)에 이어서 적어요",
+      },
+    });
+    expect(checkAnswer(ok, base, false).ok).toBe(true);
+    expect(checkAnswer(goodAnswer(), info({ domains: ["sleep"], refs }), false).ok).toBe(true);
+  });
+});
+
+describe("not_behavior: levelTitle 빈 문자열", () => {
+  it("levelTitle 이 비어 있어야 하고 정규화돼도 비어 있다", () => {
+    const nb = {
+      kind: "not_behavior",
+      level: 1,
+      levelTitle: "",
+      levelReason: "이곳은 아이의 행동·발달 걱정을 묻는 곳이에요",
+      summary: "아이와 상관없는 질문이에요",
+      fromRecords: [],
+      evidence: [],
+      tryNow: [],
+      avoid: [],
+      upIf: [],
+      downIf: [],
+      forAsker: "엄마께: 아이 걱정을 적어 주세요",
+    };
+    const r = checkAnswer(nb, info(), false);
+    expect(r.ok).toBe(true);
+    expect(r.answer?.levelTitle).toBe("");
+    expect(
+      checkAnswer({ ...nb, levelTitle: "아주 흔한 발달 과정" }, info(), false).answer,
+    ).toBeNull(); // 스키마 위반
   });
 });

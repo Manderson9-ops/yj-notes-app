@@ -94,7 +94,10 @@ askRoutes.get("/api/ask", async (c) => {
   }
   const { results } = await c.env.DB.prepare(
     `SELECT q.id, q.asked_by, substr(q.body, 1, 80) AS preview, length(q.body) AS len, q.status, q.red_flag,
-            q.created_at, a.level
+            q.created_at,
+            CASE WHEN a.answer_json IS NOT NULL AND json_valid(a.answer_json)
+                 THEN CASE WHEN json_extract(a.answer_json, '$.kind') = 'not_behavior' THEN NULL ELSE a.level END
+                 ELSE a.level END AS level
      FROM ask_question q LEFT JOIN ask_answer a ON a.question_id = q.id
      WHERE q.deleted_at IS NULL AND (?1 IS NULL OR q.id < ?1)
      ORDER BY q.id DESC LIMIT ?2`,
@@ -153,7 +156,8 @@ askRoutes.get("/api/ask/:id", async (c) => {
       created_at: string;
     }>();
   let answer: {
-    level: number;
+    /** 행동 질문이 아닌 답(not_behavior)은 DB 에는 1로 있지만 API 는 null 로 숨긴다. */
+    level: number | null;
     answer: unknown;
     createdAt: string;
     totalMs: number | null;
@@ -168,7 +172,7 @@ askRoutes.get("/api/ask/:id", async (c) => {
     }
     if (parsed?.success) {
       answer = {
-        level: ans.level,
+        level: parsed.data.kind === "not_behavior" ? null : ans.level,
         answer: parsed.data,
         createdAt: ans.created_at,
         totalMs: ans.total_ms,

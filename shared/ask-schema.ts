@@ -44,7 +44,8 @@ export const ANSWER_KINDS = ["behavior", "not_behavior"] as const;
 const AnswerBase = z.strictObject({
   kind: z.enum(ANSWER_KINDS),
   level: z.number().int().min(1).max(10),
-  levelTitle: text(40),
+  /** behavior: 정본 단계 제목. not_behavior: 빈 문자열(단계를 보이지 않는다). */
+  levelTitle: z.string().max(40),
   /** behavior: 왜 이 단계인지. not_behavior: 이 기능이 도울 수 있는 일을 알리는 짧은 안내 한 줄. */
   levelReason: text(ASK_LIMITS.levelReason),
   summary: text(ASK_LIMITS.summary),
@@ -94,6 +95,7 @@ export const AnswerSchema = AnswerBase.superRefine((a, ctx) => {
   };
   if (a.kind === "not_behavior") {
     if (a.level !== 1) bad("level");
+    if (a.levelTitle !== "") bad("levelTitle");
     if (a.fromRecords.length > 0) bad("fromRecords");
     if (a.evidence.length > 0) bad("evidence");
     if (a.tryNow.length > 0) bad("tryNow");
@@ -103,6 +105,7 @@ export const AnswerSchema = AnswerBase.superRefine((a, ctx) => {
     if (a.observe !== undefined) bad("observe");
     return;
   }
+  if (a.levelTitle === "") bad("levelTitle");
   if (a.evidence.length < 1) bad("evidence");
   if (a.tryNow.length < 1) bad("tryNow");
   if (a.avoid.length < 1) bad("avoid");

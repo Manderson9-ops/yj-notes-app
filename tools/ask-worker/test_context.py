@@ -173,15 +173,61 @@ def test_age_line_always_present(env):
     assert "현재 월령:" in pack(env, today=date(2030, 1, 1))["pack"]
 
 
-def test_age_brackets_include_both_near_boundary_and_note(env):
+def test_norm_band_rules():
+    # 상한 이후에는 다음 연령대만: 36개월이면 18~36 은 쓰지 않는다
+    assert context.norm_band(36, 18, 36, has_next=True) is None
+    assert context.norm_band(36, 36, 60, has_next=False) == "in"
+    assert context.norm_band(35, 18, 36, has_next=True) == "in"
+    # 다음 연령대 시작 2개월 전(34~35개월)부터 이웃도 함께
+    assert context.norm_band(34, 36, 60, has_next=False) == "upcoming"
+    assert context.norm_band(35, 36, 60, has_next=False) == "upcoming"
+    assert context.norm_band(33, 36, 60, has_next=False) is None
+    # 마지막 연령대는 상한을 포함, 그 위는 쓰지 않는다
+    assert context.norm_band(60, 36, 60, has_next=False) == "in"
+    assert context.norm_band(61, 36, 60, has_next=False) is None
+    assert context.norm_band(12, 18, 36, has_next=True) is None
+    assert context.norm_band(None, 18, 36, has_next=True) == "in"
+
+
+def test_age_brackets_use_only_the_band_containing_the_child(env):
     at36 = pack(env, age_hint=36)
-    assert {"NORM-FEED-01", "NORM-FEED-02"} <= set(at36["refs"])  # 18~36 과 36~60 둘 다
-    assert "더 보수적인" in at36["pack"]
-    at34 = pack(env, age_hint=34)  # 36−2 = 34: 이웃 규준 포함
-    assert "NORM-FEED-02" in at34["refs"]
-    at30 = pack(env, age_hint=30)  # 경계에서 멀면 해당 규준만
+    assert "NORM-FEED-02" in at36["refs"] and "NORM-FEED-01" not in at36["refs"]  # 36+ 는 36~60 만
+    assert "[내부 규칙" not in at36["pack"]
+    at40 = pack(env, age_hint=40)
+    assert "NORM-FEED-02" in at40["refs"] and "NORM-FEED-01" not in at40["refs"]
+    at30 = pack(env, age_hint=30)
     assert "NORM-FEED-01" in at30["refs"] and "NORM-FEED-02" not in at30["refs"]
-    assert "더 보수적인" not in at30["pack"]
+    assert "[내부 규칙" not in at30["pack"]
+    at33 = pack(env, age_hint=33)
+    assert "NORM-FEED-02" not in at33["refs"]
+
+
+def test_internal_rule_only_when_two_bands_are_really_included(env):
+    for age in (34, 35):  # 36개월 직전 2개월: 두 규준이 함께 들어가고 내부 규칙이 붙는다
+        out = pack(env, age_hint=age)
+        assert {"NORM-FEED-01", "NORM-FEED-02"} <= set(out["refs"])
+        assert out["pack"].count("[내부 규칙") == 1
+        assert "더 보수적인" in out["pack"]
+        assert "limits" in out["pack"]  # 적지 말라는 안내에서만 나온다
+    assert "더 보수적인" not in pack(env, age_hint=36)["pack"]
+    assert "더 보수적인" not in pack(env, age_hint=20)["pack"]
+
+
+def test_severity_section_from_expansion(env):
+    exp = {
+        "keywords": ["밥"],
+        "frequency": "하루 세 번",
+        "duration": "일주일째",
+        "impact": None,
+        "aggression": "",
+    }
+    out = pack(env, expansion=exp)
+    assert "## A-2. 질문에 나온 빈도·지속·영향" in out["pack"]
+    assert "- 빈도: 하루 세 번" in out["pack"] and "- 지속: 일주일째" in out["pack"]
+    assert "영향:" not in out["pack"]
+    none = pack(env, expansion={"keywords": ["밥"]})
+    assert "따로 적혀 있지 않아요" in none["pack"]
+    assert "## A-2." not in pack(env)["pack"]  # 확장이 없으면 구역 자체가 없다
 
 
 # ───────────── 근거 DB ─────────────

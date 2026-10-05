@@ -4,7 +4,7 @@ import type { ClaudeRequest, ClaudeRunner } from "./claude.ts";
 import {
   buildEmergencySection,
   EMERGENCY_FILE,
-  EMERGENCY_REFS,
+  refsOfHeading,
   sectionsForRules,
 } from "./emergency.ts";
 import {
@@ -25,6 +25,10 @@ const GOOD: Expansion = {
   domains: ["feeding"],
   topic: "식사 거부",
   isBehaviorQuestion: true,
+  frequency: "하루 세 번",
+  duration: null,
+  impact: null,
+  aggression: null,
 };
 
 function runner(script: (req: ClaudeRequest) => unknown): {
@@ -76,30 +80,60 @@ describe("질문 확장", () => {
 
 describe("응급 처치 틀", () => {
   const md = readFileSync(EMERGENCY_FILE, "utf8");
-  it("위급 규칙 → 절 지도", () => {
-    expect(sectionsForRules([0])).toEqual(["A", "B"]);
+  it("위급 규칙 → 절 지도(호흡·막힘 A, 의식·고열 B, 경련 C, 약 D, 외상 E, 자해·학대 F, 갑자기 못 함 G)", () => {
+    for (const r of [0, 1, 2, 3, 4, 5]) expect(sectionsForRules([r]), String(r)).toEqual(["A"]);
+    for (const r of [6, 7, 8, 15, 16]) expect(sectionsForRules([r]), String(r)).toEqual(["B"]);
     expect(sectionsForRules([9])).toEqual(["C"]);
     expect(sectionsForRules([11])).toEqual(["D"]);
     expect(sectionsForRules([12, 13, 14])).toEqual(["E"]);
     expect(sectionsForRules([17, 18])).toEqual(["F"]);
     expect(sectionsForRules([19, 20])).toEqual(["G"]);
-    expect(sectionsForRules([10, 9])).toEqual(["A", "C", "D"]);
-    expect(sectionsForRules([])).toEqual(["B"]); // 규칙을 모르면 일반 위급 틀
+    expect(sectionsForRules([10])).toEqual(["A", "D"]); // 삼킴: 막힘 + 약·물건
+    expect(sectionsForRules([15, 9])).toEqual(["B", "C"]); // 한 질문이 여러 절
+    expect(sectionsForRules([])).toEqual(["B"]);
   });
-  it("필요한 절만 붙이고 출처 ref 를 담는다", () => {
+  it("절 제목에서 ref 를 읽는다", () => {
+    expect(refsOfHeading("A. 목에 걸림 (ref EMERG-KDCA-CHOKE, EMERG-KDCA-2025)")).toEqual([
+      "EMERG-KDCA-CHOKE",
+      "EMERG-KDCA-2025",
+    ]);
+    expect(refsOfHeading("C. 경련 (ref EMERG-SEIZURE)")).toEqual(["EMERG-SEIZURE"]);
+    expect(refsOfHeading("머리말")).toEqual([]);
+  });
+  it("모든 절 A~G 가 자기 ref 를 갖고, 맞는 절의 ref 만 허용된다", () => {
+    const expected: Record<string, string[]> = {
+      A: ["EMERG-KDCA-CHOKE", "EMERG-KDCA-2025"],
+      B: ["EMERG-FEVER-DROWSY"],
+      C: ["EMERG-SEIZURE"],
+      D: ["EMERG-POISON"],
+      E: ["EMERG-INJURY"],
+      F: ["EMERG-SAFETY"],
+      G: ["EMERG-SUDDEN-LOSS"],
+    };
+    const rule: Record<string, number> = { A: 0, B: 15, C: 9, D: 11, E: 12, F: 17, G: 19 };
+    for (const [sec, refs] of Object.entries(expected)) {
+      const e = buildEmergencySection(md, [rule[sec] ?? 0]);
+      expect(e.sections).toEqual([sec]);
+      expect(e.refs).toEqual(refs);
+      for (const r of refs) expect(e.text).toContain(`[ref: ${r}]`);
+    }
+  });
+  it("경련 절: 경련 중 가슴압박 금지·다른 절 ref 와 본문은 붙지 않는다", () => {
     const e = buildEmergencySection(md, [9]);
-    expect(e.sections).toEqual(["C"]);
     expect(e.text).toContain("## C. 경련");
+    expect(e.text).toContain("경련하는 동안에는 가슴압박을 하지 않아요");
     expect(e.text).not.toContain("## A. 목에 걸림");
-    expect(e.text).toContain("[ref: EMERG-KDCA-2025]");
+    expect(e.text).not.toContain("EMERG-KDCA-2025");
+    expect(e.text).not.toContain("EMERG-FEVER-DROWSY");
     expect(e.text).toContain("먼저 행동, 동시에 119");
-    expect(e.refs).toEqual([...EMERGENCY_REFS]);
-    const choke = buildEmergencySection(md, [10]);
-    expect(choke.text).toContain("## A. 목에 걸림");
-    expect(choke.text).toContain("## D.");
+  });
+  it("여러 절이 필요한 질문은 해당 절들의 ref 를 합친다", () => {
+    const e = buildEmergencySection(md, [10]); // 삼킴
+    expect(e.sections).toEqual(["A", "D"]);
+    expect(e.refs).toEqual(["EMERG-KDCA-CHOKE", "EMERG-KDCA-2025", "EMERG-POISON"]);
+    expect(e.text).toContain("- EMERG-KDCA-2025:"); // 포함된 출처만 머리말에
   });
 });
-
 describe("파이프라인: 확장·응급·분류", () => {
   function setup(script: unknown[], expand = true) {
     const reqs: ClaudeRequest[] = [];
@@ -142,7 +176,7 @@ describe("파이프라인: 확장·응급·분류", () => {
   const notBehavior = {
     kind: "not_behavior",
     level: 1,
-    levelTitle: "x",
+    levelTitle: "",
     levelReason: "이곳은 아이의 행동·발달 걱정을 묻는 곳이에요",
     summary: "아이와 상관없는 질문이에요",
     fromRecords: [],
@@ -179,15 +213,15 @@ describe("파이프라인: 확장·응급·분류", () => {
     const emerg = goodAnswer({
       level: 10,
       tryNow: [
-        { action: "옆으로 눕히고 주변 물건을 치워요", basis: "EMERG-KDCA-2025" },
-        { action: "옆 사람에게 119 신고를 부탁해요", basis: "EMERG-KDCA-CHOKE" },
+        { action: "옆으로 눕히고 주변 물건을 치워요", basis: "EMERG-SEIZURE" },
+        { action: "옆 사람에게 119 신고를 부탁해요", basis: "EMERG-SEIZURE" },
       ],
       upIf: ["5분 넘게 이어지면 119에 바로 전화해요"],
     });
     const { deps, reqs } = setup([emerg, review()]);
     const r = await answerQuestion(deps, { ...q, body: "자다가 경련을 했어요", redFlag: true });
     expect(reqs[0]?.prompt).toContain("## C. 경련");
-    expect(reqs[0]?.prompt).toContain("[ref: EMERG-KDCA-2025]");
+    expect(reqs[0]?.prompt).toContain("[ref: EMERG-SEIZURE]");
     expect(reqs[0]?.prompt).not.toContain("## A. 목에 걸림");
     expect(r.level).toBe(10);
   });
@@ -197,8 +231,8 @@ describe("파이프라인: 확장·응급·분류", () => {
     const fixed = goodAnswer({
       level: 10,
       tryNow: [
-        { action: "옆으로 눕히고 주변 물건을 치워요", basis: "EMERG-KDCA-2025" },
-        { action: "옆 사람에게 119 신고를 부탁해요", basis: "EMERG-KDCA-CHOKE" },
+        { action: "옆으로 눕히고 주변 물건을 치워요", basis: "EMERG-SEIZURE" },
+        { action: "옆 사람에게 119 신고를 부탁해요", basis: "EMERG-SEIZURE" },
       ],
       upIf: ["5분 넘게 이어지면 119에 바로 전화해요"],
     });
