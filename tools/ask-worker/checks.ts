@@ -271,12 +271,12 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
     for (const m of checkSpecialist(answer.level, answer.upIf)) soft("safety", m);
     for (const e of answer.evidence) {
       if (!refs.has(e.ref.trim()))
-        soft("factual", `evidence.ref 가 근거 묶음에 없어요: ${e.ref.slice(0, 40)}`);
+        hard("factual", `evidence.ref 가 근거 묶음에 없어요: ${e.ref.slice(0, 40)}`);
     }
     for (const t of answer.tryNow) {
       const b = t.basis.trim();
       if (b !== GENERAL_BASIS && !refs.has(b)) {
-        soft(
+        hard(
           "factual",
           `tryNow.basis 는 묶음의 ref 이거나 정확히 「${GENERAL_BASIS}」 여야 해요: ${b.slice(0, 40)}`,
         );
@@ -320,12 +320,12 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
 
   for (const e of answer.evidence) {
     if (!refs.has(e.ref.trim()))
-      soft("factual", `evidence.ref 가 근거 묶음에 없어요: ${e.ref.slice(0, 40)}`);
+      hard("factual", `evidence.ref 가 근거 묶음에 없어요: ${e.ref.slice(0, 40)}`);
   }
   for (const t of answer.tryNow) {
     const b = t.basis.trim();
     if (b !== GENERAL_BASIS && !refs.has(b)) {
-      soft(
+      hard(
         "factual",
         `tryNow.basis 는 묶음의 ref 이거나 정확히 「${GENERAL_BASIS}」 여야 해요: ${b.slice(0, 40)}`,
       );
@@ -335,7 +335,7 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
   const meta = packMeta(info.pack);
   for (const r of answer.fromRecords) {
     if (!dates.has(r.date)) {
-      soft("factual", `fromRecords 날짜가 근거 묶음에 없어요: ${r.date}`);
+      hard("factual", `fromRecords 날짜가 근거 묶음에 없어요: ${r.date}`);
       continue;
     }
     const m = meta.get(r.date);
