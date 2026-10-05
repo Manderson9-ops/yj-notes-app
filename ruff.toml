@@ -1,8 +1,8 @@
-# tools/ingest·tools/admin (Python) 전용. 저장소의 나머지는 TypeScript 라 ruff 대상이 아니다.
+# tools/ingest·tools/admin·tools/ask-worker (Python) 전용. 저장소의 나머지는 TypeScript 라 ruff 대상이 아니다.
 line-length = 110
 target-version = "py311"
 src = ["."]
-include = ["tools/ingest/**/*.py", "tools/admin/**/*.py"]
+include = ["tools/ingest/**/*.py", "tools/admin/**/*.py", "tools/ask-worker/**/*.py"]
 
 [lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

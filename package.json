@@ -40,7 +40,13 @@
     "db:migrate:prod": "wrangler d1 migrations apply DB --remote",
     "deploy:prod": "npm run build && npm run guard:bundle && wrangler pages deploy dist --project-name yj-notes-app --branch main",
     "backup:prod": "node tools/admin/backup-prod.ts",
-    "ask:schema": "node tools/ask-schema.ts"
+    "ask:schema": "node tools/ask-schema.ts",
+    "ask-worker": "node tools/ask-worker/worker.ts",
+    "ask-worker:once": "node tools/ask-worker/worker.ts --once",
+    "ask-worker:install": "node tools/ask-worker/scheduler.ts install",
+    "ask-worker:uninstall": "node tools/ask-worker/scheduler.ts uninstall",
+    "ask-worker:status": "node tools/ask-worker/scheduler.ts status",
+    "ask-worker:eval": "node tools/ask-worker/eval.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.0",
