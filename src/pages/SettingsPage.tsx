@@ -49,15 +49,17 @@ export function SettingsPage() {
           />
           <span>큰 글씨</span>
         </label>
-        <ContrastSwitch />
+      </section>
+      <section className="settings-section" aria-labelledby="set-theme">
+        <h2 id="set-theme">화면 테마</h2>
+        <ThemePicker />
       </section>
       <section className="settings-section" aria-labelledby="set-scheme">
         <h2 id="set-scheme">화면 밝기</h2>
         <SchemePicker />
       </section>
-      <section className="settings-section" aria-labelledby="set-theme">
-        <h2 id="set-theme">화면 테마</h2>
-        <ThemePicker />
+      <section className="settings-section" aria-label="선명하게 보기">
+        <ContrastSwitch />
       </section>
       <section className="settings-section">
         <button

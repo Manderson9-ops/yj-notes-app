@@ -9,7 +9,9 @@
   --c-fg: #16181c;
   --c-muted: #454a52;
   --c-border: #737984;
-  --c-line: #c4c9d1;
+  --c-line: #848f9f;
+  --c-divider: #c4c9d1;
+  --c-meta: #454a52;
   --c-surface: #ffffff;
   --c-surface-2: #e8edf5;
   --c-accent: #1553b8;
@@ -49,7 +51,7 @@
   /* 모양 */
   --radius: 12px;
   --radius-lg: 16px;
-  --bw: 1px;
+  --bw: 1.5px;
   --shadow: 0 1px 3px rgba(20, 30, 50, 0.12);
   --shadow-press: none;
 
@@ -79,9 +81,11 @@
   --c-fg: #f1f2f5;
   --c-muted: #bcc1ca;
   --c-border: #828995;
-  --c-line: #3d4148;
-  --c-surface: #1c1e22;
-  --c-surface-2: #26292e;
+  --c-line: #666d79;
+  --c-divider: #3d4148;
+  --c-meta: #bcc1ca;
+  --c-surface: #1f2228;
+  --c-surface-2: #2a2e35;
   --c-accent: #a8c7fa;
   --c-on-accent: #0a2350;
   --c-accent-soft: #1f3a63;

@@ -77,8 +77,8 @@ mark {
 .month-head {
   margin: var(--space-5) 0 var(--space-1);
   padding-bottom: var(--space-1);
-  border-bottom: 2px solid var(--c-line);
-  color: var(--c-earth);
+  border-bottom: 2px solid var(--c-divider);
+  color: var(--c-meta);
   font-size: var(--fs-base);
 }
 /* 첫 달 머리글은 건수 줄 바로 아래에 붙인다(첫 알림장이 첫 화면 위쪽에 오게) */
@@ -96,7 +96,7 @@ mark {
   gap: var(--space-3);
   min-height: var(--tap);
   padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--c-line);
+  border-bottom: 1px solid var(--c-divider);
   color: var(--c-fg);
   text-decoration: none;
 }
@@ -169,7 +169,7 @@ mark {
 }
 .detail-meta {
   margin: 0 0 var(--space-4);
-  color: var(--c-earth);
+  color: var(--c-meta);
 }
 .day-nav {
   display: grid;

@@ -97,17 +97,17 @@ mark {
   display: none;
 }
 
+/* 고른 칩: 바깥 링을 겹치지 않고 테두리 자체를 강조색·3px 로(+체크 아이콘·굵은 글씨·중간 톤 면). 너비가 변하지 않게 안쪽 여백을 줄인다 */
 .chip[aria-pressed="true"] {
-  border-color: var(--c-accent);
+  padding: 0 calc(var(--space-4) - (3px - var(--bw)));
+  border: 3px solid var(--c-accent);
   background: var(--c-accent-soft);
   color: var(--c-on-accent-soft);
   font-weight: 700;
-  outline: 2px solid var(--c-accent);
-  outline-offset: 2px;
 }
 
-.chip[aria-pressed="true"]:focus-visible {
-  outline-width: 3px;
+.chip[data-size="lg"][aria-pressed="true"] {
+  padding: 0 calc(var(--space-5) - (3px - var(--bw)));
 }
 
 .chip[aria-pressed="true"] .chip-check {
@@ -123,7 +123,6 @@ mark {
   border-radius: var(--radius-lg);
   background-color: var(--c-surface);
   background-image: var(--tex-surface);
-  box-shadow: var(--shadow);
 }
 
 /* 눌러서 열리는 카드: 테두리를 더 진하게(--c-border), 오른쪽에 화살표. 안 눌리는 카드는 옅은 테두리(--c-line) */
@@ -265,7 +264,7 @@ a.card::after {
   gap: var(--space-3);
   min-height: var(--tap);
   padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--c-line);
+  border-bottom: 1px solid var(--c-divider);
 }
 
 .list-row:last-child {
@@ -273,7 +272,7 @@ a.card::after {
 }
 
 .meta {
-  color: var(--c-earth);
+  color: var(--c-meta);
   font-size: var(--fs-sm);
 }
 
@@ -311,10 +310,11 @@ a.card::after {
   cursor: pointer;
 }
 
+/* 고른 줄: 링을 겹치지 않고 테두리 자체를 강조색·3px 로(+채운 점·굵은 글씨·중간 톤 면) */
 .theme-option:has(input:checked) {
-  border-color: var(--c-accent);
+  padding: 0 calc(var(--space-4) - (3px - var(--bw)));
+  border: 3px solid var(--c-accent);
   background: var(--c-accent-soft);
-  box-shadow: 0 0 0 3px var(--c-accent);
   color: var(--c-on-accent-soft);
   font-weight: 700;
 }
@@ -371,6 +371,62 @@ a.card::after {
 
 .setting-row input[type="checkbox"]:checked::before {
   transform: translateY(-2px) rotate(-45deg) scale(1);
+}
+
+/* 진짜 스위치 줄(선명하게 보기): 라디오 줄과 같은 모양 + 켜짐/꺼짐 글자 + 트랙·손잡이 */
+.theme-option {
+  position: relative;
+}
+
+.switch-row input[type="checkbox"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.switch-row .switch-help {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 400;
+}
+
+.switch-state {
+  font-weight: 700;
+}
+
+.switch-track {
+  position: relative;
+  flex: none;
+  width: 56px;
+  height: 32px;
+  border: 2px solid var(--c-border);
+  border-radius: 999px;
+  background: var(--c-surface);
+}
+
+.switch-track i {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--c-border);
+  transition: transform var(--dur) var(--ease);
+}
+
+.switch-row input:checked ~ .switch-track {
+  border-color: var(--c-accent);
+  background: var(--c-accent);
+}
+
+.switch-row input:checked ~ .switch-track i {
+  background: var(--c-on-accent);
+  transform: translateX(24px);
 }
 
 .theme-option .theme-name {
@@ -434,7 +490,7 @@ a.card::after {
   stroke-linecap: round;
 }
 .d-ink {
-  stroke: var(--c-line);
+  stroke: var(--c-divider);
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -446,7 +502,7 @@ a.card::after {
 }
 .d-line {
   fill: none;
-  stroke: var(--c-line);
+  stroke: var(--c-divider);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -643,7 +699,7 @@ a.card::after {
   min-height: var(--tap);
   padding: var(--space-2) 0;
   border: 0;
-  border-bottom: 1px solid var(--c-line);
+  border-bottom: 1px solid var(--c-divider);
   background: transparent;
   color: var(--c-fg);
   font: inherit;
@@ -680,7 +736,7 @@ a.card::after {
 .log-table th,
 .log-table td {
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--c-line);
+  border-bottom: 1px solid var(--c-divider);
   text-align: left;
   vertical-align: top;
 }

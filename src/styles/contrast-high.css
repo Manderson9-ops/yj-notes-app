@@ -10,6 +10,8 @@
   --c-muted: #2b2b2b;
   --c-border: #1a1a1a;
   --c-line: #6b6b6b;
+  --c-divider: #6b6b6b;
+  --c-meta: #2b2b2b;
   --c-accent: #0a3d91;
   --c-on-accent: #ffffff;
   --c-accent-soft: #dfe6f5;
@@ -33,11 +35,13 @@
 :root[data-contrast="high"][data-theme="crayon"] {
   --c-accent: #004d7a;
   --c-link: #004d7a;
+  --c-accent-soft: #dcedf8;
 }
 
 :root[data-contrast="high"][data-theme="forest"] {
   --c-accent: #1b5a3d;
   --c-link: #1b5a3d;
+  --c-accent-soft: #dcece1;
 }
 
 :root[data-contrast="high"][data-scheme="dark"] {
@@ -48,6 +52,8 @@
   --c-muted: #d9d9d9;
   --c-border: #e6e6e6;
   --c-line: #8c8c92;
+  --c-divider: #8c8c92;
+  --c-meta: #d9d9d9;
   --c-accent: #b3d0ff;
   --c-on-accent: #000000;
   --c-accent-soft: #2e3340;
@@ -63,11 +69,13 @@
 :root[data-contrast="high"][data-theme="crayon"][data-scheme="dark"] {
   --c-accent: #a6dcff;
   --c-link: #a6dcff;
+  --c-accent-soft: #24343f;
 }
 
 :root[data-contrast="high"][data-theme="forest"][data-scheme="dark"] {
   --c-accent: #a9e0bb;
   --c-link: #a9e0bb;
+  --c-accent-soft: #24382f;
 }
 
 /* 포커스 링은 더 두껍고 띄운다 */
@@ -134,4 +142,13 @@
   background: none;
   clip-path: none;
   transform: none;
+}
+
+/* 꺼진 단추: 흐리게(opacity) 하지 않고 점선 테두리 + 보조 글자색 + 평평한 면 */
+:root[data-contrast="high"] :is(.btn, .btn-primary):disabled {
+  border: 2px dashed var(--c-border);
+  background-color: var(--c-surface);
+  background-image: none;
+  color: var(--c-muted);
+  opacity: 1;
 }

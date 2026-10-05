@@ -14,11 +14,13 @@
   --c-muted: #54443d;
   --c-border: #2a1f1c;
   --c-line: #8a7a70;
+  --c-divider: #b5a79c;
+  --c-meta: #5e3f2a;
   --c-surface: #ffffff;
   --c-surface-2: #d7edf8;
   --c-accent: #04609e;
   --c-on-accent: #ffffff;
-  --c-accent-soft: #ffe600;
+  --c-accent-soft: #fff1a8;
   --c-on-accent-soft: #2a1f1c;
   --c-link: #035083;
   --c-badge: #ffe600;
@@ -31,7 +33,9 @@
   --c-shadow: #2a1f1c; /* 오프셋 그림자 색(먹선과 같은 색) */
   /* 손그림 외곽선(border-image 9-slice 용 정적 SVG). 색은 data URI 안에 고정이라 라이트/다크가 따로 있다(먹선 #2a1f1c / #cbbfb3 = --c-border) */
   --bi-rect: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath d='M17 2.4C28 1.6 40 3.2 47 2.2C55 1.8 61.8 6 61.6 16.5C62.4 28 60.8 40 61.9 47.5C62.2 56.5 56 62.2 46.8 61.6C38 62.4 26 60.9 17.6 62C8.2 62.3 1.8 56.4 2.3 47C1.5 38 3.4 26 2.2 17.5C1.9 8 8.5 1.9 17 2.4Z' fill='none' stroke='%232a1f1c' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --bi-rect-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath d='M17 2.4C28 1.6 40 3.2 47 2.2C55 1.8 61.8 6 61.6 16.5C62.4 28 60.8 40 61.9 47.5C62.2 56.5 56 62.2 46.8 61.6C38 62.4 26 60.9 17.6 62C8.2 62.3 1.8 56.4 2.3 47C1.5 38 3.4 26 2.2 17.5C1.9 8 8.5 1.9 17 2.4Z' fill='none' stroke='%2304609e' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --bi-pill: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='48' viewBox='0 0 80 48'%3E%3Cpath d='M24 2.4C34 1.8 46 3 56 2.3C69 2 78 11 77.6 24.4C77.8 37 69 46.2 56 45.6C46 46.4 34 45.2 24 45.8C11 46.2 2.2 37 2.4 23.8C2 11 11.2 2.2 24 2.4Z' fill='none' stroke='%232a1f1c' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --bi-pill-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='48' viewBox='0 0 80 48'%3E%3Cpath d='M24 2.4C34 1.8 46 3 56 2.3C69 2 78 11 77.6 24.4C77.8 37 69 46.2 56 45.6C46 46.4 34 45.2 24 45.8C11 46.2 2.2 37 2.4 23.8C2 11 11.2 2.2 24 2.4Z' fill='none' stroke='%2304609e' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --bi-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M36 2.5C52 1.8 70 18 69.6 36.5C70.2 54 53 70 35.8 69.5C18 70.4 2 54 2.5 35.6C1.8 18 19 2.2 36 2.5Z' fill='none' stroke='%232a1f1c' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   /* 크레용 전용(계약 밖): 형광펜 띠, 카드 띠 하늘색 */
   --c-hl: #ffd4da;
@@ -50,7 +54,7 @@
   --radius: 14px;
   --radius-lg: 16px;
   --bw: 2px;
-  --shadow: 2px 2px 0 var(--c-shadow);
+  --shadow: none;
   /* 오프셋 그림자는 box-shadow(필터 아님: CSS filter 는 요소마다 합성 층이 생겨 저사양·소프트웨어 렌더에서 비싸다) */
   --lift: 2px 2px 0 var(--c-shadow);
   --shadow-press: 0 0 0 transparent;
@@ -65,12 +69,14 @@
 
 :root[data-theme="crayon"][data-scheme="dark"] {
   --c-bg: #1b1715;
-  --c-fg: #f8f2e9;
+  --c-fg: #fffaf0;
   --c-muted: #d6cabd;
   --c-border: #9b8c80;
-  --c-line: #4b413b;
-  --c-surface: #28221f;
-  --c-surface-2: #332b28;
+  --c-line: #7d6d63;
+  --c-divider: #4b413b;
+  --c-meta: #e2cfb6;
+  --c-surface: #2b2421;
+  --c-surface-2: #372e2a;
   --c-accent: #93d1fb;
   --c-on-accent: #0f1f2b;
   --c-accent-soft: #4a3f12;
@@ -85,7 +91,9 @@
   --c-cloud: #3a302c;
   --c-shadow: #000000; /* 다크: 밝은 베이지 그림자 대신 바탕보다 어두운 색 */
   --bi-rect: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath d='M17 2.4C28 1.6 40 3.2 47 2.2C55 1.8 61.8 6 61.6 16.5C62.4 28 60.8 40 61.9 47.5C62.2 56.5 56 62.2 46.8 61.6C38 62.4 26 60.9 17.6 62C8.2 62.3 1.8 56.4 2.3 47C1.5 38 3.4 26 2.2 17.5C1.9 8 8.5 1.9 17 2.4Z' fill='none' stroke='%239b8c80' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --bi-rect-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath d='M17 2.4C28 1.6 40 3.2 47 2.2C55 1.8 61.8 6 61.6 16.5C62.4 28 60.8 40 61.9 47.5C62.2 56.5 56 62.2 46.8 61.6C38 62.4 26 60.9 17.6 62C8.2 62.3 1.8 56.4 2.3 47C1.5 38 3.4 26 2.2 17.5C1.9 8 8.5 1.9 17 2.4Z' fill='none' stroke='%2393d1fb' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --bi-pill: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='48' viewBox='0 0 80 48'%3E%3Cpath d='M24 2.4C34 1.8 46 3 56 2.3C69 2 78 11 77.6 24.4C77.8 37 69 46.2 56 45.6C46 46.4 34 45.2 24 45.8C11 46.2 2.2 37 2.4 23.8C2 11 11.2 2.2 24 2.4Z' fill='none' stroke='%239b8c80' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --bi-pill-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='48' viewBox='0 0 80 48'%3E%3Cpath d='M24 2.4C34 1.8 46 3 56 2.3C69 2 78 11 77.6 24.4C77.8 37 69 46.2 56 45.6C46 46.4 34 45.2 24 45.8C11 46.2 2.2 37 2.4 23.8C2 11 11.2 2.2 24 2.4Z' fill='none' stroke='%2393d1fb' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --bi-circle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M36 2.5C52 1.8 70 18 69.6 36.5C70.2 54 53 70 35.8 69.5C18 70.4 2 54 2.5 35.6C1.8 18 19 2.2 36 2.5Z' fill='none' stroke='%239b8c80' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --c-hl: #5b2f39;
   --c-on-hl: #ffd9df;
@@ -220,8 +228,24 @@
   color: var(--c-alert);
 }
 
+/* 고른 칩: 강조색 손그림 선 + 눌려 들어간 모양(그림자 없음). 바깥 링은 없다 */
 :root[data-theme="crayon"] .chip[aria-pressed="true"] {
-  border-color: var(--c-border);
+  padding: 0 var(--space-4);
+  box-shadow: none;
+}
+
+:root[data-theme="crayon"] .chip[data-size="lg"][aria-pressed="true"] {
+  padding: 0 var(--space-5);
+}
+
+:root[data-theme="crayon"] .theme-option:has(input:checked) {
+  padding: 0 var(--space-4);
+}
+
+/* 눌리는 카드도 오프셋 그림자(눌러 보라는 표시). 안 눌리는 카드는 그림자 없음 */
+:root[data-theme="crayon"] :where(a).card,
+:root[data-theme="crayon"] .card:has(> :where(a)) {
+  box-shadow: var(--lift);
 }
 
 :root[data-theme="crayon"] .key {
@@ -355,7 +379,8 @@
   border-width: calc(var(--bw) + 1px);
   background-color: transparent;
   background-image:
-    linear-gradient(var(--face), var(--face)), linear-gradient(var(--c-border), var(--c-border));
+    linear-gradient(var(--face), var(--face)),
+    linear-gradient(var(--edge, var(--c-border)), var(--edge, var(--c-border)));
   background-clip: padding-box, border-box;
   background-origin: padding-box, border-box;
 }
@@ -367,6 +392,7 @@
 :root[data-theme="crayon"] .chip[aria-pressed="true"],
 :root[data-theme="crayon"] .theme-option:has(input:checked) {
   --face: var(--c-accent-soft);
+  --edge: var(--c-accent);
 }
 
 :root[data-theme="crayon"] .empty {
@@ -476,4 +502,13 @@
   background-color: transparent;
   background-image: none;
   box-shadow: none;
+}
+
+/* 고른 항목의 손그림 선은 강조색 변형 */
+:root[data-theme="crayon"] .theme-option:has(input:checked) {
+  border-image-source: var(--bi-rect-accent);
+}
+
+:root[data-theme="crayon"] .chip[aria-pressed="true"] {
+  border-image-source: var(--bi-pill-accent);
 }

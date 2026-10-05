@@ -196,7 +196,11 @@ describe("화면 밝기 · 선명하게 보기", () => {
     await userEvent.click(screen.getByRole("radio", { name: "시스템에 맞춤" }));
     const sw = screen.getByRole("switch", { name: "선명하게 보기" });
     expect(sw).not.toBeChecked();
+    expect(sw).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("꺼짐")).toBeInTheDocument();
     await userEvent.click(sw);
+    expect(sw).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("켜짐")).toBeInTheDocument();
     expect(document.documentElement.dataset.contrast).toBe("high");
     expect(localStorage.getItem("yj.contrast")).toBe("high");
     await userEvent.click(sw);
