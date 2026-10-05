@@ -109,7 +109,7 @@ export async function stableElementShot(page: Page, target: Locator, name: strin
     shot = next;
   }
   if (process.platform === "win32" && !process.env.CI) {
-    expect(shot).toMatchSnapshot(`${name}.png`, { threshold: 0.02, maxDiffPixelRatio: 0.002 });
+    expect(shot).toMatchSnapshot(`${name}.png`, { threshold: 0.02, maxDiffPixels: 100 });
   } else {
     await writeFile(`e2e/__screenshots__/${name}.png`, shot);
   }

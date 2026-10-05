@@ -15,7 +15,7 @@ export default defineConfig({
   // OS 별 렌더가 달라 비교는 로컬 win32 에서만 한다(e2e/helpers.ts). 갱신: npx playwright test --update-snapshots
   snapshotDir: "./e2e/__screenshots__",
   snapshotPathTemplate: "{snapshotDir}/{arg}{ext}",
-  expect: { toMatchSnapshot: { maxDiffPixelRatio: 0.002, threshold: 0.05 } },
+  expect: { toMatchSnapshot: { maxDiffPixels: 500, threshold: 0.05 } },
   reporter: process.env.CI ? "github" : "list",
   use: { baseURL, trace: "off", screenshot: "off", video: "off" },
   projects: [
