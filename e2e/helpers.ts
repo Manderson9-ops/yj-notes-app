@@ -50,6 +50,8 @@ async function preloadCssImages(page: Page) {
 
 export async function stableShot(page: Page, name: string, fullPage = false) {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  // html 의 scroll-padding-bottom 때문에 Playwright 가 탭바 링크를 누를 때 페이지를 아래로 스크롤해 둘 수 있다. 캡처는 항상 맨 위에서.
+  await page.evaluate("window.scrollTo(0, 0)");
   await settle(page);
   await page.evaluate(
     "Promise.all([...document.fonts].map((f) => f.load().catch(() => null))).then(() => true)",
