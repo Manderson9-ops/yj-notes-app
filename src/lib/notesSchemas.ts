@@ -94,6 +94,12 @@ export const overviewSchema = z.object({
   lastIngest: z
     .object({ at: z.string(), status: z.enum(["ok", "failed", "running"]), commit: z.string() })
     .nullable(),
+  /** T-Q 물어보기: 답 기다리는 질문 수, 집 PC 워커 상태(2분 안에 신호가 있으면 online), 최근 7일 답 걸린 시간 중앙값(ms). */
+  ask: z.object({
+    pending: z.number().int(),
+    worker: z.object({ online: z.boolean(), seenAt: z.string().nullable() }),
+    medianTotalMs7d: z.number().int().nullable(),
+  }),
   milestones: z.object({ observed: z.number().int(), unobserved: z.number().int() }),
   recentNotes: z.array(
     z.object({

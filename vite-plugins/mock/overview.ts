@@ -22,6 +22,11 @@ export const overviewMock: MockModule = {
         status: "ok",
         commit: "fixture0000",
       },
+      ask: {
+        pending: 1,
+        worker: { online: true, seenAt: "2020-01-15T00:00:00.000Z" },
+        medianTotalMs7d: 150000,
+      },
       milestones: { observed: 4, unobserved: 6 },
       recentNotes: recent.map((d) => ({
         date: d.date,

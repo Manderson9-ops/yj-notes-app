@@ -12,6 +12,8 @@ import { growthRoutes } from "./routes/growth";
 import { reportRoutes } from "./routes/reports";
 import { logRoutes } from "./routes/logs";
 import { sessionRoutes } from "./routes/session";
+import { askRoutes } from "./routes/ask";
+import { workerRoutes } from "./routes/worker";
 
 export interface AppVariables {
   deps: Deps;
@@ -40,6 +42,8 @@ export function createApp(deps: Deps = defaultDeps): Hono<AppEnv> {
   app.route("/", growthRoutes);
   app.route("/", fileRoutes);
   app.route("/", logRoutes);
+  app.route("/", askRoutes);
+  app.route("/", workerRoutes);
 
   return app;
 }
