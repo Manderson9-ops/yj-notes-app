@@ -368,3 +368,29 @@ def test_all_dates_returned_for_checks(env):
     assert "2020-03-02" in out["search"]["dates"]
     assert out["search"]["keywords"]
     assert out["search"]["shown"] >= 1
+
+
+def test_exhaustive_search_day_stats_for_discriminative_checks():
+    texts = []
+    for d in range(1, 21):  # 흔한 낱말: 20일 모두
+        texts.append([f"2020-01-{d:02d}", "교사", "어린이집", "알림장 본문", "오늘도 밥을 먹었어요"])
+    texts.append(["2020-02-01", "부모", "집", "댓글", "손톱을 뜯고 피부를 자꾸 뜯어요"])
+    texts.append(["2020-02-03", "교사", "어린이집", "알림장 본문", "손톱을 뜯어서 달랬어요"])
+    texts.append(["2020-02-03", "교사", "어린이집", "댓글", "손톱 이야기"])
+    res = cs.exhaustive_search(texts, ["밥", "손톱", "피부"], [])
+    assert res["days"] == 22
+    assert res["keywordDays"]["밥"] == 20  # 흔한 낱말(날짜 빈도 90%)
+    assert res["keywordDays"]["손톱"] == 2  # 변별력 있는 낱말(날짜 빈도 약 9%)
+    assert res["keywordDates"]["손톱"] == ["2020-02-03", "2020-02-01"]
+    assert res["total"] == 23  # 건수는 그대로 센다(가족에게는 보이지 않는다)
+    multi = {m["date"]: m["keywords"] for m in res["multi"]}
+    assert set(multi["2020-02-01"]) == {"손톱", "피부"}  # 한 글에 서로 다른 낱말 둘
+    assert "2020-02-03" not in multi
+
+
+def test_search_summary_exposes_day_stats(env):
+    out = pack(env)
+    s = out["search"]
+    assert s["days"] >= 3 and s["keywordDays"] and s["keywordDates"]
+    assert all(len(v) <= 4 for v in s["keywordDates"].values())
+    assert isinstance(s["multi"], list)

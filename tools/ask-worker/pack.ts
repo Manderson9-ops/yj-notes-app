@@ -34,6 +34,11 @@ export interface SearchSummary {
   dates: string[];
   keywords: Record<string, number>;
   ints: string[];
+  /** 알림장 전체 날짜 수 / 낱말별 걸린 서로 다른 날짜 수 / 낱말별 최근 날짜(최대 4) / 서로 다른 낱말 2개 이상이 한 글에 걸린 날짜. */
+  days?: number | undefined;
+  keywordDays?: Record<string, number> | undefined;
+  keywordDates?: Record<string, string[]> | undefined;
+  multi?: { date: string; keywords: string[] }[] | undefined;
 }
 
 const packSchema = z.object({
@@ -50,6 +55,10 @@ const packSchema = z.object({
     dates: z.array(z.string()),
     keywords: z.record(z.string(), z.number()),
     ints: z.array(z.string()),
+    days: z.number().optional(),
+    keywordDays: z.record(z.string(), z.number()).optional(),
+    keywordDates: z.record(z.string(), z.array(z.string())).optional(),
+    multi: z.array(z.object({ date: z.string(), keywords: z.array(z.string()) })).optional(),
   }),
 });
 

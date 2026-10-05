@@ -187,10 +187,23 @@ def exhaustive_search(
                 "excerpt": _excerpt(t[4], best) + classmate_flag(t[1], t[2], t[4]),
             }
         )
+    # 변별력 통계(결정적 검사용): 낱말별 걸린 서로 다른 날짜 수·최근 날짜, 서로 다른 낱말 2개 이상이 한 글에 걸린 날짜
+    kw_days: dict[str, set[str]] = {k: set() for k in kws}
+    multi: list[dict] = []
+    for _score, d, _i, matched in sorted(hits, key=lambda h: h[1], reverse=True):
+        for k in matched:
+            kw_days[k].add(d)
+        if len(matched) >= 2 and len(multi) < 60:
+            multi.append({"date": d, "keywords": matched[:6]})
+    keyword_days = {k: len(v) for k, v in kw_days.items() if v}
+    keyword_dates = {k: sorted(v, reverse=True)[:4] for k, v in kw_days.items() if v}
     return {
         "total": len(hits),
         "days": len({t[0] for t in texts}),
         "keywords": {k: df[k] for k in kws if df[k]},
+        "keywordDays": keyword_days,
+        "keywordDates": keyword_dates,
+        "multi": multi,
         "dates": sorted({h[1] for h in hits}, reverse=True)[:60],
         "items": items,
         "texts": n,

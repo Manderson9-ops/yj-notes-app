@@ -2,6 +2,7 @@
 import { ApiError, NetworkError, type AskClient, type ClaimedQuestion } from "./client.ts";
 import { ClaudeError } from "./claude.ts";
 import type { Logger } from "./logger.ts";
+import type { CheckIssue } from "./checks.ts";
 import { PackError } from "./pack.ts";
 import { PipelineError, type PipelineHooks, type PipelineResult } from "./pipeline.ts";
 
@@ -20,6 +21,13 @@ export interface LoopDeps {
   heartbeatMs?: number; // 처리 중 리스 연장 간격(0 이면 끔)
   backoffBaseMs?: number;
   backoffMaxMs?: number;
+}
+
+/** 로그용: 「h:forbidden,s:template」처럼 심각도 첫 글자와 범주 이름만(중복 제거). 지적 문장은 넣지 않는다. */
+export function issueCategories(issues: readonly CheckIssue[]): string {
+  return [...new Set(issues.map((i) => `${i.severity === "hard" ? "h" : "s"}:${i.category}`))].join(
+    ",",
+  );
 }
 
 export function failCodeOf(err: unknown): string {
@@ -89,6 +97,17 @@ export async function handleOne(
         },
         onStage: (stage, ms) => {
           log("stage", { id: q.id, stage, ms });
+        },
+        // 결정적 검사 지적은 범주 이름만 기록한다(문장·질문·답은 남기지 않는다).
+        onCheckIssues: (stage, issues) => {
+          if (issues.length > 0) {
+            log("check_issues", {
+              id: q.id,
+              stage,
+              cats: issueCategories(issues),
+              hard: issues.filter((i) => i.severity === "hard").length,
+            });
+          }
         },
       },
       signal,

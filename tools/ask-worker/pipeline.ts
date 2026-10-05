@@ -11,7 +11,8 @@ import {
   type IssueCategory,
   type ReviewIssue,
 } from "./answer-schema.ts";
-import { checkAnswer, type PackInfo } from "./checks.ts";
+import { checkAnswer, softToReviewIssues, type CheckIssue, type PackInfo } from "./checks.ts";
+import { suggestLevel } from "./level-suggest.ts";
 import type { ClaudeRunner } from "./claude.ts";
 import { detectRedFlag } from "../../server/ask/redflags.ts";
 import { buildEmergencySection } from "./emergency.ts";
@@ -52,6 +53,8 @@ export interface PipelineHooks {
   onAnswering?: () => Promise<void> | void;
   onReviewing?: () => Promise<void> | void;
   onStage?: (stage: string, ms: number) => void;
+  /** 결정적 검사 지적(진단용). 질문·답 본문은 넘기지 않는다. */
+  onCheckIssues?: (stage: string, issues: CheckIssue[]) => void;
 }
 
 export interface PipelineResult {
@@ -73,7 +76,10 @@ const REVIEW_SCHEMA_JSON = JSON.stringify(REVIEW_JSON_SCHEMA);
 
 interface Candidate {
   answer: Answer;
+  /** 게시 점수의 근거: 검토자 지적 + 코드 쪽 SOFT 지적(같은 감점표). */
   issues: ReviewIssue[];
+  /** 검토자가 낸 지적만(재검토의 이전 지적으로 쓴다). */
+  reviewer: ReviewIssue[];
   score: number;
 }
 
@@ -113,6 +119,7 @@ export async function answerQuestion(
     pack: string,
     answer: Answer,
     previous: ReviewIssue[] | null,
+    soft: readonly CheckIssue[],
   ): Promise<Candidate> => {
     if (!reviewing) {
       reviewing = true;
@@ -130,8 +137,9 @@ export async function answerQuestion(
     );
     const parsed = reviewSchema.safeParse(r.output);
     if (!parsed.success) throw new PipelineError("review_invalid");
-    const issues = mergeReview(parsed.data, previous);
-    return { answer, issues, score: computeScore(issues) };
+    const reviewer = mergeReview(parsed.data, previous);
+    const issues = [...reviewer, ...softToReviewIssues(soft)];
+    return { answer, issues, reviewer, score: computeScore(issues) };
   };
 
   await hooks.onAnswering?.();
@@ -140,8 +148,17 @@ export async function answerQuestion(
     const expand = deps.expand;
     exp = await stage("expand", () => expand(q, signal));
   }
+  const sevOf = exp?.ok
+    ? {
+        frequency: exp.expansion.frequency,
+        duration: exp.expansion.duration,
+        impact: exp.expansion.impact,
+        aggression: exp.expansion.aggression,
+      }
+    : undefined;
   const pq: PromptQuestion = {
     ...q,
+    suggested: q.redFlag ? undefined : suggestLevel(q.body, sevOf),
     isBehavior: exp?.ok ? exp.expansion.isBehaviorQuestion : undefined,
     topic: exp?.ok ? exp.expansion.topic : undefined,
   };
@@ -157,6 +174,7 @@ export async function answerQuestion(
       ? { frequency: e.frequency, duration: e.duration, impact: e.impact, aggression: e.aggression }
       : undefined,
     askedBy: q.askedBy,
+    suggested: pq.suggested,
   };
   if (q.redFlag && deps.emergencyMd) {
     const em = buildEmergencySection(deps.emergencyMd, detectRedFlag(q.body).rules);
@@ -168,16 +186,18 @@ export async function answerQuestion(
     info,
     q.redFlag,
   );
+  hooks.onCheckIssues?.("generate", first.items);
   let best: Candidate | null = null;
   let fixes: string[] = first.issues;
   let prevAnswer: Answer | null = first.answer;
   let prevReview: ReviewIssue[] | null = null;
-  if (first.ok && first.answer) {
-    best = await review("review", info.pack, first.answer, null);
+  // 첫 초안이 HARD 지적 없이 파싱되면 SOFT 지적이 있어도 검토한다(SOFT 는 막지 않고 감점으로 넘어간다).
+  if (first.answer && first.hard.length === 0) {
+    best = await review("review", info.pack, first.answer, null, first.soft);
     if (best.score >= deps.targetScore) return finish(best, 0);
     fixes = best.issues.map(issueLine);
     prevAnswer = first.answer;
-    prevReview = best.issues;
+    prevReview = best.reviewer;
   }
 
   // 재작성(최대 MAX_REWRITES 회): 지적만 고치고 나머지는 그대로
@@ -191,10 +211,12 @@ export async function answerQuestion(
     ),
   );
   const second = checkAnswer(raw, info, q.redFlag);
-  if (second.ok && second.answer) {
-    const cand = await review("review2", info.pack, second.answer, prevReview);
+  hooks.onCheckIssues?.("rewrite", second.items);
+  if (second.answer && second.hard.length === 0) {
+    const cand = await review("review2", info.pack, second.answer, prevReview, second.soft);
     if (!best || cand.score >= best.score) best = cand;
   }
+  // HARD 지적이 재작성 뒤에도 남았고 첫 초안도 HARD 였을 때만 실패. 첫 초안이 깨끗했으면 그쪽을 게시한다.
   if (!best) throw new PipelineError("checks_failed");
   return finish(best, 1);
 

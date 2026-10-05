@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ASK_LEVELS, levelTemplateText } from "../../shared/ask-levels.ts";
 import { issueLine, type ReviewIssue } from "./answer-schema.ts";
+import type { LevelSuggestion } from "./level-suggest.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -25,6 +26,8 @@ export interface PromptQuestion {
   isBehavior?: boolean | undefined;
   /** 질문 확장의 한 줄 주제. */
   topic?: string | undefined;
+  /** 질문 글에서 결정적으로 계산한 권장 단계(위급이면 없음). */
+  suggested?: LevelSuggestion | undefined;
 }
 
 export function sanitizeQuestion(s: string): string {
@@ -39,6 +42,11 @@ export function questionBlock(q: PromptQuestion): string {
     `redFlag: ${q.redFlag ? "예" : "아니오"}`,
     `행동 질문 여부(사전 분류): ${q.isBehavior === undefined ? "알 수 없음" : q.isBehavior ? "예" : "아니오"}`,
     ...(q.topic ? [`주제(사전 분류): ${q.topic.replace(/[\r\n]+/g, " ").slice(0, 40)}`] : []),
+    ...(q.suggested
+      ? [
+          `권장 단계(사전 계산): ${String(q.suggested.level)} — ${q.suggested.why}. 이 단계의 ±1 안에서 고르고, 벗어나려면 levelReason 에 그렇게 보는 기록·근거를 적어요`,
+        ]
+      : []),
     OPEN,
     sanitizeQuestion(q.body),
     CLOSE,

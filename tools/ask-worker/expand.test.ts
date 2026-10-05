@@ -226,18 +226,16 @@ describe("파이프라인: 확장·응급·분류", () => {
     expect(r.level).toBe(10);
   });
 
-  it("위급 질문에서 응급 basis 를 안 쓰면 재작성 지적이 간다", async () => {
-    const wrong = goodAnswer({ level: 10, upIf: ["119에 바로 전화해요"] }); // basis 가 EMERG 가 아님
-    const fixed = goodAnswer({
+  it("위급 질문에서 응급 basis 를 안 쓰면 SOFT 안전 지적으로 감점되고 게시는 막지 않는다", async () => {
+    const wrong = goodAnswer({
       level: 10,
-      tryNow: [
-        { action: "옆으로 눕히고 주변 물건을 치워요", basis: "EMERG-SEIZURE" },
-        { action: "옆 사람에게 119 신고를 부탁해요", basis: "EMERG-SEIZURE" },
-      ],
-      upIf: ["5분 넘게 이어지면 119에 바로 전화해요"],
-    });
-    const { deps, reqs } = setup([wrong, fixed, review()]);
-    await answerQuestion(deps, { ...q, body: "경련을 해요", redFlag: true });
-    expect(reqs[1]?.prompt).toContain("EMERG-… ref");
+      upIf: ["119에 바로 전화해요"],
+      evidence: [{ ref: "EMERG-SEIZURE", point: "경련 중에는 가슴압박을 하지 않아요" }],
+    }); // basis 가 EMERG 가 아님
+    const { deps, reqs } = setup([wrong, review()]);
+    const r = await answerQuestion(deps, { ...q, body: "경련을 해요", redFlag: true });
+    expect(reqs).toHaveLength(2);
+    expect(r.deductions.safety).toBe(0.5);
+    expect(r.reviewScore).toBe(9.5);
   });
 });

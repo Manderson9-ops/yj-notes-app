@@ -12,6 +12,7 @@ import {
   backoffMs,
   failCodeOf,
   handleOne,
+  issueCategories,
   runLoop,
   type LoopDeps,
   type Processor,
@@ -231,5 +232,44 @@ describe("helpers", () => {
   it("failCodeOf", () => {
     expect(failCodeOf(new ApiError(500))).toBe("upload_500");
     expect(failCodeOf(new Error("x"))).toBe("internal_error");
+  });
+});
+
+describe("check_issues 로그: 범주 이름만", () => {
+  it("issueCategories 는 심각도 첫 글자와 범주만(중복 제거)", () => {
+    expect(
+      issueCategories([
+        { severity: "hard", category: "forbidden", text: "비밀 질문 본문 테스트아이" },
+        { severity: "soft", category: "template", text: "x" },
+        { severity: "soft", category: "template", text: "y" },
+      ]),
+    ).toBe("h:forbidden,s:template");
+  });
+  it("훅이 불리면 범주만 로그에 남고 지적 문장·질문은 남지 않는다", async () => {
+    const { deps, rec, ac } = make({
+      claims: [Q],
+      processor: async (_q, hooks) => {
+        hooks.onCheckIssues?.("generate", [
+          { severity: "soft", category: "ungrounded", text: "「손톱」 기록이 있어요: 2020-03-04" },
+          { severity: "hard", category: "leak", text: "비밀 질문 본문 테스트아이 428건" },
+        ]);
+        hooks.onCheckIssues?.("rewrite", []);
+        await hooks.onAnswering?.();
+        return RESULT;
+      },
+    });
+    await handleOne(deps, ac.signal);
+    const logs = rec.logs.filter((l) => l.event === "check_issues");
+    expect(logs).toHaveLength(1); // 지적이 없으면 기록하지 않는다
+    expect(logs[0]?.fields).toEqual({
+      id: 3,
+      stage: "generate",
+      cats: "s:ungrounded,h:leak",
+      hard: 1,
+    });
+    const dump = JSON.stringify(rec.logs);
+    expect(dump).not.toContain("손톱");
+    expect(dump).not.toContain("비밀 질문 본문");
+    expect(dump).not.toContain("428");
   });
 });

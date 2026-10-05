@@ -501,6 +501,10 @@ def build_pack(
             "dates": search["dates"],
             "keywords": search["keywords"],
             "ints": ints,
+            "days": search["days"],
+            "keywordDays": search["keywordDays"],
+            "keywordDates": search["keywordDates"],
+            "multi": search["multi"],
         },
     }
 

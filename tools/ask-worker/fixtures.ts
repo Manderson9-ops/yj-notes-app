@@ -17,7 +17,7 @@ export function goodAnswer(over: Partial<Answer> = {}): Answer {
     kind: "behavior",
     level,
     levelTitle: levelTitle(level),
-    levelReason: "30개월이고 며칠째 반복되지만 다른 활동에는 지장이 없어요.",
+    levelReason: "30개월이고 알림장 기록에서 며칠째 반복되지만 다른 활동에는 지장이 없어요.",
     summary: "테스트아이가 점심을 반만 먹는 일이 며칠째 이어져요.",
     fromRecords: [
       {

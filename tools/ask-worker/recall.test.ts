@@ -2,9 +2,11 @@
 import { describe, expect, it } from "vitest";
 import {
   checkAnswer,
+  claimSubject,
   packMeta,
   statedAuthor,
   statedPlace,
+  softToReviewIssues,
   stripAxisTags,
   type PackInfo,
 } from "./checks.ts";
@@ -37,27 +39,83 @@ const record = (date: string, what: string, link = "질문과 이어져요") => 
   source: "알림장" as const,
 });
 
-describe("「기록이 없어요」 오류 주장 대조", () => {
-  it("전수 검색에 걸린 낱말을 「기록이 없어요」라고 하면 건수·날짜와 함께 알린다", () => {
-    const r = checkAnswer(goodAnswer({ limits: "밥 관련 기록이 없어요" }), info(), false);
-    expect(r.ok).toBe(false);
-    expect(r.issues).toContain("[ungrounded] 전수 검색에 7건이 있어요: 2020-03-04, 2020-03-02");
+describe("「기록이 없어요」 오류 주장 대조(변별력 있는 낱말만)", () => {
+  const stats = (
+    over: Partial<NonNullable<PackInfo["search"]>> = {},
+  ): NonNullable<PackInfo["search"]> => ({
+    total: 428,
+    shown: 25,
+    dates: ["2020-03-04", "2020-03-02"],
+    keywords: { 밥: 400, 손톱: 3 },
+    ints: [],
+    days: 100,
+    keywordDays: { 밥: 90, 손톱: 3 }, // 밥은 흔한 낱말(90%), 손톱은 변별력 있는 낱말(3%)
+    keywordDates: {
+      밥: ["2020-03-04"],
+      손톱: ["2020-03-04", "2020-03-02", "2020-02-20", "2020-02-11", "2020-01-30"],
+    },
+    multi: [],
+    ...over,
   });
-  it("검색 낱말과 상관없는 한계 서술은 통과", () => {
-    expect(
-      checkAnswer(goodAnswer({ limits: "체중 변화는 확인되지 않아요" }), info(), false).ok,
-    ).toBe(true);
+  const withStats = (over: Partial<NonNullable<PackInfo["search"]>> = {}) =>
+    info({ search: stats(over) });
+
+  it("흔한 낱말(밥 90%)의 건수로는 「기록이 없어요」를 반박하지 않는다(오탐 방지)", () => {
+    const r = checkAnswer(goodAnswer({ limits: "밥 관련 기록이 없어요" }), withStats(), false);
+    expect(r.items.some((i) => i.category === "ungrounded")).toBe(false);
   });
-  it("전수 검색 결과가 0건이면 같은 말도 허용", () => {
-    const zero = info({ search: { total: 0, shown: 0, dates: [], keywords: {}, ints: [] } });
-    expect(checkAnswer(goodAnswer({ limits: "밥 관련 기록이 없어요" }), zero, false).ok).toBe(true);
+  it("변별력 있는 낱말(날짜 빈도 5% 미만)이 주장 대상과 겹치면 낱말 + 날짜 최대 4개를 알린다", () => {
+    const r = checkAnswer(goodAnswer({ limits: "손톱 뜯기 기록이 없어요" }), withStats(), false);
+    const issue = r.issues.find((i) => i.startsWith("[ungrounded]"));
+    expect(issue).toContain("「손톱」");
+    expect(issue).toContain("2020-03-04, 2020-03-02, 2020-02-20, 2020-02-11");
+    expect(issue).not.toContain("2020-01-30"); // 4개까지만
+    expect(issue).not.toMatch(/\d+건/); // 건수는 쓰지 않는다
+    expect(r.soft.some((i) => i.category === "ungrounded")).toBe(true);
+    expect(r.hard).toHaveLength(0); // SOFT: 막지 않는다
+  });
+  it("주장 대상과 겹치지 않는 낱말은 세지 않는다", () => {
+    const r = checkAnswer(goodAnswer({ limits: "체중 변화 기록이 없어요" }), withStats(), false);
+    expect(r.items.some((i) => i.category === "ungrounded")).toBe(false);
+  });
+  it("서로 다른 낱말 2개 이상이 한 글에 함께 걸리고 둘 다 주장 대상과 겹치면 반박한다", () => {
+    const s = stats({
+      keywordDays: { 밥: 90, 손톱: 30, 피부: 30 },
+      multi: [{ date: "2020-02-01", keywords: ["손톱", "피부"] }],
+    });
+    const r = checkAnswer(
+      goodAnswer({ limits: "손톱과 피부 관련 기록이 없어요" }),
+      info({ search: s }),
+      false,
+    );
+    expect(r.issues.join()).toContain("「손톱·피부」 기록이 있어요: 2020-02-01");
+    const one = checkAnswer(
+      goodAnswer({ limits: "피부 관련 기록이 없어요" }),
+      info({ search: s }),
+      false,
+    );
+    expect(one.items.some((i) => i.category === "ungrounded")).toBe(false); // 겹치는 낱말이 하나뿐
+  });
+  it("전수 검색 통계가 없으면(구버전 묶음) 낱말 대조는 건너뛴다", () => {
+    const old = info({
+      search: { total: 7, shown: 3, dates: ["2020-03-04"], keywords: { 밥: 7 }, ints: [] },
+    });
+    expect(checkAnswer(goodAnswer({ limits: "밥 관련 기록이 없어요" }), old, false).ok).toBe(true);
   });
   it("실천 프로토콜(INT-*)이 있는데 「근거가 없어요」라고 하면 알린다", () => {
-    const r = checkAnswer(goodAnswer({ limits: "이 행동에 대한 근거가 없어요" }), info(), false);
+    const r = checkAnswer(
+      goodAnswer({ limits: "이 행동에 대한 근거가 없어요" }),
+      withStats({ ints: ["INT-FEED-01"] }),
+      false,
+    );
     expect(r.issues).toContain("[ungrounded] 근거 묶음에 실천 프로토콜이 있어요: INT-FEED-01");
   });
+  it("주장 대상 추출(앞 1~3 낱말)", () => {
+    expect(claimSubject("손톱 뜯기에 대한 기록이 없어요")).toBe("손톱 뜯기");
+    expect(claimSubject("피부 뜯는 모습 기록이 없어요")).toContain("뜯는 모습");
+    expect(claimSubject("그냥 말이에요")).toBe("그냥 말이에요"); // 못 찾으면 문장 전체
+  });
 });
-
 describe("작성자·장소 표기 대조(fromRecords)", () => {
   it("묶음 표시와 다른 작성자·장소를 지적한다", () => {
     const r = checkAnswer(
@@ -459,5 +517,170 @@ describe("not_behavior: levelTitle 빈 문자열", () => {
     expect(
       checkAnswer({ ...nb, levelTitle: "아주 흔한 발달 과정" }, info(), false).answer,
     ).toBeNull(); // 스키마 위반
+  });
+});
+
+describe("위급 질문: 안전·응급 규칙만(주제·말씨·식사·단계 규칙은 적용하지 않는다)", () => {
+  // 사탕을 먹다가 숨을 못 쉬고 파래진 질문: 주제가 「식사」로 읽혀도 식사기록·주제 규칙이 걸리면 안 된다
+  const chokePack =
+    "[ref: note:2020-03-02] [2020-03-02][작성자: 교사][장소: 어린이집][글 종류: 알림장 본문] 점심\n" +
+    "[ref: EMERG-KDCA-CHOKE] [ref: EMERG-KDCA-2025] 등 두드리기";
+  const chokeInfo = info({
+    pack: chokePack,
+    refs: [
+      "note:2020-03-02",
+      "EMERG-KDCA-CHOKE",
+      "EMERG-KDCA-2025",
+      "INT-FEAR-01",
+      "guide:05-식사#§3-1",
+    ],
+    domains: ["feeding"],
+    severity: { frequency: null, duration: null, impact: null, aggression: null },
+    askedBy: "엄마",
+    isBehavior: true,
+    suggested: { level: 2, why: "x" },
+    search: {
+      total: 5,
+      shown: 3,
+      dates: ["2020-03-02"],
+      keywords: { 먹다가: 5 },
+      ints: [],
+      days: 100,
+      keywordDays: { 먹다가: 2 },
+      keywordDates: { 먹다가: ["2020-03-02"] },
+      multi: [],
+    },
+  });
+  const choke = (over: Record<string, unknown> = {}) =>
+    goodAnswer({
+      level: 10,
+      levelReason: "숨을 못 쉬는 병일 수 있어 바로 119예요",
+      summary: "엄마가 사탕을 먹다가 숨을 못 쉬어요. 지금 등을 두드리세요",
+      tryNow: [
+        {
+          action: "등을 5회 세게 두드리고 옆 사람에게 119 신고를 부탁해요",
+          basis: "EMERG-KDCA-2025",
+        },
+        { action: "안 나오면 복부를 밀어내요", basis: "EMERG-KDCA-CHOKE" },
+      ],
+      evidence: [{ ref: "EMERG-KDCA-2025", point: "먼저 행동하고 119는 동시에" }],
+      upIf: ["119에 바로 전화해요"],
+      forAsker: "엄마께: 지금 바로 등을 두드려요",
+      ...over,
+    });
+  it("식사기록·주제 불일치·3인칭·질환 낱말·단계 보정·권장 단계·호칭 규칙은 위급에 걸리지 않는다", () => {
+    const r = checkAnswer(choke(), chokeInfo, true);
+    expect(r.items).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+  it("같은 답을 위급이 아닌 질문으로 보면 식사 규칙·말씨 규칙이 걸린다(대조)", () => {
+    const r = checkAnswer(
+      choke({
+        level: 4,
+        upIf: ["소아과에 연락해요"],
+        observe: { what: "a", howLong: "3~4일", how: "b" },
+      }),
+      chokeInfo,
+      false,
+    );
+    expect(r.issues.join()).toContain("식사기록");
+    expect(r.issues.join()).toContain("2인칭");
+  });
+  it("위급에서도 막는 것: 단계≠10, 금지어, 119 안내 미루기, 내부 규칙·건수 노출은 HARD", () => {
+    expect(checkAnswer(choke({ level: 4 }), chokeInfo, true).hard.map((i) => i.category)).toContain(
+      "redflag",
+    );
+    expect(
+      checkAnswer(choke({ limits: "정상이에요" }), chokeInfo, true).hard.map((i) => i.category),
+    ).toContain("forbidden");
+    expect(
+      checkAnswer(choke({ limits: "기록이 428건이에요" }), chokeInfo, true).hard.map(
+        (i) => i.category,
+      ),
+    ).toContain("leak");
+    const defer = choke({
+      tryNow: [
+        { action: "119에 전화하고 119 안내에 따라 해요", basis: "EMERG-KDCA-2025" },
+        { action: "곁에서 지켜봐요", basis: "EMERG-KDCA-CHOKE" },
+      ],
+    });
+    expect(checkAnswer(defer, chokeInfo, true).hard.map((i) => i.category)).toContain("emergency");
+    expect(checkAnswer({ nope: 1 }, chokeInfo, true).hard.map((i) => i.category)).toContain(
+      "schema",
+    );
+  });
+  it("응급 basis·전문 기관 이름·ref 실재는 SOFT 안전 지적", () => {
+    const r = checkAnswer(
+      choke({
+        tryNow: [{ action: "등을 두드려요", basis: "일반 권고" }],
+        upIf: ["어린이집 선생님께 말해요"],
+      }),
+      chokeInfo,
+      true,
+    );
+    expect(r.hard).toHaveLength(0);
+    expect(r.soft.map((i) => i.category)).toEqual(["safety", "safety"]);
+  });
+});
+
+describe("HARD / SOFT 분류", () => {
+  it("SOFT 는 막지 않는다(hard 비어 있음)", () => {
+    const r = checkAnswer(
+      goodAnswer({ forAsker: "아버님께: 오늘은 같이 앉아요", summary: "질환이 걱정되셨어요" }),
+      info(),
+      false,
+    );
+    expect(r.hard).toHaveLength(0);
+    expect(r.soft.map((i) => i.category)).toEqual(["style", "style"]);
+    expect(r.ok).toBe(false); // 지적은 있다
+  });
+  it("kind 불일치(주입 질문에 behavior)는 HARD, 분류 반대는 SOFT", () => {
+    const hard = checkAnswer(goodAnswer(), info({ isBehavior: false }), false);
+    expect(hard.hard.map((i) => i.category)).toContain("kind");
+    const nb = {
+      kind: "not_behavior",
+      level: 1,
+      levelTitle: "",
+      levelReason: "이곳은 아이의 행동·발달 걱정을 묻는 곳이에요",
+      summary: "아이와 상관없는 질문이에요",
+      fromRecords: [],
+      evidence: [],
+      tryNow: [],
+      avoid: [],
+      upIf: [],
+      downIf: [],
+      forAsker: "엄마께: 아이 걱정을 적어 주세요",
+    };
+    const soft = checkAnswer(nb, info({ isBehavior: true }), false);
+    expect(soft.hard).toHaveLength(0);
+    expect(soft.soft.map((i) => i.category)).toEqual(["template"]);
+  });
+  it("권장 단계 지적은 SOFT template", () => {
+    const r = checkAnswer(
+      goodAnswer({ level: 5, levelReason: "30개월이에요" }),
+      info({ suggested: { level: 2, why: "한 번의 흔한 감정 표현이에요" } }),
+      false,
+    );
+    expect(r.hard).toHaveLength(0);
+    expect(r.items.find((i) => i.text.includes("권장 단계"))).toMatchObject({
+      severity: "soft",
+      category: "template",
+    });
+    const ok = checkAnswer(
+      goodAnswer({ level: 5, levelReason: "알림장 기록에서 반복돼요" }),
+      info({ suggested: { level: 2, why: "x" } }),
+      false,
+    );
+    expect(ok.items.some((i) => i.text.includes("권장 단계"))).toBe(false);
+  });
+  it("softToReviewIssues: 감점 범주만 변환(HARD 범주는 제외)", () => {
+    const r = checkAnswer(goodAnswer({ forAsker: "아버님께" }), info(), false);
+    const issues = softToReviewIssues(r.items);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ category: "style", where: "코드 검사" });
+    expect(issues[0]?.fix).toContain("호칭");
+    expect(softToReviewIssues([{ severity: "hard", category: "forbidden", text: "x" }])).toEqual(
+      [],
+    );
   });
 });
