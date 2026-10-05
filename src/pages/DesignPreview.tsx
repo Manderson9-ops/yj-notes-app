@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Chip } from "../components/Chip";
 import { Notice } from "../components/Notice";
 import { ThemeDecor } from "../components/decor/ThemeDecor";
+import { ContrastSwitch } from "../components/ContrastSwitch";
+import { SchemePicker } from "../components/SchemePicker";
 import { ThemePicker } from "../components/ThemePicker";
 
 // S91 디자인 미리보기. 합성 자료만 쓴다: 이름은 테스트아이·교사A·친구A, 날짜는 2020-01-15 근처.
@@ -20,6 +22,11 @@ export function DesignPreview() {
       <h1>디자인 미리보기</h1>
       <p className="muted">테마를 고르면 시안이 바뀝니다. 모두 예시예요.</p>
       <ThemePicker />
+      <p>
+        <strong>화면 밝기</strong>
+      </p>
+      <SchemePicker />
+      <ContrastSwitch />
 
       <section aria-labelledby="pv-home">
         <h2 id="pv-home">홈</h2>

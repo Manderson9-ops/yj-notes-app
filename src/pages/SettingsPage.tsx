@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ContrastSwitch } from "../components/ContrastSwitch";
+import { SchemePicker } from "../components/SchemePicker";
 import { ThemePicker } from "../components/ThemePicker";
 import { api } from "../lib/api";
 import { formatYmdKo, seoulDateOf } from "../lib/dateFormat";
@@ -47,6 +49,11 @@ export function SettingsPage() {
           />
           <span>큰 글씨</span>
         </label>
+        <ContrastSwitch />
+      </section>
+      <section className="settings-section" aria-labelledby="set-scheme">
+        <h2 id="set-scheme">화면 밝기</h2>
+        <SchemePicker />
       </section>
       <section className="settings-section" aria-labelledby="set-theme">
         <h2 id="set-theme">화면 테마</h2>

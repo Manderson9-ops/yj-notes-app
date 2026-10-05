@@ -181,3 +181,25 @@ describe("R1-3: global lock notice", () => {
     expect(screen.queryByText(/최근 전체 잠금/)).toBeNull();
   });
 });
+
+describe("화면 밝기 · 선명하게 보기", () => {
+  it("shows a 3-option brightness group and a high-contrast switch that apply at once", async () => {
+    localStorage.clear();
+    delete document.documentElement.dataset.contrast;
+    await setup([]);
+    const group = screen.getByRole("radiogroup", { name: "화면 밝기" });
+    expect(group).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "시스템에 맞춤" })).toBeChecked();
+    await userEvent.click(screen.getByRole("radio", { name: "어둡게" }));
+    expect(document.documentElement.dataset.scheme).toBe("dark");
+    expect(localStorage.getItem("yj.scheme")).toBe("dark");
+    await userEvent.click(screen.getByRole("radio", { name: "시스템에 맞춤" }));
+    const sw = screen.getByRole("switch", { name: "선명하게 보기" });
+    expect(sw).not.toBeChecked();
+    await userEvent.click(sw);
+    expect(document.documentElement.dataset.contrast).toBe("high");
+    expect(localStorage.getItem("yj.contrast")).toBe("high");
+    await userEvent.click(sw);
+    expect(document.documentElement.dataset.contrast).toBeUndefined();
+  });
+});
