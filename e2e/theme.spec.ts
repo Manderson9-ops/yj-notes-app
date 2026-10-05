@@ -239,6 +239,66 @@ for (const theme of ["basic", "crayon", "forest"] as const) {
       const tappable = await w("a.card");
       const fixed = await w("article.card");
       expect(tappable).toBeGreaterThan(fixed);
+      if (scheme === "dark") {
+        // 다크: 눌리는 카드는 한 단계 밝은 면(크레용은 첫 그라데이션 층이 면 색)
+        const fill = async (sel: string) =>
+          String(
+            await page.evaluate(
+              `(() => { const s = getComputedStyle(document.querySelector(${JSON.stringify(sel)})); const m = s.backgroundImage.match(/rgb\\([^)]*\\)/); return m ? m[0] : s.backgroundColor; })()`,
+            ),
+          );
+        expect(await fill("a.card")).not.toBe(await fill("article.card"));
+      }
     });
+  }
+}
+
+// SettingSwitch: 켜짐이면 트랙이 강조색이고 손잡이가 오른쪽, 꺼짐이면 그 반대(트랙 안쪽 구조가 바뀌어도 규칙이 이어지는지)
+for (const mode of ["normal", "high"] as const) {
+  for (const theme of ["basic", "crayon", "forest"] as const) {
+    for (const scheme of ["light", "dark"] as const) {
+      test(`스위치 켜짐/꺼짐 모양: ${theme} ${scheme} ${mode}`, async ({ page }) => {
+        await page.addInitScript(
+          ({ t, s, m }) => {
+            localStorage.setItem("yj.theme", t);
+            localStorage.setItem("yj.scheme", s);
+            if (m === "high") localStorage.setItem("yj.contrast", "high");
+          },
+          { t: theme, s: scheme, m: mode },
+        );
+        await page.emulateMedia({ reducedMotion: "reduce" }); // 손잡이 이동 전환을 끄고 최종 위치를 잰다
+        await login(page);
+        await page.getByRole("link", { name: "설정", exact: true }).click();
+        await expect(page.getByRole("switch", { name: "큰 글씨" })).toBeVisible();
+        const probe = (name: string) =>
+          page.evaluate<{ accent: string; bg: string; knobRight: boolean }>(
+            `(() => { const hex = getComputedStyle(document.documentElement).getPropertyValue("--c-accent").trim(); const n = parseInt(hex.slice(1), 16); const accent = "rgb(" + [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(", ") + ")"; const row = [...document.querySelectorAll(".switch-row")].find((r) => r.textContent.includes(${JSON.stringify(name)})); const track = row.querySelector(".switch-track"); const knob = track.querySelector("i"); const a = track.getBoundingClientRect(); const b = knob.getBoundingClientRect(); return { accent, bg: getComputedStyle(track).backgroundColor, knobRight: b.left + b.width / 2 > a.left + a.width / 2 }; })()`,
+          );
+        const large = page.getByRole("switch", { name: "큰 글씨" });
+        const sharp = page.getByRole("switch", { name: "선명하게 보기" });
+        // 큰 글씨: 꺼짐 상태
+        let p = await probe("큰 글씨");
+        expect(p.bg).not.toBe(p.accent);
+        expect(p.knobRight).toBe(false);
+        if (mode === "high") {
+          p = await probe("선명하게 보기");
+          expect(p.bg).toBe(p.accent);
+          expect(p.knobRight).toBe(true);
+          await sharp.uncheck();
+          p = await probe("선명하게 보기");
+          expect(p.bg).not.toBe(p.accent);
+          expect(p.knobRight).toBe(false);
+        } else {
+          await large.check();
+          p = await probe("큰 글씨");
+          expect(p.bg).toBe(p.accent);
+          expect(p.knobRight).toBe(true);
+          await large.uncheck();
+          p = await probe("큰 글씨");
+          expect(p.bg).not.toBe(p.accent);
+          expect(p.knobRight).toBe(false);
+        }
+      });
+    }
   }
 }

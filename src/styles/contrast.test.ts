@@ -208,6 +208,7 @@ const HIGH_PAIRS: [string, string, number][] = [
   ...onAll("--c-border", 7),
   ...onAll("--c-line", 3),
   ...onAll("--c-meta", 10),
+  ...onAll("--c-disabled", 7),
   ...onAll("--c-link", 7),
   ...onAll("--c-earth", 7),
   ...onAll("--c-accent", 7),

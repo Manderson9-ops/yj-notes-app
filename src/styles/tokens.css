@@ -108,6 +108,7 @@
   --c-ok: #7dd69a;
   --c-ok-bg: #16291f;
   --shadow: none;
+  --lift: none;
 }
 /* 큰 글씨 설정 (docs/06 §1): <html data-large-text="1"> */
 :root[data-large-text="1"] {
