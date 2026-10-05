@@ -31,6 +31,11 @@ export default function HomePage() {
   return (
     <>
       <h1 className="sr-only">홈</h1>
+      <div className="home-ask">
+        <Link to="/ask" className="btn-primary btn-lg">
+          물어보기
+        </Link>
+      </div>
       {overview.isPending ? (
         <>
           <p className="loading" role="status">

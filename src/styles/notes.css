@@ -251,6 +251,9 @@ mark {
 .home-actions {
   margin: var(--space-4) 0;
 }
+.home-ask {
+  margin: var(--space-2) 0 var(--space-3);
+}
 .home-facts {
   margin-top: var(--space-4);
 }

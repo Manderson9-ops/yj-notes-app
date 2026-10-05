@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { AnswerCard } from "../components/ask/AnswerCard";
+import { LevelBadge } from "../components/ask/LevelBadge";
+import { RedFlagCard } from "../components/ask/RedFlagCard";
 import { Chip } from "../components/Chip";
 import { Notice } from "../components/Notice";
 import { ThemeDecor } from "../components/decor/ThemeDecor";
 import { SchemePicker } from "../components/SchemePicker";
 import { TextSettings } from "../components/TextSettings";
 import { ThemePicker } from "../components/ThemePicker";
+import "../styles/ask.css";
+import { previewAnswer } from "./previewAnswer";
 
 // S91 디자인 미리보기. 합성 자료만 쓴다: 이름은 테스트아이·교사A·친구A, 날짜는 2020-01-15 근처.
 // 화면에 보이는 숫자는 시안임을 "예시"로 표시한다(P3: 실제 화면의 숫자는 API 값).
@@ -136,6 +141,24 @@ export function DesignPreview() {
             <p className="meta">만든 날 2020-01-10 (누르면 열려요)</p>
             <span className="badge">예시</span>
           </Link>
+        </div>
+      </section>
+
+      <section aria-labelledby="pv-ask">
+        <h2 id="pv-ask">물어보기</h2>
+        <div className="card-stack">
+          <div className="chip-row">
+            {[1, 5, 10].map((n) => (
+              <LevelBadge key={n} level={n} />
+            ))}
+          </div>
+          <RedFlagCard />
+          <AnswerCard level={1} answer={previewAnswer(1, "아주 흔한 모습이에요 (예시)")} />
+          <AnswerCard
+            level={5}
+            answer={previewAnswer(5, "방법을 바꿔 보며 1주 적어 봐요 (예시)")}
+          />
+          <AnswerCard level={10} answer={previewAnswer(10, "지금 바로 연락이 필요해요 (예시)")} />
         </div>
       </section>
 

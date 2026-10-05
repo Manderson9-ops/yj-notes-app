@@ -12,6 +12,10 @@ const FORBIDDEN_FILES = [
   "pages/DesignPreview",
   "pages/SettingsPage",
   "pages/HomePage",
+  "pages/AskPage",
+  "pages/AskDetailPage",
+  "components/ask",
+  "lib/ask",
   "pages/NotesPage",
   "features/library",
 ];

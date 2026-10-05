@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasForbiddenWord } from "../../shared/ask-levels";
+import { hasForbiddenWord } from "../../shared/ask-forbidden";
 import { detectRedFlag, RED_FLAG_RULE_COUNT } from "./redflags";
 
 // 합성 문장만 쓴다.

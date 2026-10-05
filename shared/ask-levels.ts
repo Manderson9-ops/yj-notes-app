@@ -1,4 +1,4 @@
-// 물어보기(T-Q) 10단계·판정 어휘 금지 목록. 앱 화면·서버·워커가 같은 정의를 쓴다 (docs/11-ask.md §2).
+// 물어보기(T-Q) 10단계 정의. 앱 화면·서버·워커가 같은 정의를 쓴다 (docs/11-ask.md §2).
 // 합성/일반 문구만 있다. 아이 자료 없음.
 
 export const ASK_LEVELS = [
@@ -19,24 +19,4 @@ export type AskBand = "ok" | "info" | "warn" | "alert";
 export function levelInfo(level: number): { level: number; title: string; band: AskBand } {
   const found = ASK_LEVELS.find((l) => l.level === level);
   return found ?? { level, title: "", band: "info" };
-}
-
-/**
- * 답변에 쓰지 않는 판정·꼬리표 어휘(P1). 「이상」 은 「1주 이상」 처럼 수량에도 쓰이므로
- * 판정으로 쓰인 형태(이상하다·이상 행동·이상 소견 등)만 막는다.
- */
-export const FORBIDDEN_PATTERNS: readonly RegExp[] = [
-  /정상/,
-  /이상(?:하|해|한|함|이\s*있|\s*행동|\s*증상|\s*소견|\s*징후|\s*반응)/,
-  /지연/,
-  /장애/,
-  /문제\s*아/,
-  /자폐/,
-  /adhd/i,
-  /진단(?:명|받|됩|될|해야|이\s*나|을\s*내)/,
-];
-
-/** 금지어에 걸린 패턴 개수 대신 걸렸는지만 알린다(문장을 오류·로그에 옮기지 않는다). */
-export function hasForbiddenWord(text: string): boolean {
-  return FORBIDDEN_PATTERNS.some((p) => p.test(text));
 }

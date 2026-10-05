@@ -21,6 +21,8 @@ const LibraryPage = lazy(() => import("../features/library/LibraryPage"));
 const DocPage = lazy(() => import("../features/library/DocPage"));
 const CheckupsPage = lazy(() => import("../features/library/CheckupsPage"));
 const GrowthPage = lazy(() => import("../features/library/GrowthPage"));
+const AskPage = lazy(() => import("../pages/AskPage"));
+const AskDetailPage = lazy(() => import("../pages/AskDetailPage"));
 const LogsPage = lazy(() => import("../pages/LogsPage").then((m) => ({ default: m.LogsPage })));
 const loadLogEditor = () => import("../pages/LogEditorPage");
 const LogEditorPage = lazy(() => loadLogEditor().then((m) => ({ default: m.LogEditorPage })));
@@ -99,6 +101,8 @@ function AuthGate() {
             <Route path="logs" element={<LogsPage />} />
             <Route path="logs/new" element={<LogEditorPage />} />
             <Route path="logs/:id/edit" element={<LogEditorPage />} />
+            <Route path="ask" element={<AskPage />} />
+            <Route path="ask/:id" element={<AskDetailPage />} />
             <Route path="notes" element={<NotesPage />} />
             <Route path="notes/:date" element={<NoteDetailPage />} />
             <Route path="library" element={<LibraryPage />} />

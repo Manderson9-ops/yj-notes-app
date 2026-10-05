@@ -1,0 +1,106 @@
+// font-subset: skip (본문 글만: 장식 글꼴 대상이 아니다 — tools/fonts/collect.ts)
+import type { Answer } from "../../../shared/ask-schema";
+import { LevelBadge } from "./LevelBadge";
+
+/**
+ * 답변 카드(S30·S91). 순서: 단계 배지 → 이유 → 요약 → 기록에서 본 것 → 근거 → 지금 해 볼 것(할 말 예시 강조)
+ * → 피할 것 → 관찰 방법 → 올라가는/내려가는 신호 → 질문자 한 줄 → 한계. 판정 문구 없음(P1).
+ * 본문 글은 서버가 검증한 답변 JSON 이다. 화면 고정 문구는 모두 짧게 나눠 둔다(G7).
+ */
+export function AnswerCard({ level, answer }: { level: number; answer: Answer }) {
+  return (
+    <article className="card ask-answer" aria-label="답변">
+      <LevelBadge level={level} />
+      <p className="ask-reason">{answer.levelReason}</p>
+
+      <h3>상황 요약</h3>
+      <p>{answer.summary}</p>
+
+      {answer.fromRecords.length > 0 && (
+        <>
+          <h3>기록에서 본 것</h3>
+          <ul className="ask-list">
+            {answer.fromRecords.map((r, i) => (
+              <li key={`${r.date}-${String(i)}`}>
+                <span className="meta">
+                  {r.date} · {r.source}
+                </span>
+                <br />
+                {r.what}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <h3>근거</h3>
+      <ul className="ask-list">
+        {answer.evidence.map((e, i) => (
+          <li key={`${e.ref}-${String(i)}`}>
+            {e.point}
+            <br />
+            <span className="meta">
+              {e.ref}
+              {e.grade ? ` · 등급 ${e.grade}` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <h3>지금 해 볼 것</h3>
+      <ol className="ask-list ask-steps-list">
+        {answer.tryNow.map((t, i) => (
+          <li key={String(i)}>
+            {t.action}
+            {t.say ? <q className="ask-say">{t.say}</q> : null}
+          </li>
+        ))}
+      </ol>
+
+      <h3>피할 것</h3>
+      <ul className="ask-list">
+        {answer.avoid.map((a, i) => (
+          <li key={String(i)}>{a}</li>
+        ))}
+      </ul>
+
+      <h3>관찰 방법</h3>
+      <dl className="kv">
+        <dt>무엇을</dt>
+        <dd>{answer.observe.what}</dd>
+        <dt>얼마나</dt>
+        <dd>{answer.observe.howLong}</dd>
+        <dt>어떻게</dt>
+        <dd>{answer.observe.how}</dd>
+      </dl>
+
+      <h3>단계가 올라가는 신호</h3>
+      <ul className="ask-list">
+        {answer.upIf.map((u, i) => (
+          <li key={String(i)}>{u}</li>
+        ))}
+      </ul>
+
+      <h3>단계가 내려가는 신호</h3>
+      <ul className="ask-list">
+        {answer.downIf.map((d, i) => (
+          <li key={String(i)}>{d}</li>
+        ))}
+      </ul>
+
+      {answer.forAsker ? (
+        <>
+          <h3>질문하신 분께</h3>
+          <p>{answer.forAsker}</p>
+        </>
+      ) : null}
+
+      {answer.limits ? (
+        <>
+          <h3>한계</h3>
+          <p className="meta">{answer.limits}</p>
+        </>
+      ) : null}
+    </article>
+  );
+}

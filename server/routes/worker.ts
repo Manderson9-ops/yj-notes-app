@@ -5,7 +5,7 @@ import type { AppEnv } from "../app";
 import { touchWorkerSeen } from "../ask/seen";
 import { bearerMatches } from "../auth/worker";
 import { errorResponse, jsonResponse } from "../http/errors";
-import { hasForbiddenWord } from "../../shared/ask-levels";
+import { hasForbiddenWord } from "../../shared/ask-forbidden";
 import {
   ASK_ANSWER_MAX_BYTES,
   WorkerAnswerSchema,
