@@ -1,14 +1,10 @@
-// 답변 파이프라인: 근거 묶음 → 작성 → (결정적 검사) → 검토 → (score < 목표면 1회 재작성·재검토).
-import {
-  answerSchema,
-  REVIEW_JSON_SCHEMA,
-  reviewSchema,
-  type Answer,
-  type Review,
-} from "./answer-schema.ts";
+// 답변 파이프라인: 근거 묶음 → 작성 → (결정적 검사) → 검토 → (점수 < 목표 또는 단계 불일치면 최대 2회 재작성·재검토) → 최고 점수 채택.
+import { reviewSchema, REVIEW_JSON_SCHEMA, type Answer, type Review } from "./answer-schema.ts";
 import { checkAnswer, type PackInfo } from "./checks.ts";
 import type { ClaudeRunner } from "./claude.ts";
 import { generatePrompt, reviewPrompt, rewritePrompt, type PromptQuestion } from "./prompts.ts";
+
+export const MAX_REWRITES = 2;
 
 export class PipelineError extends Error {
   readonly code: string;
@@ -43,12 +39,18 @@ export interface PipelineResult {
   rubric: Review["rubric"];
   model: string;
   workMs: number;
+  rewrites: number;
   rewritten: boolean;
   timings: Record<string, number>;
   packTokens: number;
 }
 
 const REVIEW_SCHEMA_JSON = JSON.stringify(REVIEW_JSON_SCHEMA);
+
+interface Candidate {
+  answer: Answer;
+  review: Review;
+}
 
 export async function answerQuestion(
   deps: PipelineDeps,
@@ -99,50 +101,48 @@ export async function answerQuestion(
     ...r.issues,
     ...(r.levelConsistent ? [] : ["단계(level)가 기록·근거·판단 축과 맞지 않아요"]),
   ];
+  const good = (c: Candidate): boolean =>
+    c.review.score >= deps.targetScore && c.review.levelConsistent;
 
   await hooks.onAnswering?.();
   const info = await stage("pack", () => deps.buildPack(q.body, signal));
-  const first = checkAnswer(
-    await generate("generate", generatePrompt(info.pack, q)),
-    info,
-    q.redFlag,
-  );
 
-  await hooks.onReviewing?.();
-  let best: { answer: Answer; review: Review } | null = null;
-  let issues: string[] = [...first.issues];
-  if (first.ok && first.answer) {
-    const r1 = await review("review", info.pack, first.answer);
-    best = { answer: first.answer, review: r1 };
-    issues = issuesOf(r1);
-  }
-
-  let rewritten = false;
-  const good = (b: typeof best): boolean =>
-    b !== null && b.review.score >= deps.targetScore && b.review.levelConsistent;
-  if (!good(best)) {
-    rewritten = true;
-    const prev = best?.answer ?? first.answer;
-    const raw = await generate(
-      "rewrite",
+  let best: Candidate | null = null;
+  let rewrites = 0;
+  let raw = await generate("generate", generatePrompt(info.pack, q));
+  let reviewing = false;
+  for (let round = 0; ; round++) {
+    const suffix = round === 0 ? "" : String(round + 1);
+    const check = checkAnswer(raw, info, q.redFlag);
+    let issues = [...check.issues];
+    let cand: Candidate | null = null;
+    if (check.ok && check.answer) {
+      if (!reviewing) {
+        reviewing = true;
+        await hooks.onReviewing?.();
+      }
+      const rev = await review(`review${suffix}`, info.pack, check.answer);
+      cand = { answer: check.answer, review: rev };
+      issues = issuesOf(rev);
+      if (!best || rev.score >= best.review.score) best = cand;
+      if (good(cand)) break;
+    }
+    if (round >= MAX_REWRITES) break;
+    rewrites += 1;
+    const prev = cand?.answer ?? check.answer ?? best?.answer;
+    raw = await generate(
+      `rewrite${suffix}`,
       rewritePrompt(
         info.pack,
         q,
         JSON.stringify(prev ?? "(스키마 검증 실패)"),
-        issues.length ? issues : ["전체를 다시 작성해요"],
+        issues.length > 0 ? issues : ["전체를 다시 작성해요"],
       ),
     );
-    const second = checkAnswer(raw, info, q.redFlag);
-    if (second.ok && second.answer) {
-      const r2 = await review("review2", info.pack, second.answer);
-      if (!best || r2.score >= best.review.score) best = { answer: second.answer, review: r2 };
-    }
   }
 
   if (!best) throw new PipelineError("checks_failed");
   if (best.review.score < deps.minPublishScore) throw new PipelineError("low_score");
-  const parsed = answerSchema.safeParse(best.answer);
-  if (!parsed.success) throw new PipelineError("schema_invalid");
   timings.total = Math.round(now() - t0);
   return {
     level: best.answer.level,
@@ -151,7 +151,8 @@ export async function answerQuestion(
     rubric: best.review.rubric,
     model,
     workMs: timings.total,
-    rewritten,
+    rewrites,
+    rewritten: rewrites > 0,
     timings,
     packTokens: info.tokens,
   };

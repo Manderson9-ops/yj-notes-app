@@ -34,6 +34,7 @@ const RESULT: PipelineResult = {
   rubric: { evidence: 3, records: 2, actionable: 2, safety: 1.5, tone: 1.5 },
   model: "opus",
   workMs: 10,
+  rewrites: 0,
   rewritten: false,
   timings: { total: 10 },
   packTokens: 10,

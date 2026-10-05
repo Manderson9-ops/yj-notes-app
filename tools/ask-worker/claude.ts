@@ -1,6 +1,6 @@
 // claude CLI 호출기. 구독(로그인) 인증만 쓰도록 API 키 환경변수는 자식 프로세스에서 제거한다.
 // 측정된 빠른 플래그 조합: 오버헤드 약 5초. 출력 envelope 은 JSON 한 개(structured_output / result).
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -94,9 +94,11 @@ export function createClaudeRunner(o: RunnerOptions): ClaudeRunner {
   return async (req, signal) => {
     mkdirSync(work, { recursive: true });
     writeFileSync(emptyMcp, '{"mcpServers":{}}\n');
+    // 아래 단언은 tests/ 가 이 파일을 tsconfig.server(workers-types 와 node 타입 혼재)로 컴파일할 때 필요하다.
+    /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
     const env = Object.fromEntries(
       Object.entries(process.env).filter(([k]) => !STRIP_ENV.includes(k)),
-    );
+    ) as NodeJS.ProcessEnv;
     const started = performance.now();
     return await new Promise<ClaudeResult>((resolveRun, reject) => {
       const child = spawn(o.bin, [...(o.argsPrefix ?? []), ...claudeArgs(emptyMcp, req)], {
@@ -105,7 +107,8 @@ export function createClaudeRunner(o: RunnerOptions): ClaudeRunner {
         shell: false,
         windowsHide: true,
         stdio: ["pipe", "pipe", "pipe"],
-      });
+      }) as unknown as ChildProcessWithoutNullStreams;
+      /* eslint-enable @typescript-eslint/no-unnecessary-type-assertion */
       const out: Buffer[] = [];
       let size = 0;
       let done = false;

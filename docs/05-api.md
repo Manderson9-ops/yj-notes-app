@@ -99,7 +99,7 @@
 |---|---|---|
 | POST | `/ask` | `{body(1~1000자), askedBy(1~12자)}` → `201 {id, status:"pending", redFlag, instant:{notes:[{date,snippet,id}], docs:[{slug,title}]}}`. instant = 알림장 본문·자료 제목/요약의 `LIKE` 검색(각 최대 5, AI 없음). `redFlag` 는 결정적 키워드 검사. 같은 질문자가 10분 안 10건을 넘기면 `429 too_many`. `422` 검증 오류 |
 | GET | `/ask?before=<id>` | 최신순 20개 `{items:[{id,askedBy,bodyPreview(80자),status,redFlag,level?,createdAt}], nextBefore}` |
-| GET | `/ask/:id` | `{question:{id,askedBy,body,createdAt}, status, redFlag, answer?:{level, answer(AnswerSchema), createdAt, totalMs}, feedback:[{id,by,helpful,note,createdAt}]}` / `404`(없음·삭제됨·번호 형식 오류). 화면이 5초마다 조회(완료·실패면 멈춤) |
+| GET | `/ask/:id` | `{question:{id,askedBy,body,createdAt}, status, redFlag, answer?:{level, answer(AnswerSchema), createdAt, totalMs, reviewScore(0~10, 없으면 null)}, feedback:[{id,by,helpful,note,createdAt}]}` / `404`(없음·삭제됨·번호 형식 오류). 화면이 5초마다 조회(완료·실패면 멈춤) |
 | GET | `/ask/:id/instant` | `{notes, docs}` — 목록에서 연 질문의 즉시 결과 다시 보기(명세 보강: 폴링에 검색 쿼리를 싣지 않으려고 분리) |
 | POST | `/ask/:id/feedback` | `{by, helpful?: bool|null, note?(≤500)}`(둘 중 하나 이상) → `201 {id}`. 질문당 50건 한도 `429` |
 | DELETE | `/ask/:id` | 소프트 삭제 `204`(질문자 구분 없이 가족 누구나, 기록 삭제 정책과 같다) / `404` |

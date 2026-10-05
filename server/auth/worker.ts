@@ -67,7 +67,10 @@ export async function authenticateWorker(
 ): Promise<WorkerAuthResult> {
   if (!isWorkerConfigured(env)) return { ok: false, status: 503 };
 
-  // 잠금 중이면 토큰이 맞아도 거절한다(맞는지 알려 주지 않는다).
+  // 맞는 토큰은 잠금 중에도 항상 통과한다(잠금은 추측 공격만 막는다. 공격자가 잠금으로 정당한 워커를 막지 못하게).
+  if (await bearerMatches(request, env)) return { ok: true };
+
+  // 잠금 중이면 틀린 토큰은 429. 실패 행을 쓰지 않는다(D1 쓰기 증폭 방지).
   const lock = await env.DB.prepare("SELECT value FROM app_setting WHERE key = ?1")
     .bind(LOCK_KEY)
     .first<{ value: string }>();
@@ -78,8 +81,6 @@ export async function authenticateWorker(
 
   // 헤더가 아예 없는 요청(쿠키만 있는 브라우저 등)은 실패로 세지 않는다: 잠금으로 정당한 워커를 막는 수단이 되지 않게.
   if (request.headers.get("Authorization") === null) return { ok: false, status: 401 };
-  if (await bearerMatches(request, env)) return { ok: true };
-
   const [, , count] = await env.DB.batch<{ c: number }>([
     env.DB.prepare("INSERT INTO worker_auth_fail (at) VALUES (?1)").bind(iso(nowMs)),
     env.DB.prepare("DELETE FROM worker_auth_fail WHERE at < ?1").bind(iso(nowMs - RETENTION_MS)),

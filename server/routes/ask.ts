@@ -142,12 +142,23 @@ askRoutes.get("/api/ask/:id", async (c) => {
   if (!q) return notFound();
   const ans = await db
     .prepare(
-      "SELECT level, answer_json, total_ms, created_at FROM ask_answer WHERE question_id = ?1",
+      "SELECT level, answer_json, total_ms, review_score, created_at FROM ask_answer WHERE question_id = ?1",
     )
     .bind(id)
-    .first<{ level: number; answer_json: string; total_ms: number | null; created_at: string }>();
-  let answer: { level: number; answer: unknown; createdAt: string; totalMs: number | null } | null =
-    null;
+    .first<{
+      level: number;
+      answer_json: string;
+      total_ms: number | null;
+      review_score: number | null;
+      created_at: string;
+    }>();
+  let answer: {
+    level: number;
+    answer: unknown;
+    createdAt: string;
+    totalMs: number | null;
+    reviewScore: number | null;
+  } | null = null;
   if (ans) {
     let parsed: ReturnType<typeof AnswerSchema.safeParse> | null;
     try {
@@ -161,6 +172,7 @@ askRoutes.get("/api/ask/:id", async (c) => {
         answer: parsed.data,
         createdAt: ans.created_at,
         totalMs: ans.total_ms,
+        reviewScore: ans.review_score,
       };
     }
   }

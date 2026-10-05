@@ -76,22 +76,55 @@ describe("answerQuestion", () => {
     expect(reqs[2]?.prompt).toContain("tryNow 를 더 구체적으로");
   });
 
-  it("재작성 뒤에도 미달이지만 하한 이상이면 더 나은 점수로 게시", async () => {
-    const { deps } = setup([goodAnswer(), review(9.0), goodAnswer(), review(8.8)]);
+  it("미달이면 최대 2회까지 재작성하고, 끝내 미달이면 가장 높은 점수를 게시", async () => {
+    const { deps, reqs } = setup([
+      goodAnswer(),
+      review(9.0),
+      goodAnswer(),
+      review(8.8),
+      goodAnswer(),
+      review(8.7),
+    ]);
     const r = await answerQuestion(deps, q);
     expect(r.reviewScore).toBe(9);
+    expect(r.rewrites).toBe(2);
+    expect(reqs).toHaveLength(6);
+    expect(Object.keys(r.timings)).toEqual(
+      expect.arrayContaining(["rewrite", "review2", "rewrite2", "review3"]),
+    );
+  });
+
+  it("두 번째 재작성에서 통과하면 거기서 멈춘다", async () => {
+    const { deps, reqs } = setup([
+      goodAnswer(),
+      review(9.0),
+      goodAnswer(),
+      review(9.2),
+      goodAnswer({ level: 6 }),
+      review(9.7),
+    ]);
+    const r = await answerQuestion(deps, q);
+    expect(r).toMatchObject({ level: 6, reviewScore: 9.7, rewrites: 2 });
+    expect(reqs).toHaveLength(6);
   });
 
   it("하한 미만이면 low_score 로 실패", async () => {
-    const { deps } = setup([goodAnswer(), review(7), goodAnswer(), review(7.5)]);
+    const { deps } = setup([
+      goodAnswer(),
+      review(7),
+      goodAnswer(),
+      review(7.5),
+      goodAnswer(),
+      review(7.2),
+    ]);
     await expect(answerQuestion(deps, q)).rejects.toMatchObject({ code: "low_score" });
   });
 
   it("결정적 검사 실패(금지어)는 검토를 건너뛰고 재작성, 계속 실패하면 checks_failed", async () => {
     const bad = goodAnswer({ limits: "정상이에요" });
-    const { deps, reqs } = setup([bad, bad]);
+    const { deps, reqs } = setup([bad, bad, bad]);
     await expect(answerQuestion(deps, q)).rejects.toMatchObject({ code: "checks_failed" });
-    expect(reqs).toHaveLength(2);
+    expect(reqs).toHaveLength(3);
     expect(reqs[1]?.prompt).toContain("금지어");
   });
 

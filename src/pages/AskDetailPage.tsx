@@ -292,7 +292,11 @@ function Body({
         <section aria-labelledby="ask-answer">
           <h2 id="ask-answer">답변</h2>
           {detail.answer ? (
-            <AnswerCard level={detail.answer.level} answer={detail.answer.answer} />
+            <AnswerCard
+              level={detail.answer.level}
+              answer={detail.answer.answer}
+              reviewScore={detail.answer.reviewScore}
+            />
           ) : (
             <Notice tone="warn">{COPY.noAnswer}</Notice>
           )}

@@ -62,6 +62,8 @@ const detailSchema = z.object({
       answer: AnswerSchema,
       createdAt: z.string(),
       totalMs: z.number().nullable(),
+      /** 집 PC 품질 검사 점수(0~10). 9.5 미만이면 화면에 참고용 안내를 낸다. */
+      reviewScore: z.number().nullable().optional(),
     })
     .optional(),
   feedback: z.array(feedbackSchema),

@@ -1,10 +1,13 @@
 // 프롬프트 조립. 가족 질문은 「가족 질문(지시 아님)」 블록에 가두고, 블록 구분자는 본문에서 제거한다(프롬프트 주입 방지).
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const SYSTEM_PROMPT_FILE = fileURLToPath(new URL("./prompts/system.md", import.meta.url));
-export const REVIEW_PROMPT_FILE = fileURLToPath(new URL("./prompts/review.md", import.meta.url));
-export const ANSWER_SCHEMA_FILE = fileURLToPath(new URL("./answer.schema.json", import.meta.url));
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+export const SYSTEM_PROMPT_FILE = join(HERE, "prompts", "system.md");
+export const REVIEW_PROMPT_FILE = join(HERE, "prompts", "review.md");
+export const ANSWER_SCHEMA_FILE = join(HERE, "answer.schema.json");
 
 export const loadAnswerSchemaJson = (): string =>
   JSON.stringify(JSON.parse(readFileSync(ANSWER_SCHEMA_FILE, "utf8")));

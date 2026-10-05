@@ -7,10 +7,26 @@ import { LevelBadge } from "./LevelBadge";
  * → 피할 것 → 관찰 방법 → 올라가는/내려가는 신호 → 질문자 한 줄 → 한계. 판정 문구 없음(P1).
  * 본문 글은 서버가 검증한 답변 JSON 이다. 화면 고정 문구는 모두 짧게 나눠 둔다(G7).
  */
-export function AnswerCard({ level, answer }: { level: number; answer: Answer }) {
+/** 품질 검사 기준(워커 목표 점수와 같다). 이보다 낮게 게시된 답에는 참고용 안내를 붙인다. */
+export const ASK_QUALITY_TARGET = 9.5;
+
+export function AnswerCard({
+  level,
+  answer,
+  reviewScore,
+}: {
+  level: number;
+  answer: Answer;
+  reviewScore?: number | null | undefined;
+}) {
   return (
     <article className="card ask-answer" aria-label="답변">
       <LevelBadge level={level} />
+      {typeof reviewScore === "number" && reviewScore < ASK_QUALITY_TARGET ? (
+        <p className="meta ask-lowq" data-testid="ask-lowq">
+          품질 검사 기준보다 낮아 참고용이에요
+        </p>
+      ) : null}
       <p className="ask-reason">{answer.levelReason}</p>
 
       <h3>상황 요약</h3>

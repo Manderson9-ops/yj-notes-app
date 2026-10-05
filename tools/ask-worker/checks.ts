@@ -1,6 +1,7 @@
 // 결정적 검사: 스키마, 금지어, redFlag→10단계, ref·날짜가 근거 묶음에 실제 존재.
 // 모델 호출 전후에 코드로 먼저 걸러, 모델 검토가 놓치는 것을 막는다.
 import { answerSchema, type Answer } from "./answer-schema.ts";
+import { hasForbiddenWord } from "../../shared/ask-forbidden.ts";
 import { levelTitle } from "./levels.ts";
 
 export interface PackInfo {
@@ -12,28 +13,6 @@ export interface CheckResult {
   ok: boolean;
   issues: string[];
   answer: Answer | null;
-}
-
-// 숫자+(단위) 바로 뒤의 "이상"(예: 2주 이상, 38도 이상)은 기간·횟수 표현이라 허용한다.
-const NUM_BEFORE =
-  /(?:\d|이틀|사흘|나흘|닷새|열흘|하루|일주일|보름|한 ?달|[한두세네]|다섯|여섯|일곱|여덟|아홉|열)\s*(?:주|일|개월|달|회|번|분|시간|도|세|살|개|명|끼|차례|군데|곳|%|kg|cm)?\s*$/;
-const FORBIDDEN_PLAIN = ["정상", "비정상", "지연", "문제아", "자폐", "ADHD", "과잉행동", "품행"];
-
-export function findForbidden(s: string): string[] {
-  const found = new Set<string>();
-  for (const w of FORBIDDEN_PLAIN) if (s.includes(w)) found.add(w);
-  for (const m of s.matchAll(/이상/g)) {
-    if (!NUM_BEFORE.test(s.slice(0, m.index))) found.add("이상");
-  }
-  for (const m of s.matchAll(/장애/g)) {
-    if (!s.startsWith("물", m.index + 2)) found.add("장애");
-  }
-  for (const m of s.matchAll(/진단/g)) {
-    // 「진단하지 않아요」「진단이 아니에요」처럼 부정하는 말은 허용한다.
-    if (!/^진단(?:하지 않|이 아니|은 아니|할 수 없|을 대신)/.test(s.slice(m.index)))
-      found.add("진단");
-  }
-  return [...found];
 }
 
 export function collectStrings(v: unknown, out: string[] = []): string[] {
@@ -59,9 +38,8 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
   const answer: Answer = { ...parsed.data, levelTitle: levelTitle(parsed.data.level) };
   const issues: string[] = [];
   if (redFlag && answer.level !== 10) issues.push("redFlag 질문은 level 10 이어야 해요");
-  const words = new Set<string>();
-  for (const s of collectStrings(answer)) for (const w of findForbidden(s)) words.add(w);
-  if (words.size > 0) issues.push(`금지어 사용: ${[...words].join(", ")}`);
+  if (collectStrings(answer).some(hasForbiddenWord))
+    issues.push("금지어(판정·꼬리표 어휘)를 썼어요");
   const refs = new Set(info.refs);
   for (const e of answer.evidence) {
     if (!refs.has(e.ref.trim()))

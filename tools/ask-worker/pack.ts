@@ -1,9 +1,10 @@
 // context.py 호출. 질문은 stdin(JSON)으로만 넘긴다(명령줄·로그에 남지 않게).
 import { spawn } from "node:child_process";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-export const CONTEXT_PY = fileURLToPath(new URL("./context.py", import.meta.url));
+export const CONTEXT_PY = join(dirname(fileURLToPath(import.meta.url)), "context.py");
 
 export class PackError extends Error {
   readonly code: string;

@@ -191,23 +191,29 @@ describe("worker 영역 인증", () => {
 describe("worker 실패 제한", () => {
   const wrong = () => workerCall(h, "GET", "/api/worker/ping", undefined, "wrong-token-0123456789");
 
-  it("10분 20회 실패까지는 401, 21번째 실패 뒤 15분은 올바른 토큰도 429", async () => {
+  it("10분 20회 실패까지는 401, 21번째 실패 뒤 15분은 틀린 토큰만 429 (맞는 토큰은 항상 통과)", async () => {
     for (let i = 0; i < 20; i++) expect((await wrong()).status).toBe(401);
     expect(fails()).toBe(20);
-    // 아직 잠기지 않음: 올바른 토큰은 통과
     expect((await workerCall(h, "GET", "/api/worker/ping")).status).toBe(204);
     expect((await wrong()).status).toBe(401); // 21번째 실패 -> 잠금 기록
-    const locked = await workerCall(h, "GET", "/api/worker/ping");
+    expect(fails()).toBe(21);
+    // 잠금 중: 맞는 토큰은 통과
+    expect((await workerCall(h, "GET", "/api/worker/ping")).status).toBe(204);
+    expect((await workerCall(h, "POST", "/api/worker/ask/claim")).status).toBe(204);
+    // 잠금 중: 틀린 토큰은 429 이고 실패 행을 쓰지 않는다
+    const locked = await wrong();
     expect(locked.status).toBe(429);
     expect(Number(locked.headers.get("Retry-After"))).toBeGreaterThan(0);
     expect(Number(locked.headers.get("Retry-After"))).toBeLessThanOrEqual(900);
     expect((await locked.json<{ error: string }>()).error).toBe("locked");
-    // 잠금 중에는 실패가 더 쌓이지 않는다(잠금 연장 없음)
+    for (let i = 0; i < 5; i++) expect((await wrong()).status).toBe(429);
+    expect((await workerCall(h, "GET", "/api/worker/ping", undefined, null)).status).toBe(429);
     expect(fails()).toBe(21);
     h.clock.t += 14 * 60_000;
-    expect((await workerCall(h, "GET", "/api/worker/ping")).status).toBe(429);
+    expect((await wrong()).status).toBe(429);
     h.clock.t += 61_000;
     expect((await workerCall(h, "GET", "/api/worker/ping")).status).toBe(204);
+    expect((await wrong()).status).toBe(401); // 잠금이 풀리면 예전처럼 401·기록
   });
 
   it("PIN 시도 표(auth_attempt)와 섞이지 않는다", async () => {

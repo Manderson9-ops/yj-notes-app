@@ -1,43 +1,7 @@
-// 답변 JSON 스키마(zod). answer.schema.json 과 같은 내용이어야 한다(answer-schema.test.ts 가 대조).
+// 답변 스키마의 단일 출처는 shared/ask-schema.ts (서버 검증과 같은 zod). 워커는 검토 출력 스키마만 따로 가진다.
 import { z } from "zod";
 
-const text = z.string().max(600);
-const list = (min: number, max: number) => z.array(text).min(min).max(max);
-
-export const answerSchema = z.strictObject({
-  level: z.number().int().min(1).max(10),
-  levelTitle: text,
-  levelReason: text,
-  summary: text,
-  fromRecords: z
-    .array(
-      z.strictObject({
-        date: z
-          .string()
-          .max(600)
-          .regex(/^\d{4}-\d{2}-\d{2}$/),
-        what: text,
-        source: z.enum(["알림장", "관찰", "검진", "가족기록"]),
-      }),
-    )
-    .max(6),
-  evidence: z
-    .array(z.strictObject({ ref: text, point: text, grade: text.optional() }))
-    .min(1)
-    .max(6),
-  tryNow: z
-    .array(z.strictObject({ action: text, say: text.optional() }))
-    .min(2)
-    .max(4),
-  avoid: list(1, 4),
-  observe: z.strictObject({ what: text, howLong: text, how: text }),
-  upIf: list(1, 4),
-  downIf: list(1, 4),
-  forAsker: text.optional(),
-  limits: text.optional(),
-});
-
-export type Answer = z.infer<typeof answerSchema>;
+export { AnswerSchema as answerSchema, type Answer } from "../../shared/ask-schema.ts";
 
 export const reviewSchema = z.strictObject({
   score: z.number().min(0).max(10),

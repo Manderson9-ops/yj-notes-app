@@ -17,7 +17,7 @@
 | `tools/ask-worker/eval.ts` | 골든 세트 평가 |
 
 흐름: claim → progress(answering) → 근거 묶음 → 작성(claude) → 결정적 검사 → progress(reviewing) → 검토(claude)
-→ 점수 < 9.5 또는 단계 불일치면 지적을 넣어 **1회** 재작성·재검토(더 높은 쪽 채택) → answer 업로드.
+→ 점수 < 9.5 또는 단계 불일치면 지적을 넣어 **최대 2회** 재작성·재검토(가장 높은 점수 채택) → answer 업로드. 9.5 미만으로 게시된 답은 `reviewScore` 로 서버에 저장되고, 앱이 「품질 검사 기준보다 낮아 참고용이에요」를 작게 보여 준다.
 실패하면 `fail(code)` 로 되돌린다(3회 실패 시 서버가 failed 처리). 코드: `pack_failed`, `claude_exit`, `timeout`,
 `checks_failed`, `low_score`(게시 하한 8.5 미만), `review_invalid`, `upload_<HTTP>`, `worker_stopped`, `internal_error`.
 
@@ -97,7 +97,7 @@ npm run ask-worker:eval -- --set "<DATA_DIR>\ask-eval\golden.jsonl" --out "<DATA
 목표: p50 ≤ 3분, p90 ≤ 6분(PC 켜짐). 서버는 답변 저장 때 `wait_ms`(접수→claim)·`work_ms`(claim→answer)·`total_ms` 를 기록하고
 overview 에 7일 중앙값(`medianTotalMs7d`)을 낸다.
 
-- 워커 쪽 단계별 시간: 로그의 `stage` 줄(`pack`, `generate`, `review`, `rewrite`, `review2`)과 `answered` 줄의 `ms`.
+- 워커 쪽 단계별 시간: 로그의 `stage` 줄(`pack`, `generate`, `review`, `rewrite`, `review2`, `rewrite2`, `review3`)과 `answered` 줄의 `ms`.
 - 분포 계산(로컬 로그만 사용, 본문 없음):
   ```powershell
   Get-Content "$env:USERPROFILE\.yj-ask\logs\worker-*.log" | ForEach-Object { $_ | ConvertFrom-Json } |

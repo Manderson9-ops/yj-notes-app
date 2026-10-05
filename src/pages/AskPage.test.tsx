@@ -94,7 +94,7 @@ afterEach(() => {
 });
 
 function renderAt(path: string) {
-  render(
+  return render(
     <QueryClientProvider client={createQueryClient()}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
@@ -235,6 +235,24 @@ describe("AskDetailPage (진행·답변·의견)", () => {
       .getByRole("list", { name: "진행 단계" })
       .querySelector("[aria-current='step']");
     expect(now?.textContent).toContain("검토 중");
+  });
+
+  it("품질 점수가 9.5 미만이면 참고용 안내를 보이고, 이상이거나 없으면 보이지 않는다", async () => {
+    const answer = (reviewScore?: number | null) =>
+      detail("done", {
+        answer: { level: 5, answer: ANSWER, createdAt: "x", totalMs: 1, reviewScore },
+      });
+    routes["GET /ask/7"] = () => json(200, answer(9.2));
+    const first = renderAt("/ask/7");
+    expect(await screen.findByText("품질 검사 기준보다 낮아 참고용이에요")).toBeInTheDocument();
+    first.unmount();
+    for (const score of [9.5, 9.9, null, undefined]) {
+      routes["GET /ask/7"] = () => json(200, answer(score));
+      const view = renderAt("/ask/7");
+      await screen.findByRole("article", { name: "답변" });
+      expect(screen.queryByTestId("ask-lowq")).toBeNull();
+      view.unmount();
+    }
   });
 
   it("완료: 답변 카드의 모든 구역이 순서대로 보이고 폴링이 멈춘다", async () => {
