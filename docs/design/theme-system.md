@@ -67,7 +67,7 @@
 | 새 화면 만들기 | 토큰·공용 클래스만 사용. 색 hex 직접 쓰기 금지. 미리보기 화면에 새 컴포넌트 상태 추가 |
 | 폰트 부분 집합 다시 만들기 | 정적 UI 문구를 바꿨으면 `npm run fonts:subset` 후 커밋. 빠진 글자는 시스템 글꼴로 보임(깨지지 않음) |
 | 번들 크기 확인 | 빌드 뒤 `npm run size:check`(CI check 잡에서도 build 직후 실행). 한도(초기 +20 KB, 전체 JS 200 KB, 폰트 80 KiB)는 `tools/size/check.ts` 상단 상수. 통합 시점(2026-10-03, 6개 카드 병합 후) 측정: 초기 로드 137.43 KB(main 대비 +17.93 KB), 전체 JS 156.37 KB. 화면은 모두 lazy 청크. **기준값 측정법**: main 을 빌드한 `dist/` 에 같은 스크립트를 돌린다(`node tools/size/check.ts <main 의 dist>`) → 119.50 KB(zlib 기본 레벨, 1 KB = 1000 B). Vite 의 "gzip: N kB" 출력과는 약 1% 달라 섞어 비교하지 않는다 |
-| 스크린샷 갱신 | `npm run test:e2e` 가 `e2e/__screenshots__/<화면>-<테마>-<light|dark>.png` 로 저장. **로컬 Windows 에서는 커밋된 PNG 와 비교**(`toMatchSnapshot`: 다른 픽셀 비율 `maxDiffPixelRatio` 0.002 이하, 픽셀별 색 차이 `threshold` 0.05 — `playwright.config.ts`) — 디자인을 일부러 바꿨으면 `npx playwright test --update-snapshots` 후 PNG 를 커밋. CI(linux 컨테이너)는 렌더가 달라 비교하지 않고 저장만. **민감도 변이 시험(2026-10-02)**: 숲 `--c-deco-2` `#66a063` → `#a06066`(밝기 비슷한 색상만 변경)은 `pin-forest-light` 에서 26,263 픽셀(비율 0.03) 차이로 **실패**(기본 threshold 0.2 에서는 통과해 놓쳤음), `#ff00ff` 같은 큰 변화는 당연히 실패, `#6c9d66`(미세 변화)은 통과. 같은 설정에서 e2e 연속 3회 통과(비결정성 없음) |
+| 스크린샷 갱신 | `npm run test:e2e` 가 `e2e/__screenshots__/<화면>-<테마>-<light|dark>.png` 로 저장. **로컬 Windows 에서는 커밋된 PNG 와 비교**(`toMatchSnapshot`: 다른 픽셀 비율 `maxDiffPixels` 500 이하, 픽셀별 색 차이 `threshold` 0.05 — `playwright.config.ts`) — 디자인을 일부러 바꿨으면 `npx playwright test --update-snapshots` 후 PNG 를 커밋. CI(linux 컨테이너)는 렌더가 달라 비교하지 않고 저장만. **민감도 변이 시험(2026-10-02)**: 숲 `--c-deco-2` `#66a063` → `#a06066`(밝기 비슷한 색상만 변경)은 `pin-forest-light` 에서 26,263 픽셀(비율 0.03) 차이로 **실패**(기본 threshold 0.2 에서는 통과해 놓쳤음), `#ff00ff` 같은 큰 변화는 당연히 실패, `#6c9d66`(미세 변화)은 통과. 같은 설정에서 e2e 연속 3회 통과(비결정성 없음) |
 | 전체 페이지 스크린샷 | `stableShot` 은 fullPage 캡처 대신 **뷰포트를 페이지 높이만큼 키워** 찍고(position:fixed 배경 층이 첫 화면 높이에서 끊겨 중간에 경계선이 생기는 캡처 산출물 방지), 그동안 sticky 탭바에 `.is-static-for-shot`(base.css)를 달아 중간에 찍히지 않게 함 |
 | 요소 단위 시각 회귀 | `e2e/elements.spec.ts`: 테마(크레용·숲) × light/dark 의 h2 띠·선택 칩·주 버튼을 요소만 찍어 `threshold` 0.02 로 비교(`el-<요소>-<테마>-<scheme>.png`). **변이 시험(2026-10-02)**: 크레용 `--c-hl` `#ffd4da` → `#f6cfe6` 은 `el-h2-crayon-light` 에서 6,496 픽셀(요소의 60%) 차이로 **실패**, 같은 변이가 전체 화면 비교(threshold 0.05)에서는 통과 — 그래서 요소 단위를 둔다 |
 
@@ -234,3 +234,9 @@ Material Design dark theme(표면 #121212 계열, 본문 15.8:1, 채도 낮은 �
 - 다크에서 눌리는 카드는 `--c-surface-2` 면 + 2px `--c-border`, 안 눌리는 카드는 `--c-surface` + 1.5px `--c-line`(e2e 가 면 색 차이도 확인). 기본·숲 다크 `--lift` 는 `none`.
 - 선명하게 보기의 꺼진 단추 글자는 새 `--c-disabled`(라이트 `#4a4a4a`, 다크 `#b8b8b8`, 면 위 ≥ 7:1; 본문 보조색 `--c-muted` 10:1 보다 일부러 약하게) + 점선.
 - 크레용 다크 `--c-accent` `#93d1fb`→`#7cc3f2`(손그림 선택 선 색도 같이). `--c-link` 는 `#93d1fb` 유지.
+
+### 6-9. 5차 수정: 스냅샷 민감도 (T-D1-17~)
+
+- 전체 화면 스냅샷 비교를 비율(`maxDiffPixelRatio` 0.002 ≈ 긴 화면에서 9천 픽셀)에서 절대값 `maxDiffPixels: 500`(+ `threshold` 0.05)으로 바꿨다. 긴 미리보기 화면에서 스위치 켜짐 회귀가 비율 허용치에 묻혀 기준 PNG 가 낡아 있었기 때문이다. 요소 스냅샷은 `threshold` 0.02, `maxDiffPixels` 100.
+- 스위치 줄 요소 스냅샷(`el-switch-on|off-<테마>-<scheme>[-high].png`, 3테마 × 라이트/다크 × (일반, 선명하게 보기))을 추가했다. 켜짐 모양이 깨지면 해당 요소가 수천 픽셀 달라져 바로 실패한다.
+- 크레용: 카드 위 색 띠는 눌리는 카드에만, 카드 안 `h2` 는 형광펜 없이 굵은 본문 글꼴(형광펜은 화면 단위 섹션 제목에만).
