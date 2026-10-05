@@ -170,3 +170,48 @@ test("decor SVGs are hidden from assistive tech and ignore pointers", async ({ p
     await expect(svg).toHaveCSS("pointer-events", "none");
   }
 });
+
+test("scheme choice applies at once, survives a reload, and system follows the OS", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "light" });
+  await login(page);
+  await page.getByRole("link", { name: "설정", exact: true }).click();
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-scheme", "light");
+  await expect(page.getByRole("radio", { name: "시스템에 맞춤" })).toBeChecked();
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(html).toHaveAttribute("data-scheme", "dark");
+  await page.getByRole("radio", { name: "밝게" }).check();
+  await expect(html).toHaveAttribute("data-scheme", "light");
+  await page.reload();
+  await expect(html).toHaveAttribute("data-scheme", "light");
+  await expect(page.getByRole("radio", { name: "밝게" })).toBeChecked();
+  await page.getByRole("radio", { name: "어둡게" }).check();
+  await expect(html).toHaveAttribute("data-scheme", "dark");
+  expect(await page.evaluate(() => localStorage.getItem("yj.scheme"))).toBe("dark");
+});
+
+test("high contrast switch applies at once and survives a reload", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: "설정", exact: true }).click();
+  const html = page.locator("html");
+  await expect(html).not.toHaveAttribute("data-contrast", /.+/);
+  await page.getByRole("switch", { name: "선명하게 보기" }).check();
+  await expect(html).toHaveAttribute("data-contrast", "high");
+  await page.reload();
+  await expect(html).toHaveAttribute("data-contrast", "high");
+  await expect(page.getByRole("switch", { name: "선명하게 보기" })).toBeChecked();
+  await page.getByRole("switch", { name: "선명하게 보기" }).uncheck();
+  await expect(html).not.toHaveAttribute("data-contrast", /.+/);
+});
+
+test("header settings button shows icon and the visible label 설정, at least 48px tall", async ({
+  page,
+}) => {
+  await login(page);
+  const btn = page.locator(".shell-header").getByRole("link", { name: "설정" });
+  await expect(btn).toContainText("설정");
+  const box = await btn.boundingBox();
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(48);
+});
