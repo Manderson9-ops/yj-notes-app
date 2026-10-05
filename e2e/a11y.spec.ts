@@ -37,11 +37,11 @@ for (const theme of THEMES) {
         test.slow(); // 알림장 화면까지 돌아서 webkit 에서 30초를 넘길 수 있다
         // 밝기는 시스템 에뮬레이션이 아니라 설정값(yj.scheme)으로 정한다(T-D1)
         await page.addInitScript(
-          ([t, s]) => {
+          ({ t, s }) => {
             localStorage.setItem("yj.theme", t);
             localStorage.setItem("yj.scheme", s);
           },
-          [theme, scheme],
+          { t: theme, s: scheme },
         );
         const shot = async (name: string, fullPage = false) => {
           if (info.project.name !== "mobile-chromium") return;
@@ -106,12 +106,12 @@ for (const theme of THEMES) {
     test(`선명하게 보기 ${theme} ${scheme}: 미리보기 axe 0 + 캡처`, async ({ page }, info) => {
       test.slow();
       await page.addInitScript(
-        ([t, s]) => {
+        ({ t, s }) => {
           localStorage.setItem("yj.theme", t);
           localStorage.setItem("yj.scheme", s);
           localStorage.setItem("yj.contrast", "high");
         },
-        [theme, scheme],
+        { t: theme, s: scheme },
       );
       await login(page);
       await page.getByRole("link", { name: "설정", exact: true }).click();
