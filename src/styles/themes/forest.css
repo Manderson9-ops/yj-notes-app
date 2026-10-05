@@ -10,30 +10,30 @@
 }
 
 :root[data-theme="forest"] {
-  --c-bg: #f6f1e3;
-  --c-fg: #2b3a33;
-  --c-muted: #4f5d55;
-  --c-border: #8a7b5e;
-  --c-line: rgba(122, 86, 52, 0.22);
+  --c-bg: #f4efe1;
+  --c-fg: #1b2721;
+  --c-muted: #3d4943;
+  --c-border: #7a6b50;
+  --c-line: #cdbfa5;
   --c-surface: #fffdf6;
   --c-surface-2: #dceaf0;
-  --c-accent: #2f6b4f;
+  --c-accent: #2a6249;
   --c-on-accent: #ffffff;
-  --c-accent-soft: #ddebdd;
-  --c-on-accent-soft: #1f4d38;
-  --c-link: #2d6a8e;
+  --c-accent-soft: #d7e8d8;
+  --c-on-accent-soft: #163a2a;
+  --c-link: #1c4965;
   --c-badge: #f2d58a;
-  --c-on-badge: #2b3a33;
-  --c-earth: #7a5634;
+  --c-on-badge: #1d2a24;
+  --c-earth: #5c3e22;
   --c-deco-1: #64a0bc;
   --c-deco-2: #66a063;
   --c-deco-3: #28533d;
   --c-cloud: #fffdf6;
   --c-shadow: #28495f; /* 푸른 기 그림자 */
   --c-hill-front: #28533d; /* 숲 전용(계약 밖): 맨 앞 언덕은 항상 뒤 언덕보다 어둡게 */
-  --blob-alpha: 0.18; /* 숲 전용: 하늘 번짐의 진하기(contrast.test.ts 가 읽어 대비 확인) */
-  --blob-alpha-2: 0.1; /* 숲 전용: 숲색 번짐 */
-  --c-warn: #7a4a00;
+  --blob-alpha: 0.04; /* 숲 전용: 하늘 번짐의 진하기(contrast.test.ts 가 읽어 대비 확인) */
+  --blob-alpha-2: 0.02; /* 숲 전용: 숲색 번짐 */
+  --c-warn: #6e4300;
   --c-warn-bg: #f7e8c4;
   --c-alert: #7a2a1f;
   --c-alert-bg: #f8e3dc;
@@ -46,12 +46,12 @@
   --radius: 14px;
   --radius-lg: 16px;
   --bw: 1px;
-  --shadow: 0 2px 12px color-mix(in srgb, var(--c-shadow) 16%, transparent);
+  --shadow: 0 2px 10px rgba(40, 73, 95, 0.14);
   --shadow-press: 0 1px 5px color-mix(in srgb, var(--c-shadow) 16%, transparent);
   /* 하늘(위)·숲(아래) 워시. 글자 뒤 카드·입력은 --c-surface 단색이라 대비에 영향 없음 */
   --tex-bg:
     radial-gradient(150% 46% at 50% -4%, #dceaf0 0%, #dceaf0 38%, rgba(220, 234, 240, 0) 100%),
-    radial-gradient(130% 40% at 50% 106%, rgba(102, 160, 99, 0.12) 0%, rgba(102, 160, 99, 0) 100%);
+    radial-gradient(130% 40% at 50% 106%, rgba(102, 160, 99, 0.05) 0%, rgba(102, 160, 99, 0) 100%);
   --tex-surface: none;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --dur: 260ms;
@@ -59,45 +59,48 @@
   --shake-dur: 600ms;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="forest"] {
-    --c-bg: #121b1a;
-    --c-fg: #ede6d3;
-    --c-muted: #b9c2b5;
-    --c-border: #76887c;
-    --c-line: rgba(237, 230, 211, 0.1);
-    --c-surface: #1b2826;
-    --c-surface-2: #1e3033;
-    --c-accent: #8cc7a1;
-    --c-on-accent: #10201a;
-    --c-accent-soft: #2a4a3a;
-    --c-on-accent-soft: #dcefe2;
-    --c-link: #9cc9e3;
-    --c-badge: #f2d58a;
-    --c-on-badge: #121b1a;
-    --c-earth: #d2b48c;
-    --c-deco-1: #28495f;
-    --c-deco-2: #28533d;
-    --c-deco-3: #f2d58a;
-    --c-cloud: #3a4f55;
-    --c-shadow: #000000;
-    --c-hill-front: #1a2e26;
-    --blob-alpha: 0.28;
-    --blob-alpha-2: 0.2;
-    --c-warn: #f2c46d;
-    --c-warn-bg: #2e2614;
-    --c-alert: #f09a84;
-    --c-alert-bg: #2e1b17;
-    --c-info: #9cc9e3;
-    --c-info-bg: #16262e;
-    --c-ok: #8cc7a1;
-    --c-ok-bg: #16291f;
-    --shadow: 0 0 0 1px rgba(237, 230, 211, 0.06);
-    --shadow-press: 0 0 0 1px rgba(237, 230, 211, 0.06);
-    --tex-bg:
-      radial-gradient(150% 46% at 50% -4%, #1e3033 0%, #1e3033 38%, rgba(30, 48, 51, 0) 100%),
-      radial-gradient(130% 40% at 50% 106%, rgba(40, 83, 61, 0.5) 0%, rgba(40, 83, 61, 0) 100%);
-  }
+:root[data-theme="forest"][data-scheme="dark"] {
+  --c-bg: #111a18;
+  --c-fg: #faf5e8;
+  --c-muted: #c4ccc0;
+  --c-border: #80948a;
+  --c-line: #35443f;
+  --c-surface: #1a2623;
+  --c-surface-2: #21302c;
+  --c-accent: #98d1ab;
+  --c-on-accent: #0d1e16;
+  --c-accent-soft: #244437;
+  --c-on-accent-soft: #ddf0e3;
+  --c-link: #a8d2ea;
+  --c-badge: #463e1c;
+  --c-on-badge: #f6e3a8;
+  --c-earth: #dfc6a0;
+  --c-deco-1: #28495f;
+  --c-deco-2: #28533d;
+  --c-deco-3: #f2d58a;
+  --c-cloud: #3a4f55;
+  --c-shadow: #000000;
+  --c-hill-front: #1a2e26;
+  --blob-alpha: 0.03;
+  --blob-alpha-2: 0.02;
+  --c-warn: #f2c46d;
+  --c-warn-bg: #2e2614;
+  --c-alert: #f09a84;
+  --c-alert-bg: #2e1b17;
+  --c-info: #9cc9e3;
+  --c-info-bg: #16262e;
+  --c-ok: #8cc7a1;
+  --c-ok-bg: #16291f;
+  --shadow: none;
+  --shadow-press: none;
+  --tex-bg:
+    radial-gradient(
+      150% 46% at 50% -4%,
+      rgba(33, 48, 44, 0.35) 0%,
+      rgba(33, 48, 44, 0.35) 38%,
+      rgba(33, 48, 44, 0) 100%
+    ),
+    radial-gradient(130% 40% at 50% 106%, rgba(40, 83, 61, 0.2) 0%, rgba(40, 83, 61, 0) 100%);
 }
 
 /* ---- 글꼴: 정적 UI 문구만 (본문·숫자는 시스템 글꼴) ---- */
@@ -120,7 +123,7 @@
 
 :root[data-theme="forest"] .shell-header .decor-header {
   position: absolute;
-  right: 64px;
+  right: 112px;
   top: 8px;
   width: 56px;
   height: 28px;
@@ -129,26 +132,6 @@
 :root[data-theme="forest"] .tabbar {
   background: var(--c-surface);
   border-top: 1px solid var(--c-line);
-}
-
-:root[data-theme="forest"] .tab {
-  position: relative;
-}
-
-:root[data-theme="forest"] .tab.active {
-  background: transparent;
-  color: var(--c-accent);
-}
-
-:root[data-theme="forest"] .tab.active::before {
-  content: "";
-  position: absolute;
-  top: -5px;
-  left: 22%;
-  right: 22%;
-  height: 3px;
-  border-radius: 0 0 3px 3px;
-  background: var(--c-accent);
 }
 
 /* ---- 버튼·키 ---- */
@@ -366,14 +349,14 @@
 /* 헤더: 설정 아이콘 왼쪽 위 구석에 작게(제목과 겹치지 않음) */
 :root[data-theme="forest"] .shell-header::before {
   top: 0;
-  right: 44px;
+  right: 84px;
   bottom: 0;
   width: 150px;
 }
 
 :root[data-theme="forest"] .shell-header::after {
   top: 0;
-  right: 100px;
+  right: 140px;
   bottom: 0;
   width: 110px;
 }
@@ -474,64 +457,13 @@
   z-index: -1;
   pointer-events: none;
   background-image: url("/icons/tex-forest-grain.png");
-  opacity: 0.055; /* 연구 범위 .04~.06 안. 최악 지점 대비는 contrast.test.ts 가 계산 */
+  opacity: 0.02; /* 연구 범위 .04~.06 안. 최악 지점 대비는 contrast.test.ts 가 계산 */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="forest"] body::after {
-    opacity: 0.05;
-  }
+:root[data-theme="forest"][data-scheme="dark"] body::after {
+  opacity: 0.02;
 }
 
-/* ---- 테마 고르기 라디오: --c-border 원 + 초록 점 ---- */
-:root[data-theme="forest"] .theme-option input[type="radio"] {
-  appearance: none;
-  -webkit-appearance: none;
-  flex: none;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--c-border);
-  border-radius: 50%;
-  background: var(--c-surface);
-}
-
-:root[data-theme="forest"] .theme-option input[type="radio"]:checked {
-  border-color: var(--c-accent);
-  background: radial-gradient(circle, var(--c-accent) 0 40%, var(--c-surface) 44%);
-}
-/* ---- 큰 글씨 스위치: 둥근 네모 + 체크 ---- */
-:root[data-theme="forest"] .setting-row input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  display: grid;
-  flex: none;
-  place-content: center;
-  width: 32px;
-  height: 32px;
-  margin: 0;
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
-  background: var(--c-surface);
-}
-
-:root[data-theme="forest"] .setting-row input[type="checkbox"]:checked {
-  border-color: var(--c-accent);
-  background: var(--c-accent);
-}
-
-:root[data-theme="forest"] .setting-row input[type="checkbox"]::before {
-  content: "";
-  width: 16px;
-  height: 9px;
-  border-bottom: 3px solid var(--c-on-accent);
-  border-left: 3px solid var(--c-on-accent);
-  transform: translateY(-2px) rotate(-45deg) scale(0);
-  transition: transform var(--dur) var(--ease);
-}
-
-:root[data-theme="forest"] .setting-row input[type="checkbox"]:checked::before {
-  transform: translateY(-2px) rotate(-45deg) scale(1);
-}
 /* 스와치(설정·미리보기의 테마 고르기) */
 .swatch[data-swatch="forest"] i:nth-child(1) {
   background: #dceaf0;

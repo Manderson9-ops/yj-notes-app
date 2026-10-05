@@ -1,12 +1,14 @@
 // theme-system TH-1 / TH-2: 6 조합(3 테마 × 라이트/다크)의 토큰 대비를 CSS 파일에서 읽어 계산한다.
+// T-D1 기준: 일반 모드 본문 12:1·보조/흙색/링크 7:1·경계 3:1·상태색 7:1, 선명하게 보기 본문 15:1·보조 10:1·경계 7:1.
 /// <reference types="node" />
 import { readFileSync } from "node:fs";
-import { THEMES, THEME_COLORS } from "../lib/theme";
+import { HIGH_CONTRAST_COLORS, THEMES, THEME_COLORS } from "../lib/theme";
 
 // vitest 는 .css 를 빈 모듈로 바꾸므로 fs 로 직접 읽는다.
 const read = (rel: string): string => readFileSync(new URL(rel, import.meta.url), "utf8");
 const files: Record<string, string> = {
   "./tokens.css": read("./tokens.css"),
+  "./contrast-high.css": read("./contrast-high.css"),
   ...Object.fromEntries(
     THEMES.filter((t) => t.id !== "basic").map((t) => [
       `./themes/${t.id}.css`,
@@ -51,19 +53,15 @@ function parseBlocks(css: string): Block[] {
   return parseList();
 }
 
-const DARK = "@media (prefers-color-scheme: dark)";
-
-/** 파일에서 selector 규칙의 선언(라이트=최상위, 다크=@media dark 안)을 모은다. */
-function collect(css: string, selector: string) {
+/** 파일에서 규칙의 선언을 모은다. 라이트 = selector, 다크 = darkSelector(<html data-scheme="dark"> 규칙). */
+function collect(css: string, selector: string, darkSelector = `${selector}[data-scheme="dark"]`) {
   const blocks = parseBlocks(css);
-  const merge = (list: Block[]) => {
+  const merge = (sel: string) => {
     const m = new Map<string, string>();
-    for (const b of list) if (b.selector === selector) for (const [k, v] of b.decls) m.set(k, v);
+    for (const b of blocks) if (b.selector === sel) for (const [k, v] of b.decls) m.set(k, v);
     return m;
   };
-  const light = merge(blocks);
-  const dark = merge(blocks.filter((b) => b.selector === DARK).flatMap((b) => b.children));
-  return { light, dark };
+  return { light: merge(selector), dark: merge(darkSelector) };
 }
 
 const COLOR_TOKENS = [
@@ -142,6 +140,7 @@ function ratio(a: string, b: string): number {
 
 type Scheme = "light" | "dark";
 
+/** 일반 모드의 토큰. 다크는 라이트 위에 다크 규칙을 덮어쓴 값(실제 CSS 캐스케이드와 같다). */
 function tokensFor(theme: string, scheme: Scheme): Map<string, string> {
   const base = collect(files["./tokens.css"] ?? "", ":root");
   if (theme === "basic") {
@@ -149,7 +148,24 @@ function tokensFor(theme: string, scheme: Scheme): Map<string, string> {
   }
   const css = files[`./themes/${theme}.css`] ?? "";
   const t = collect(css, `:root[data-theme="${theme}"]`);
-  return scheme === "light" ? t.light : new Map([...t.light, ...t.dark]);
+  const merged = scheme === "light" ? t.light : new Map([...t.light, ...t.dark]);
+  return new Map([...base.light, ...(scheme === "dark" ? base.dark : []), ...merged]);
+}
+
+/** 선명하게 보기 토큰: 일반 토큰 위에 contrast-high.css 를 캐스케이드 순서대로 덮는다(라이트 → 테마 → 다크 → 테마+다크). */
+function highTokensFor(theme: string, scheme: Scheme): Map<string, string> {
+  const css = files["./contrast-high.css"] ?? "";
+  const m = new Map(tokensFor(theme, scheme));
+  const sel = ':root[data-contrast="high"]';
+  const get = (s: string) => collect(css, s).light;
+  const layers = [get(sel)];
+  if (theme !== "basic") layers.push(get(`${sel}[data-theme="${theme}"]`));
+  if (scheme === "dark") {
+    layers.push(get(`${sel}[data-scheme="dark"]`));
+    if (theme !== "basic") layers.push(get(`${sel}[data-theme="${theme}"][data-scheme="dark"]`));
+  }
+  for (const l of layers) for (const [k, v] of l) m.set(k, v);
+  return m;
 }
 
 function hex(tokens: Map<string, string>, k: string): string {
@@ -158,34 +174,48 @@ function hex(tokens: Map<string, string>, k: string): string {
   return v;
 }
 
+const SURFACES = ["--c-bg", "--c-surface", "--c-surface-2"] as const;
+const onAll = (fg: string, min: number): [string, string, number][] =>
+  SURFACES.map((s): [string, string, number] => [fg, s, min]);
+
 const PAIRS: [string, string, number][] = [
-  ["--c-fg", "--c-bg", 4.5],
-  ["--c-fg", "--c-surface", 4.5],
-  ["--c-fg", "--c-surface-2", 4.5],
-  ["--c-muted", "--c-bg", 4.5],
-  ["--c-muted", "--c-surface", 4.5],
-  ["--c-muted", "--c-surface-2", 4.5],
-  ["--c-on-accent", "--c-accent", 4.5],
-  ["--c-on-accent-soft", "--c-accent-soft", 4.5],
-  ["--c-on-badge", "--c-badge", 4.5],
-  ["--c-link", "--c-bg", 4.5],
-  ["--c-link", "--c-surface", 4.5],
-  ["--c-earth", "--c-bg", 4.5],
-  ["--c-earth", "--c-surface", 4.5],
+  ...onAll("--c-fg", 12),
+  ...onAll("--c-muted", 7),
+  ...onAll("--c-earth", 7),
+  ...onAll("--c-link", 7),
+  ...onAll("--c-border", 3),
   ["--c-accent", "--c-bg", 4.5],
   ["--c-accent", "--c-surface", 4.5],
+  ["--c-on-accent", "--c-accent", 6.5],
+  ["--c-on-accent-soft", "--c-accent-soft", 7],
+  ["--c-on-badge", "--c-badge", 7],
   ...["warn", "alert", "ok", "info"].flatMap((s): [string, string, number][] => [
-    [`--c-${s}`, `--c-${s}-bg`, 4.5],
+    [`--c-${s}`, `--c-${s}-bg`, 7],
     [`--c-${s}`, "--c-bg", 4.5],
   ]),
-  // TH-2: UI 경계·포커스 링·아이콘
-  ["--c-border", "--c-bg", 3],
-  ["--c-border", "--c-surface", 3],
+];
+
+/** 선명하게 보기(data-contrast="high") 쌍. */
+const HIGH_PAIRS: [string, string, number][] = [
+  ...onAll("--c-fg", 15),
+  ...onAll("--c-muted", 10),
+  ...onAll("--c-border", 7),
+  ...onAll("--c-line", 3),
+  ...onAll("--c-link", 7),
+  ...onAll("--c-earth", 7),
+  ...onAll("--c-accent", 7),
+  ["--c-on-accent", "--c-accent", 7],
+  ["--c-on-accent-soft", "--c-accent-soft", 10],
+  ["--c-on-badge", "--c-badge", 10],
+  ["--c-fg", "--c-accent-soft", 10],
+  ...["warn", "alert", "ok", "info"].flatMap((s): [string, string, number][] => [
+    [`--c-${s}`, `--c-${s}-bg`, 7],
+  ]),
 ];
 
 /** 기준 미달 쌍의 설명 목록(비면 통과). */
-function failures(tokens: Map<string, string>): string[] {
-  return PAIRS.flatMap(([fg, bg, min]) => {
+function failures(tokens: Map<string, string>, pairs = PAIRS): string[] {
+  return pairs.flatMap(([fg, bg, min]) => {
     const r = ratio(hex(tokens, fg), hex(tokens, bg));
     return r >= min ? [] : [`${fg} on ${bg} = ${r.toFixed(2)} < ${String(min)}`];
   });
@@ -232,10 +262,10 @@ const GRAIN_MAX_DARKEN = 0.354;
 const GRAIN_MAX_LIGHTEN = 0.727;
 
 const WASH_PAIRS: [string, number][] = [
-  ["--c-fg", 4.5],
-  ["--c-muted", 4.5],
-  ["--c-link", 4.5],
-  ["--c-earth", 4.5],
+  ["--c-fg", 12],
+  ["--c-muted", 7],
+  ["--c-link", 7],
+  ["--c-earth", 7],
   ["--c-accent", 4.5],
   ["--c-border", 3],
 ];
@@ -302,10 +332,15 @@ export function blobFailures(tokens: Map<string, string>): string[] {
       ["sky+green", over(green, a2, skyOn)],
     ];
     for (const [label, rgb] of cases) {
-      for (const fg of ["--c-fg", "--c-muted"]) {
+      for (const [fg, min] of [
+        ["--c-fg", 12],
+        ["--c-muted", 7],
+      ] as const) {
         const r = ratio(hex(tokens, fg), toHex(rgb));
-        if (r < 4.5)
-          out.push(`${fg} on blob(${label}) over ${baseKey} ${toHex(rgb)} = ${r.toFixed(2)} < 4.5`);
+        if (r < min)
+          out.push(
+            `${fg} on blob(${label}) over ${baseKey} ${toHex(rgb)} = ${r.toFixed(2)} < ${String(min)}`,
+          );
       }
     }
   }
@@ -313,13 +348,17 @@ export function blobFailures(tokens: Map<string, string>): string[] {
 }
 /** 테마 전용 쌍(예: 크레용 형광펜 띠 위 글자). */
 const THEME_PAIRS: Record<string, [string, string, number][]> = {
-  crayon: [["--c-on-hl", "--c-hl", 4.5]],
+  crayon: [["--c-on-hl", "--c-hl", 7]],
 };
 
 function grainOpacityFor(theme: string, scheme: Scheme): number {
   const css = files[`./themes/${theme}.css`];
   if (!css) return 0;
-  const g = collect(css, `:root[data-theme="${theme}"] body::after`);
+  const g = collect(
+    css,
+    `:root[data-theme="${theme}"] body::after`,
+    `:root[data-theme="${theme}"][data-scheme="dark"] body::after`,
+  );
   const v = (scheme === "light" ? g.light : new Map([...g.light, ...g.dark])).get("opacity");
   return v ? Number(v) : 0;
 }
@@ -346,13 +385,11 @@ for (const theme of THEMES.map((t) => t.id)) {
       // 테마 파일은 색 토큰을 라이트·다크 둘 다 스스로 정의해야 한다(상속 금지).
       const own =
         theme === "basic"
-          ? t
+          ? collect(files["./tokens.css"] ?? "", ":root")[scheme]
           : collect(files[`./themes/${theme}.css`] ?? "", `:root[data-theme="${theme}"]`)[scheme];
 
       it("계약의 모든 토큰이 정의됨", () => {
-        const missing = COLOR_TOKENS.filter(
-          (k) => !own.has(k) && !(scheme === "dark" && theme === "basic" && t.has(k)),
-        );
+        const missing = COLOR_TOKENS.filter((k) => !own.has(k));
         expect(missing).toEqual([]);
         expect(OTHER_TOKENS.filter((k) => !t.has(k) && !tokensFor("basic", scheme).has(k))).toEqual(
           [],
@@ -390,6 +427,39 @@ for (const theme of THEMES.map((t) => t.id)) {
     });
   }
 }
+
+for (const theme of THEMES.map((t) => t.id)) {
+  for (const scheme of ["light", "dark"] as const) {
+    describe(`선명하게 보기: ${theme} / ${scheme}`, () => {
+      const t = highTokensFor(theme, scheme);
+
+      it.each(HIGH_PAIRS)("%s / %s ≥ %s", (fg, bg, min) => {
+        const r = ratio(hex(t, fg), hex(t, bg));
+        expect(r, `${fg} on ${bg} = ${r.toFixed(2)}`).toBeGreaterThanOrEqual(min);
+      });
+
+      it("질감·워시·오프셋 그림자가 없다", () => {
+        expect(t.get("--tex-bg")).toBe("none");
+        expect(t.get("--tex-surface")).toBe("none");
+        expect(t.get("--shadow")).toBe("none");
+        expect(t.get("--lift") ?? "none").toBe("none");
+        expect(t.get("--bw")).toBe("2px");
+      });
+
+      it("theme-color(주소창) 은 선명하게 보기의 --c-bg 와 같다", () => {
+        expect(HIGH_CONTRAST_COLORS[scheme]).toBe(hex(t, "--c-bg"));
+      });
+    });
+  }
+}
+
+describe("다크 규칙은 data-scheme 로만 정한다", () => {
+  it("토큰·테마 파일에 prefers-color-scheme 미디어 쿼리가 없다(밝기는 scheme.ts 가 정함)", () => {
+    for (const [name, css] of Object.entries(files)) {
+      expect(css.replace(/\/\*[\s\S]*?\*\//g, ""), name).not.toContain("prefers-color-scheme");
+    }
+  });
+});
 
 describe("대조군: 검사 함수는 낮은 대비를 실제로 잡는다", () => {
   it("낮은 대비 토큰 맵은 실패 목록을 돌려준다", () => {

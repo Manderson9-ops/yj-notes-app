@@ -1,36 +1,37 @@
 /* Design tokens (docs/06 §5, docs/design/theme-system.md §2) — 「기본」 테마 값.
-   라이트가 기본, 다크는 prefers-color-scheme. 다른 테마는 themes/*.css 가 같은 토큰을 덮어쓴다. */
+   라이트가 기본, 다크는 <html data-scheme="dark"> (src/lib/scheme.ts 가 시스템 설정/사용자 선택으로 정함).
+   다른 테마는 themes/*.css 가 같은 토큰을 덮어쓴다. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* 색 */
-  --c-bg: #ffffff;
-  --c-fg: #1b1d21;
-  --c-muted: #5b6068;
-  --c-border: #7d838c;
-  --c-line: #d9dce1;
-  --c-surface: #eef0f4;
-  --c-surface-2: #e3e9f4;
-  --c-accent: #1558c0;
+  --c-bg: #f6f7f9;
+  --c-fg: #16181c;
+  --c-muted: #454a52;
+  --c-border: #737984;
+  --c-line: #c4c9d1;
+  --c-surface: #ffffff;
+  --c-surface-2: #e8edf5;
+  --c-accent: #1553b8;
   --c-on-accent: #ffffff;
-  --c-accent-soft: #dbe7fb;
-  --c-on-accent-soft: #0f3f8c;
-  --c-link: #1558c0;
+  --c-accent-soft: #d8e5fb;
+  --c-on-accent-soft: #0c3a85;
+  --c-link: #134aa5;
   --c-badge: #ffe08a;
   --c-on-badge: #1b1d21;
-  --c-earth: #6b5a45;
+  --c-earth: #54452f;
   --c-deco-1: #8fb3ec;
   --c-deco-2: #c9d6ee;
   --c-deco-3: #f2d98a;
   --c-cloud: #ffffff;
   --c-shadow: #141e32;
-  --c-warn: #a14a00;
+  --c-warn: #853d00;
   --c-warn-bg: #fdf0dc;
-  --c-alert: #b3261e;
+  --c-alert: #972019;
   --c-alert-bg: #fce8e6;
-  --c-info: #1d4f9c;
+  --c-info: #1d4e9a;
   --c-info-bg: #e8f0fc;
-  --c-ok: #1b6e3a;
+  --c-ok: #175c30;
   --c-ok-bg: #e4f4ea;
 
   /* 글꼴 */
@@ -49,7 +50,7 @@
   --radius: 12px;
   --radius-lg: 16px;
   --bw: 1px;
-  --shadow: 0 1px 2px rgba(20, 30, 50, 0.08);
+  --shadow: 0 1px 3px rgba(20, 30, 50, 0.12);
   --shadow-press: none;
 
   /* 질감 */
@@ -72,40 +73,38 @@
   --space-6: 32px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --c-bg: #121316;
-    --c-fg: #ececf0;
-    --c-muted: #a3a8b1;
-    --c-border: #737a85;
-    --c-line: #34373d;
-    --c-surface: #1e2025;
-    --c-surface-2: #1b2433;
-    --c-accent: #7fb0ff;
-    --c-on-accent: #0b1220;
-    --c-accent-soft: #22385e;
-    --c-on-accent-soft: #d6e4ff;
-    --c-link: #8fbaff;
-    --c-badge: #f0cf6b;
-    --c-on-badge: #121316;
-    --c-earth: #cdb89a;
-    --c-deco-1: #2b4a80;
-    --c-deco-2: #2a3550;
-    --c-deco-3: #6b5a20;
-    --c-cloud: #2a3550;
-    --c-shadow: #000000;
-    --c-warn: #ffb066;
-    --c-warn-bg: #33250f;
-    --c-alert: #ff8a80;
-    --c-alert-bg: #3a1a18;
-    --c-info: #9cc2ff;
-    --c-info-bg: #17233a;
-    --c-ok: #7dd69a;
-    --c-ok-bg: #16291f;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  }
+:root[data-scheme="dark"] {
+  color-scheme: dark;
+  --c-bg: #121316;
+  --c-fg: #f1f2f5;
+  --c-muted: #bcc1ca;
+  --c-border: #828995;
+  --c-line: #3d4148;
+  --c-surface: #1c1e22;
+  --c-surface-2: #26292e;
+  --c-accent: #a8c7fa;
+  --c-on-accent: #0a2350;
+  --c-accent-soft: #1f3a63;
+  --c-on-accent-soft: #dce8ff;
+  --c-link: #a8c7fa;
+  --c-badge: #4a3f17;
+  --c-on-badge: #ffe7a3;
+  --c-earth: #dcc8aa;
+  --c-deco-1: #2b4a80;
+  --c-deco-2: #2a3550;
+  --c-deco-3: #6b5a20;
+  --c-cloud: #2a3550;
+  --c-shadow: #000000;
+  --c-warn: #ffb066;
+  --c-warn-bg: #33250f;
+  --c-alert: #ff8d83;
+  --c-alert-bg: #3a1a18;
+  --c-info: #9cc2ff;
+  --c-info-bg: #17233a;
+  --c-ok: #7dd69a;
+  --c-ok-bg: #16291f;
+  --shadow: none;
 }
-
 /* 큰 글씨 설정 (docs/06 §1): <html data-large-text="1"> */
 :root[data-large-text="1"] {
   --fs-base: 20px;

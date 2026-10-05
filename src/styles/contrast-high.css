@@ -1,0 +1,127 @@
+/* 선명하게 보기 (고대비 모드, KRDS 선명한 화면 모드 참고): <html data-contrast="high">.
+   어느 테마·밝기 위에도 얹힌다(테마 파일 뒤에 불러온다). 글자는 검정/흰색에 가깝게, 테두리는 글자색에 가깝게,
+   장식·질감·오프셋 그림자는 끈다. 값은 contrast.test.ts 가 6조합 모두 확인한다(본문 15:1, 보조 10:1, 테두리 7:1).
+   라이트 = 선택자 그 자체, 다크 = [data-scheme="dark"], 테마별 강조색 = [data-theme]. */
+:root[data-contrast="high"] {
+  --c-bg: #ffffff;
+  --c-surface: #ffffff;
+  --c-surface-2: #eef0f3;
+  --c-fg: #000000;
+  --c-muted: #2b2b2b;
+  --c-border: #1a1a1a;
+  --c-line: #6b6b6b;
+  --c-accent: #0a3d91;
+  --c-on-accent: #ffffff;
+  --c-accent-soft: #dfe6f5;
+  --c-on-accent-soft: #000000;
+  --c-link: #0a3d91;
+  --c-badge: #ffe066;
+  --c-on-badge: #000000;
+  --c-earth: #3b2c14;
+  --c-hl: #eef0f3;
+  --c-on-hl: #000000;
+  --c-shadow: #000000;
+  --bw: 2px;
+  --shadow: none;
+  --shadow-press: none;
+  --lift: none;
+  --band: 0px;
+  --tex-bg: none;
+  --tex-surface: none;
+}
+
+:root[data-contrast="high"][data-theme="crayon"] {
+  --c-accent: #004d7a;
+  --c-link: #004d7a;
+}
+
+:root[data-contrast="high"][data-theme="forest"] {
+  --c-accent: #1b5a3d;
+  --c-link: #1b5a3d;
+}
+
+:root[data-contrast="high"][data-scheme="dark"] {
+  --c-bg: #0b0b0c;
+  --c-surface: #161618;
+  --c-surface-2: #222226;
+  --c-fg: #ffffff;
+  --c-muted: #d9d9d9;
+  --c-border: #e6e6e6;
+  --c-line: #8c8c92;
+  --c-accent: #b3d0ff;
+  --c-on-accent: #000000;
+  --c-accent-soft: #2e3340;
+  --c-on-accent-soft: #ffffff;
+  --c-link: #b3d0ff;
+  --c-badge: #3d3300;
+  --c-on-badge: #ffe680;
+  --c-earth: #ecd9b8;
+  --c-hl: #222226;
+  --c-on-hl: #ffffff;
+}
+
+:root[data-contrast="high"][data-theme="crayon"][data-scheme="dark"] {
+  --c-accent: #a6dcff;
+  --c-link: #a6dcff;
+}
+
+:root[data-contrast="high"][data-theme="forest"][data-scheme="dark"] {
+  --c-accent: #a9e0bb;
+  --c-link: #a9e0bb;
+}
+
+/* 포커스 링은 더 두껍고 띄운다 */
+:root[data-contrast="high"] :focus-visible {
+  outline: 3px solid var(--c-accent);
+  outline-offset: 3px;
+}
+
+/* 장식은 모두 끈다(data-tone="serious" 와 같은 규칙 + 테마 장식) */
+:root[data-contrast="high"]
+  :is(.decor, .decor-empty, .decor-pin-top, .decor-pin-bottom, .decor-pin-sky) {
+  display: none;
+}
+
+:root[data-contrast="high"] .card::before,
+:root[data-contrast="high"] body::before,
+:root[data-contrast="high"] body::after,
+:root[data-contrast="high"] :is(.shell-header, .empty, .pin-screen)::before,
+:root[data-contrast="high"] :is(.shell-header, .empty)::after {
+  display: none;
+}
+
+:root[data-contrast="high"] .card {
+  padding-top: var(--space-4);
+}
+
+:root[data-contrast="high"] *,
+:root[data-contrast="high"] *::before {
+  animation: none !important;
+}
+
+:root[data-contrast="high"] .empty {
+  background: var(--c-surface);
+}
+
+/* 크레용: 손그림 외곽선(색이 고정된 SVG)·형광펜 띠를 끄고 곧은 단색 테두리로 */
+:root[data-contrast="high"][data-theme="crayon"]
+  :is(.btn, .btn-primary, a.card, .card:has(> a), .field, .theme-option, .chip, .key, .empty) {
+  border-image: none;
+  border-style: solid;
+  border-color: var(--c-border);
+  background-image: none;
+  background-color: var(--face);
+}
+
+:root[data-contrast="high"][data-theme="crayon"] .btn-danger {
+  border-color: var(--c-alert);
+  background-color: transparent;
+}
+
+:root[data-contrast="high"][data-theme="crayon"] h2 {
+  width: auto;
+  padding: 0;
+  background: none;
+  clip-path: none;
+  transform: none;
+}
