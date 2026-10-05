@@ -227,3 +227,10 @@ Material Design dark theme(표면 #121212 계열, 본문 15.8:1, 채도 낮은 �
 - 스위치는 공용 `SettingSwitch`(큰 글씨·선명하게 보기): 최소 높이 64px, 도움말은 `--c-muted`, 켜짐/꺼짐 글자는 트랙 아래에 쌓는다. 설정·미리보기 모두 화면 테마 → 화면 밝기 → 「글자·선명도」 순서.
 - 꺼진 `.btn`/`.btn-primary` 는 모든 모드에서 opacity 없이 점선 테두리 + `--c-muted` 글자. 크레용 라이트 `--c-badge` `#ffe600`→`#ffe27a`(`--c-accent-soft` `#fff1a8` 과 구분).
 - 설정 화면 스크린샷은 전체 페이지.
+
+### 6-8. 4차 수정 (T-D1-14~)
+
+- 회귀 수정: 스위치 트랙이 `.switch-ctl` 안으로 들어가 켜짐 선택자가 안 맞던 문제를 `.switch-row input:checked ~ .switch-ctl .switch-track` 으로 고쳤다. `e2e/theme.spec.ts` 가 3테마 × 라이트/다크 × (일반, 선명하게 보기)에서 켜짐 = 트랙 강조색 + 손잡이 오른쪽, 꺼짐 = 그 반대를 확인한다.
+- 다크에서 눌리는 카드는 `--c-surface-2` 면 + 2px `--c-border`, 안 눌리는 카드는 `--c-surface` + 1.5px `--c-line`(e2e 가 면 색 차이도 확인). 기본·숲 다크 `--lift` 는 `none`.
+- 선명하게 보기의 꺼진 단추 글자는 새 `--c-disabled`(라이트 `#4a4a4a`, 다크 `#b8b8b8`, 면 위 ≥ 7:1; 본문 보조색 `--c-muted` 10:1 보다 일부러 약하게) + 점선.
+- 크레용 다크 `--c-accent` `#93d1fb`→`#7cc3f2`(손그림 선택 선 색도 같이). `--c-link` 는 `#93d1fb` 유지.
