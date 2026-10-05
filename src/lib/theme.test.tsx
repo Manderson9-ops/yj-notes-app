@@ -17,7 +17,7 @@ let dark: HTMLMetaElement;
 beforeEach(() => {
   localStorage.clear();
   delete document.documentElement.dataset.theme;
-  light = addMeta("(prefers-color-scheme: light)", "#ffffff");
+  light = addMeta("(prefers-color-scheme: light)", "#f6f7f9");
   dark = addMeta("(prefers-color-scheme: dark)", "#121316");
 });
 
@@ -43,8 +43,9 @@ describe("theme", () => {
     localStorage.setItem(THEME_KEY, "forest");
     initTheme();
     expect(document.documentElement.dataset.theme).toBe("forest");
-    expect(light.content).toBe("#f6f1e3");
-    expect(dark.content).toBe("#121b1a");
+    // 밝기 설정이 아직 없으면 시스템 설정(테스트 환경: 라이트)을 따른다. 두 meta 가 같은 색.
+    expect(light.content).toBe("#f4efe1");
+    expect(dark.content).toBe("#f4efe1");
   });
 
   it("falls back to basic for an invalid saved value", () => {
@@ -69,6 +70,6 @@ describe("theme", () => {
       result.current[1]("basic");
     });
     expect(document.documentElement.dataset.theme).toBeUndefined();
-    expect(dark.content).toBe("#121316");
+    expect(dark.content).toBe("#f6f7f9");
   });
 });

@@ -79,7 +79,7 @@ for (const theme of THEMES) {
           await stableShot(page, `logs-${name}-${theme}-${scheme}`, fullPage);
         };
         const check = async () => {
-          // 아래쪽 고정 탭바가 긴 화면의 버튼을 가리면 axe 가 겹침으로 본다: 한 화면에 다 들어오게 키워서 잰다.
+          // 아래쪽 따라오는(sticky) 탭바가 긴 화면의 버튼을 가리면 axe 가 겹침으로 본다: 한 화면에 다 들어오게 키워서 잰다.
           await page.setViewportSize({ width: 360, height: 3200 });
           await settle(page);
           const found = await seriousViolations(page);
@@ -151,7 +151,7 @@ test.describe("큰 글씨", () => {
       await login(page);
       await seed(page);
       const noOverflow = async (label: string) => {
-        // 아래쪽 고정 탭바가 긴 화면의 칩을 가리면 axe 가 겹침으로 본다: 한 화면에 다 들어오게 키우고 잰다.
+        // 아래쪽 따라오는(sticky) 탭바가 긴 화면의 칩을 가리면 axe 가 겹침으로 본다: 한 화면에 다 들어오게 키우고 잰다.
         await page.setViewportSize({ width: 360, height: 3200 });
         const wide = await page.evaluate(
           "document.documentElement.scrollWidth > document.documentElement.clientWidth + 1",

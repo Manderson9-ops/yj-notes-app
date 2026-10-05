@@ -13,10 +13,13 @@ export const THEME_KEY = "yj.theme";
 
 /** 주소창·상태바 색(index.html 의 theme-color 두 줄: 라이트/다크). 각 테마 --c-bg 와 같아야 한다(contrast.test.ts 가 확인). */
 export const THEME_COLORS: Record<ThemeId, { light: string; dark: string }> = {
-  basic: { light: "#ffffff", dark: "#121316" },
-  crayon: { light: "#fffdf5", dark: "#1e1a18" },
-  forest: { light: "#f6f1e3", dark: "#121b1a" },
+  basic: { light: "#f6f7f9", dark: "#121316" },
+  crayon: { light: "#fffdf5", dark: "#1b1715" },
+  forest: { light: "#f4efe1", dark: "#111a18" },
 };
+
+/** 선명하게 보기 켠 때의 주소창 색(contrast-high.css 의 --c-bg 와 같아야 한다). */
+export const HIGH_CONTRAST_COLORS = { light: "#ffffff", dark: "#0b0b0c" } as const;
 
 export function isThemeId(value: unknown): value is ThemeId {
   return THEMES.some((t) => t.id === value);
@@ -31,18 +34,33 @@ function read(): ThemeId {
   }
 }
 
-function applyMeta(theme: ThemeId): void {
-  const colors = THEME_COLORS[theme];
+/** 지금 적용 중인 밝기: <html data-scheme> (src/lib/scheme.ts 가 정함), 없으면 시스템 설정. */
+function currentScheme(): "light" | "dark" {
+  const s = document.documentElement.dataset.scheme;
+  if (s === "light" || s === "dark") return s;
+  const dark =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return dark ? "dark" : "light";
+}
+
+/** 주소창·상태바 색을 지금 테마 + 지금 밝기에 맞춘다. 두 meta 모두 같은 색으로 둔다(사용자가 시스템과 다른 밝기를 골라도 따라가게). */
+export function applyThemeColor(): void {
+  const scheme = currentScheme();
+  // 선명하게 보기: 바탕이 흰색/검정에 가까운 색으로 바뀌므로 주소창도 맞춘다(contrast-high.css 의 --c-bg)
+  const color =
+    document.documentElement.dataset.contrast === "high"
+      ? HIGH_CONTRAST_COLORS[scheme]
+      : THEME_COLORS[read()][scheme];
   for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
-    const media = meta.getAttribute("media") ?? "";
-    meta.content = media.includes("dark") ? colors.dark : colors.light;
+    meta.content = color;
   }
 }
 
 function apply(theme: ThemeId): void {
   if (theme === "basic") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = theme;
-  applyMeta(theme);
+  applyThemeColor();
 }
 
 const listeners = new Set<() => void>();

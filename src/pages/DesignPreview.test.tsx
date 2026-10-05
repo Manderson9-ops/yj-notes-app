@@ -22,6 +22,8 @@ describe("DesignPreview", () => {
     renderPreview();
     expect(screen.getByRole("heading", { level: 1, name: "디자인 미리보기" })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "화면 테마" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "화면 밝기" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "선명하게 보기" })).toBeInTheDocument();
     const h2 = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(h2).toEqual([
       "홈",

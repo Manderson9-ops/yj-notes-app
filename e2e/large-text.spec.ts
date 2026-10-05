@@ -18,9 +18,12 @@ const TARGETS = [
 ] as const;
 
 async function seriousViolations(page: Page) {
+  // 화면이 길어서 따라오는(sticky) 탭바가 스크롤 맨 위 화면의 아래쪽 요소를 가린다(axe 는 스크롤하지 않음). 검사하는 동안만 흐름 안에 둔다.
+  await page.evaluate("document.querySelector('.tabbar')?.classList.add('is-static-for-shot')");
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
+  await page.evaluate("document.querySelector('.tabbar')?.classList.remove('is-static-for-shot')");
   return results.violations
     .filter((v) => v.impact === "serious" || v.impact === "critical")
     .map((v) => `${v.id}: ${v.help} (${String(v.nodes.length)})`);
@@ -116,7 +119,7 @@ for (const { theme, large, scheme } of COMBOS) {
       await page.getByRole("link", { name: "설정", exact: true }).click();
       await expect(page.getByRole("heading", { level: 1, name: "설정" })).toBeVisible();
       await check();
-      await shot("settings");
+      await shot("settings", true);
 
       await page.getByRole("link", { name: "디자인 미리보기" }).click();
       await expect(page.getByRole("heading", { level: 1, name: "디자인 미리보기" })).toBeVisible();
