@@ -1,4 +1,4 @@
-"""context.py 테스트 — 합성 픽스처(테스트아이/2020)만 사용."""
+"""context.py·context_search.py 테스트 — 합성 픽스처(테스트아이/2020)만 사용."""
 
 from __future__ import annotations
 
@@ -9,19 +9,18 @@ from datetime import date
 from pathlib import Path
 
 import context
+import context_search as cs
 import fixture_builder
 import pytest
 
 HERE = Path(__file__).parent
+TODAY = date(2020, 3, 6)  # 합성 픽스처의 가장 최근 알림장(2020-03-05) 바로 다음 날
 
 
 @pytest.fixture
 def env(tmp_path: Path) -> dict[str, Path]:
     paths = fixture_builder.build(tmp_path)
     return {"data": Path(paths["dataDir"]), "ingest": Path(paths["ingestRoot"]), "cache": tmp_path / "cache"}
-
-
-TODAY = date(2020, 3, 6)  # 합성 픽스처의 가장 최근 알림장(2020-03-05) 바로 다음 날
 
 
 def pack(env: dict[str, Path], q: str = "테스트아이가 밥을 안 먹어요", **kw):
@@ -32,14 +31,14 @@ def pack(env: dict[str, Path], q: str = "테스트아이가 밥을 안 먹어요
 def test_pack_has_all_sections_and_refs(env):
     out = pack(env)
     text = out["pack"]
-    for head in ("## A. 아이 요약", "## B-1.", "## B-2.", "## B-3."):
+    for head in ("## A. 아이 요약", "## B-1. 키워드 전수 검색", "## B-2.", "## B-3."):
         assert head in text
     assert "현재 월령: 30개월" in text
     for ref in ("note:2020-03-02", "SYN-IV-01", "SYN-CL-01", "checkup:1", "SYN-MS-01"):
         assert ref in out["refs"]
         assert f"[ref: {ref}]" in text
     assert any(r.startswith("guide:01-합성#") for r in out["refs"])
-    assert "말할 수 없는 것" in text  # not_licensed 포함
+    assert "말할 수 없는 것" in text
     assert out["runId"] == fixture_builder.RUN_ID
 
 
@@ -48,17 +47,18 @@ def test_refs_match_tags_in_pack(env):
     assert set(context.REF_TAG.findall(out["pack"])) == set(out["refs"])
 
 
-def test_budget_respected(env):
-    out = pack(env, max_tokens=900)
-    assert out["tokens"] <= 900 or out["pack"].count("[ref:") <= 3
+def test_budget_trims_from_the_tail(env):
     big = pack(env)
     assert big["tokens"] <= context.MAX_TOKENS
+    small = pack(env, max_tokens=900)
+    assert small["pack"].count("[ref:") < big["pack"].count("[ref:")
 
 
-def test_summary_cache_keyed_by_run(env):
+def test_caches_keyed_by_run(env):
     first = pack(env)
     assert first["cacheHit"] is False
     assert (env["cache"] / f"child-{fixture_builder.RUN_ID}.json").exists()
+    assert (env["cache"] / f"texts-{fixture_builder.RUN_ID}.json").exists()
     assert pack(env)["cacheHit"] is True
     new_run = env["ingest"] / "20200401-000000-synth002"
     new_run.mkdir()
@@ -68,6 +68,7 @@ def test_summary_cache_keyed_by_run(env):
     again = pack(env)
     assert again["cacheHit"] is False and again["runId"] == "20200401-000000-synth002"
     assert [p.name for p in env["cache"].glob("child-*.json")] == ["child-20200401-000000-synth002.json"]
+    assert [p.name for p in env["cache"].glob("texts-*.json")] == ["texts-20200401-000000-synth002.json"]
 
 
 def test_no_export_raises(tmp_path: Path):
@@ -83,10 +84,12 @@ def test_read_only_no_writes_in_data_dir(env):
     assert before == after
 
 
-def test_unrelated_question_still_has_summary(env):
+def test_unrelated_question_still_has_summary_and_zero_hits(env):
     out = pack(env, "zzzz qqqq")
     assert "## A. 아이 요약" in out["pack"]
-    assert "## B-1." not in out["pack"]
+    assert out["search"]["total"] == 0
+    assert "걸린 낱말 없음" in out["pack"]
+    assert not out["search"]["ints"]
 
 
 def test_synonym_expansion_finds_note(env):
@@ -114,17 +117,19 @@ def test_cli_stdout_json_and_errors(env):
         str(env["ingest"]),
         "--cache-dir",
         str(env["cache"]),
+        "--today",
+        "2020-03-06",
     ]
+    req = {
+        "question": "밥을 안 먹어요",
+        "expansion": {"keywords": ["밥"], "synonyms": ["점심"], "domains": ["feeding"]},
+    }
     ok = subprocess.run(
-        base,
-        input=json.dumps({"question": "밥을 안 먹어요"}),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        check=False,
+        base, input=json.dumps(req), capture_output=True, text=True, encoding="utf-8", check=False
     )
     assert ok.returncode == 0
-    assert json.loads(ok.stdout)["refs"]
+    out = json.loads(ok.stdout)
+    assert out["refs"] and out["search"]["total"] >= 1 and out["topics"] == ["feeding"]
     bad = subprocess.run(
         base,
         input=json.dumps({"question": ""}),
@@ -136,27 +141,29 @@ def test_cli_stdout_json_and_errors(env):
     assert bad.returncode == 2 and json.loads(bad.stdout) == {"error": "bad_input"}
 
 
+# ───────────── 나이·월령 ─────────────
+
+
 def test_months_between_and_age_sources():
     assert context.months_between(date(2017, 9, 1), date(2020, 3, 1)) == 30
-    assert context.months_between(date(2017, 9, 2), date(2020, 3, 1)) == 29  # 아직 채우지 못한 달
+    assert context.months_between(date(2017, 9, 2), date(2020, 3, 1)) == 29
     assert context.months_between(date(2020, 3, 1), date(2020, 1, 1)) == 0
     summary = {"ageMonths": 30, "latestNote": "2020-03-05"}
     assert context.current_age(summary, date(2020, 3, 6))[0] == 30
-    assert context.current_age(summary, date(2020, 6, 5))[0] == 33  # 알림장 이후 지난 달을 더한다
-    assert context.current_age(summary, date(2020, 6, 5), date(2017, 9, 1))[0] == 33  # 생년월일이 우선
+    assert context.current_age(summary, date(2020, 6, 5))[0] == 33
+    assert context.current_age(summary, date(2020, 6, 5), date(2017, 9, 1))[0] == 33
     assert context.current_age({}, date(2020, 3, 6)) == (None, "")
 
 
 def test_section_a_states_current_age_with_birth_date_or_notes(env):
     assert "현재 월령: 30개월" in pack(env)["pack"]
-    out = pack(env, birth=date(2017, 12, 1))  # 생년월일 기준: 27개월
-    assert "현재 월령: 27개월" in out["pack"]
-    assert "생년월일로 계산" in out["pack"]
-    assert "2017" not in out["pack"]  # 생년월일 자체는 묶음에 싣지 않는다
+    out = pack(env, birth=date(2017, 12, 1))
+    assert "현재 월령: 27개월" in out["pack"] and "생년월일로 계산" in out["pack"]
+    assert "2017" not in out["pack"]
 
 
 def test_cached_summary_does_not_freeze_age(env):
-    pack(env)  # 캐시 생성
+    pack(env)
     later = pack(env, today=date(2020, 6, 5))
     assert later["cacheHit"] is True
     assert "현재 월령: 33개월" in later["pack"]
@@ -166,16 +173,152 @@ def test_age_line_always_present(env):
     assert "현재 월령:" in pack(env, today=date(2030, 1, 1))["pack"]
 
 
+def test_age_brackets_include_both_near_boundary_and_note(env):
+    at36 = pack(env, age_hint=36)
+    assert {"NORM-FEED-01", "NORM-FEED-02"} <= set(at36["refs"])  # 18~36 과 36~60 둘 다
+    assert "더 보수적인" in at36["pack"]
+    at34 = pack(env, age_hint=34)  # 36−2 = 34: 이웃 규준 포함
+    assert "NORM-FEED-02" in at34["refs"]
+    at30 = pack(env, age_hint=30)  # 경계에서 멀면 해당 규준만
+    assert "NORM-FEED-01" in at30["refs"] and "NORM-FEED-02" not in at30["refs"]
+    assert "더 보수적인" not in at30["pack"]
+
+
+# ───────────── 근거 DB ─────────────
+
+
 def test_interventions_first_same_domain_and_at_least_two(env):
     out = pack(env)
     text = out["pack"]
-    iv = [r for r in out["refs"] if r.startswith("SYN-IV-")]
+    iv = [r for r in out["refs"] if r.startswith(("SYN-IV-", "INT-"))]
     assert len(iv) >= 2
-    assert {"SYN-IV-01", "SYN-IV-02"} <= set(iv)  # 같은 영역(식사)의 DO·AVOID
-    assert text.index("[ref: SYN-IV-01]") < text.index("[ref: SYN-IV-03]")  # 맞는 영역이 먼저
-    assert text.index("[ref: SYN-IV-02]") < text.index("[ref: SYN-NM-01]")  # 규준보다 실천이 먼저
+    assert {"SYN-IV-01", "SYN-IV-02", "INT-FEED-01"} <= set(iv)
+    assert text.index("[ref: SYN-IV-01]") < text.index("[ref: SYN-IV-03]")
+    assert text.index("[ref: SYN-IV-02]") < text.index("[ref: SYN-NM-01]")
     assert "실천(AVOID" in text and "금기" in text and "한계" in text
+    assert out["search"]["ints"]
 
 
-def test_budget_still_respected_with_more_items(env):
-    assert pack(env)["tokens"] <= context.MAX_TOKENS
+def test_topic_domains_pull_protocols_with_specialist_in_contraindication(env):
+    out = pack(
+        env, "말이 자꾸 막혀요", expansion={"keywords": ["막혀"], "synonyms": [], "domains": ["fluency"]}
+    )
+    assert "INT-FLUENCY-01" in out["refs"]
+    assert "언어재활사" in out["pack"]
+    fear = pack(env, "자꾸 무서워해요", expansion={"keywords": [], "synonyms": [], "domains": ["fear"]})
+    assert "INT-FEAR-01" in fear["refs"]
+
+
+def test_evidence_capped_at_eight(env):
+    out = pack(
+        env,
+        "밥 식사 편식 수면 낮잠",
+        expansion={"keywords": [], "synonyms": [], "domains": ["feeding", "sleep"]},
+    )
+    ev_refs = [r for r in out["refs"] if r.startswith(("SYN-IV", "INT-", "SYN-NM", "NORM-", "SYN-CL"))]
+    assert len(ev_refs) <= 8
+
+
+# ───────────── 주제 → 가이드 ─────────────
+
+
+def test_feeding_topic_exposes_guide_05_sections_and_family_log_note(env):
+    out = pack(env)
+    assert "guide:05-식사#§3" in out["refs"] and "guide:05-식사#§3-1" in out["refs"]
+    assert "저녁은 가족이 함께 앉아" in out["pack"]
+    assert "records/식사기록" in out["pack"]
+    assert "guide:05-식사#§4" not in out["refs"]  # 4절은 가져오지 않는다
+
+
+def test_skill_loss_topic_exposes_guide_04_and_lost_skills_rule(env):
+    out = pack(
+        env,
+        "예전엔 하던 말을 못 하게 됐어요",
+        expansion={"keywords": ["못하게"], "synonyms": [], "domains": ["skill_loss"]},
+    )
+    assert any(r.startswith("guide:04-퇴행#") for r in out["refs"])
+    assert "lost skills" in out["pack"]  # 주제 안내(CDC 규칙)
+    assert out["topics"][0] == "skill_loss"
+
+
+def test_topic_detection_from_question_words():
+    assert cs.detect_topics("밥을 안 먹어요", [], []) == ["feeding"]
+    assert cs.detect_topics("x", ["fluency", "bogus"], []) == ["fluency"]
+    assert "media" in cs.detect_topics("유튜브를 너무 봐요", [], [])
+
+
+def test_guide_section_number_matching(tmp_path: Path):
+    g = tmp_path
+    (g / "05-a.md").write_text(
+        "# T\n\n## 3. 가\n본문 셋\n### 3-1. 나\n본문 셋하나\n## 30. 다\n서른\n## 4. 라\n넷\n", "utf-8"
+    )
+    got = dict(cs.guide_sections_by_number(g, "05", ["3", "3-1"]))
+    assert "본문 셋하나" in got["guide:05-a#§3"] and "서른" not in got["guide:05-a#§3"]
+    assert got["guide:05-a#§3-1"].startswith("### 3-1.")
+    assert "guide:05-a#§30" not in got
+
+
+# ───────────── 전수 검색 ─────────────
+
+
+def test_texts_carry_author_place_kind_labels(env):
+    out = pack(env)
+    text = out["pack"]
+    assert "[2020-03-02][작성자: 교사][장소: 어린이집][글 종류: 알림장 본문]" in text
+    assert "[작성자: 부모][장소: 집][글 종류: 댓글]" in text  # 부모 댓글(집에서는 …)
+    assert "[작성자: 교사][장소: 어린이집][글 종류: 댓글]" in text  # 교사 댓글
+    assert (
+        "[2020-03-04][작성자: 부모][장소: 집][글 종류: 알림장 본문]"
+        in pack(env, "새벽에 깨서 울어요")["pack"]
+    )
+
+
+def test_classmate_flag_for_dongsaeng_in_daycare_context(env):
+    text = pack(env, "동생들과 밥을 같이 먹어요")["pack"]
+    line = next(x for x in text.splitlines() if "동생들과 함께 앉아서" in x)
+    assert "(반 친구일 수 있음)" in line
+    assert cs.classmate_flag("부모", "집", "동생이 울었어요") == ""
+
+
+def test_place_and_author_heuristics():
+    assert cs.author_of_item("원장", "to_home") == "교사"
+    assert cs.author_of_item("엄마", "to_center") == "부모"
+    assert cs.author_of_item("담임", "") == "교사"
+    assert cs.place_of("교사", "집에서도 해 주세요") == "어린이집"  # 교사 글은 어린이집
+    assert cs.place_of("부모", "밤에 깼어요") == "집"
+    assert cs.place_of("부모", "하원 때 울었어요") == "어린이집"
+    assert cs.place_of("부모", "그냥 그랬어요") == "모름"
+
+
+def test_exhaustive_counts_all_hits_but_shows_at_most_25():
+    texts = [
+        [
+            f"2020-01-{(i % 28) + 1:02d}",
+            "부모" if i % 2 else "교사",
+            "집",
+            "댓글",
+            f"테스트 단어 {i}번째 기록",
+        ]
+        for i in range(60)
+    ]
+    texts.append(["2020-02-01", "교사", "어린이집", "알림장 본문", "관련 없는 글"])
+    res = cs.exhaustive_search(texts, ["단어"], [])
+    assert res["total"] == 60  # 상위 N 이 아니라 전수 건수
+    assert len(res["items"]) == cs.MAX_EXCERPTS == 25
+    assert res["keywords"] == {"단어": 60}
+    lines = cs.render_search_section(res)
+    assert "서로 다른 60건" in lines[0][1] and "단어 60건" in lines[0][1]
+
+
+def test_rare_core_keywords_outrank_common_ones():
+    texts = [["2020-01-01", "교사", "어린이집", "댓글", "밥 밥 밥 오늘도 밥"] for _ in range(30)]
+    texts.append(["2020-01-02", "교사", "어린이집", "댓글", "더듬는 말이 있었어요"])
+    res = cs.exhaustive_search(texts, ["더듬", "밥"], [])
+    assert res["items"][0]["excerpt"].startswith("더듬")
+
+
+def test_all_dates_returned_for_checks(env):
+    out = pack(env)
+    assert "2020-03-02" in out["search"]["dates"]
+    assert out["search"]["keywords"]
+    assert out["search"]["shown"] >= 1

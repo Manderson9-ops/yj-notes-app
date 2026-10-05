@@ -116,6 +116,7 @@ describe("검토 스키마", () => {
       "template",
       "record_link",
       "over_interpretation",
+      "recall",
       "style",
     ]);
     expect(REVIEW_JSON_SCHEMA.required).toEqual(["issues", "previousStatus"]);

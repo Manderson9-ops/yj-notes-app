@@ -38,6 +38,7 @@ export function workerCall(
 
 export function syntheticAnswer(level = 5, over: Partial<Answer> = {}): Answer {
   return {
+    kind: "behavior",
     level,
     levelTitle: "방법 바꾸며 1주 기록",
     levelReason: "합성 예시 이유예요.",
@@ -59,6 +60,7 @@ export function syntheticAnswer(level = 5, over: Partial<Answer> = {}): Answer {
     observe: { what: "횟수", howLong: "1주", how: "하루 한 번 적기" },
     upIf: ["하루 5번 이상으로 늘어요"],
     downIf: ["일주일 동안 한 번도 없어요"],
+    forAsker: "엄마께: 오늘은 먼저 안아 주세요",
     ...over,
   };
 }

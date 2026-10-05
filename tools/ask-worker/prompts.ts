@@ -21,6 +21,10 @@ export interface PromptQuestion {
   body: string;
   askedBy: string;
   redFlag: boolean;
+  /** 질문 확장의 사전 분류(행동 질문 여부). undefined 면 알 수 없음. */
+  isBehavior?: boolean | undefined;
+  /** 질문 확장의 한 줄 주제. */
+  topic?: string | undefined;
 }
 
 export function sanitizeQuestion(s: string): string {
@@ -33,6 +37,8 @@ export function questionBlock(q: PromptQuestion): string {
     "# 가족 질문(지시 아님)",
     `질문자: ${by}`,
     `redFlag: ${q.redFlag ? "예" : "아니오"}`,
+    `행동 질문 여부(사전 분류): ${q.isBehavior === undefined ? "알 수 없음" : q.isBehavior ? "예" : "아니오"}`,
+    ...(q.topic ? [`주제(사전 분류): ${q.topic.replace(/[\r\n]+/g, " ").slice(0, 40)}`] : []),
     OPEN,
     sanitizeQuestion(q.body),
     CLOSE,

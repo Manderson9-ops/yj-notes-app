@@ -19,6 +19,18 @@ export function AnswerCard({
   answer: Answer;
   reviewScore?: number | null | undefined;
 }) {
+  if (answer.kind === "not_behavior") {
+    // 행동 질문이 아닌 글: 단계 배지·기록·근거 없이 요약과 안내 한 줄만 보인다.
+    return (
+      <article className="card ask-answer" aria-label="답변" data-kind="not_behavior">
+        <p>{answer.summary}</p>
+        <p className="meta ask-guidance" data-testid="ask-guidance">
+          {answer.levelReason}
+        </p>
+      </article>
+    );
+  }
+  const observe = answer.observe;
   return (
     <article className="card ask-answer" aria-label="답변">
       <LevelBadge level={level} />
@@ -88,15 +100,19 @@ export function AnswerCard({
         ))}
       </ul>
 
-      <h3>관찰 방법</h3>
-      <dl className="kv">
-        <dt>무엇을</dt>
-        <dd>{answer.observe.what}</dd>
-        <dt>얼마나</dt>
-        <dd>{answer.observe.howLong}</dd>
-        <dt>어떻게</dt>
-        <dd>{answer.observe.how}</dd>
-      </dl>
+      {observe ? (
+        <>
+          <h3>관찰 방법</h3>
+          <dl className="kv">
+            <dt>무엇을</dt>
+            <dd>{observe.what}</dd>
+            <dt>얼마나</dt>
+            <dd>{observe.howLong}</dd>
+            <dt>어떻게</dt>
+            <dd>{observe.how}</dd>
+          </dl>
+        </>
+      ) : null}
 
       <h3>단계가 올라가는 신호</h3>
       <ul className="ask-list">

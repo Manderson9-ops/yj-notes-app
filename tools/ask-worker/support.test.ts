@@ -167,6 +167,7 @@ describe("eval 통계", () => {
       template: 0,
       record_link: 0,
       over_interpretation: 0,
+      recall: 0,
       style: 0.1,
     },
     totalMs: 60_000,

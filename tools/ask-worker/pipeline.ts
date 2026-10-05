@@ -13,6 +13,9 @@ import {
 } from "./answer-schema.ts";
 import { checkAnswer, type PackInfo } from "./checks.ts";
 import type { ClaudeRunner } from "./claude.ts";
+import { detectRedFlag } from "../../server/ask/redflags.ts";
+import { buildEmergencySection } from "./emergency.ts";
+import type { Expansion, ExpandResult } from "./expand.ts";
 import { generatePrompt, reviewPrompt, rewritePrompt, type PromptQuestion } from "./prompts.ts";
 
 export const MAX_REWRITES = 1;
@@ -28,7 +31,15 @@ export class PipelineError extends Error {
 
 export interface PipelineDeps {
   runClaude: ClaudeRunner;
-  buildPack: (question: string, signal?: AbortSignal) => Promise<PackInfo & { tokens: number }>;
+  buildPack: (
+    question: string,
+    signal?: AbortSignal,
+    expansion?: Expansion,
+  ) => Promise<PackInfo & { tokens: number }>;
+  /** 질문 확장(빠른 모델). 없으면 건너뛴다. */
+  expand?: (q: PromptQuestion, signal?: AbortSignal) => Promise<ExpandResult>;
+  /** prompts/emergency.md 본문. 있으면 위급 질문에 맞는 절을 묶음에 붙인다. */
+  emergencyMd?: string;
   systemPromptFile: string;
   reviewPromptFile: string; // 검토 호출용 시스템 프롬프트(규칙 문서)
   answerSchemaJson: string;
@@ -110,7 +121,7 @@ export async function answerQuestion(
     const r = await stage(name, () =>
       deps.runClaude(
         {
-          prompt: reviewPrompt(pack, q, JSON.stringify(answer), previous),
+          prompt: reviewPrompt(pack, pq, JSON.stringify(answer), previous),
           systemPromptFile: deps.reviewPromptFile,
           schemaJson: REVIEW_SCHEMA_JSON,
         },
@@ -124,10 +135,27 @@ export async function answerQuestion(
   };
 
   await hooks.onAnswering?.();
-  const info = await stage("pack", () => deps.buildPack(q.body, signal));
+  let exp: ExpandResult | null = null;
+  if (deps.expand) {
+    const expand = deps.expand;
+    exp = await stage("expand", () => expand(q, signal));
+  }
+  const pq: PromptQuestion = {
+    ...q,
+    isBehavior: exp?.ok ? exp.expansion.isBehaviorQuestion : undefined,
+    topic: exp?.ok ? exp.expansion.topic : undefined,
+  };
+  const packed = await stage("pack", () =>
+    deps.buildPack(q.body, signal, exp?.ok ? exp.expansion : undefined),
+  );
+  let info: PackInfo & { tokens: number } = { ...packed, isBehavior: pq.isBehavior };
+  if (q.redFlag && deps.emergencyMd) {
+    const em = buildEmergencySection(deps.emergencyMd, detectRedFlag(q.body).rules);
+    info = { ...info, pack: `${info.pack}\n${em.text}`, refs: [...info.refs, ...em.refs] };
+  }
 
   const first = checkAnswer(
-    await generate("generate", generatePrompt(info.pack, q)),
+    await generate("generate", generatePrompt(info.pack, pq)),
     info,
     q.redFlag,
   );
@@ -148,7 +176,7 @@ export async function answerQuestion(
     "rewrite",
     rewritePrompt(
       info.pack,
-      q,
+      pq,
       JSON.stringify(prevAnswer ?? "(스키마 검증 실패)"),
       fixes.length > 0 ? fixes : ["전체를 다시 작성해요"],
     ),

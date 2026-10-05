@@ -4,6 +4,7 @@ import type { Answer } from "../../shared/ask-schema";
 /** 물어보기 답변 카드 시안(합성 예시). 실제 화면의 내용은 서버가 검증한 답변이다. */
 export function previewAnswer(level: number, reason: string): Answer {
   return {
+    kind: "behavior",
     level,
     levelTitle: "예시",
     levelReason: reason,
@@ -31,5 +32,6 @@ export function previewAnswer(level: number, reason: string): Answer {
     observe: { what: "던지는 횟수", howLong: "1주", how: "하루 한 번 적어 두기" },
     upIf: ["하루 5번 넘게 던져요. 소아과에 물어봐요 (예시)"],
     downIf: ["일주일 동안 한 번도 없어요 (예시)"],
+    forAsker: "엄마께: 오늘은 같이 앉아 주세요 (예시)",
   };
 }

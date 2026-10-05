@@ -63,7 +63,8 @@ export const LEVEL_TEMPLATES: Record<number, LevelTemplate> = {
 };
 
 /** 올라가는 신호에 이 중 하나는 있어야 한다(누구에게 연락하는지). */
-export const CONTACT_PATTERN = /소아과|어린이집\s*선생|선생님|발달\s*상담|전문가|병원|119|응급/;
+export const CONTACT_PATTERN =
+  /소아과|어린이집\s*선생|선생님|발달\s*상담|발달\s*클리닉|언어\s*재활사|소아\s*정신건강|전문가|병원|119|응급/;
 
 export interface TemplateInput {
   level: number;
@@ -100,4 +101,15 @@ export function checkLevelTemplate(a: TemplateInput): string[] {
     issues.push("upIf 중 하나에 연락할 곳(소아과·어린이집 선생님·발달 상담·119)을 적어야 해요");
   }
   return issues;
+}
+
+/** 8단계 이상은 연락할 곳이 전문 기관 이름이어야 한다(소아과·언어재활사·발달 클리닉·소아정신건강의학과·119 등). */
+export const SPECIALIST_PATTERN =
+  /소아과|언어\s*재활사|발달\s*클리닉|발달\s*상담|소아\s*정신건강|정신건강의학|소아\s*청소년|119|응급실/;
+
+export function checkSpecialist(level: number, upIf: readonly string[]): string[] {
+  if (level < 8 || upIf.some((s) => SPECIALIST_PATTERN.test(s))) return [];
+  return [
+    "8단계 이상은 upIf 중 하나에 연락할 전문 기관(소아과·언어재활사·발달 클리닉·소아정신건강의학과·119 중 맞는 곳)을 이름으로 적어야 해요",
+  ];
 }

@@ -38,9 +38,14 @@ export const ASK_LIMITS = {
   point: 200,
 } as const;
 
-export const AnswerSchema = z.strictObject({
+/** 답 종류: 행동 질문이면 behavior, 이 기능이 도울 수 없는 글(상관없는 질문·지시 글 등)이면 not_behavior(단계 1, 요약+안내 한 줄만). */
+export const ANSWER_KINDS = ["behavior", "not_behavior"] as const;
+
+const AnswerBase = z.strictObject({
+  kind: z.enum(ANSWER_KINDS),
   level: z.number().int().min(1).max(10),
   levelTitle: text(40),
+  /** behavior: 왜 이 단계인지. not_behavior: 이 기능이 도울 수 있는 일을 알리는 짧은 안내 한 줄. */
   levelReason: text(ASK_LIMITS.levelReason),
   summary: text(ASK_LIMITS.summary),
   fromRecords: z
@@ -62,8 +67,7 @@ export const AnswerSchema = z.strictObject({
         grade: text(40).optional(),
       }),
     )
-    .min(1)
-    .max(6),
+    .max(3),
   tryNow: z
     .array(
       z.strictObject({
@@ -73,14 +77,38 @@ export const AnswerSchema = z.strictObject({
         basis: text(120),
       }),
     )
-    .min(1)
     .max(3),
-  avoid: z.array(text(ASK_LIMITS.avoidItem)).min(1).max(3),
-  observe: z.strictObject({ what: text(100), howLong: text(40), how: text(200) }),
-  upIf: z.array(text(ASK_LIMITS.signalItem)).min(1).max(3),
-  downIf: z.array(text(ASK_LIMITS.signalItem)).min(1).max(3),
-  forAsker: text(160).optional(),
+  avoid: z.array(text(ASK_LIMITS.avoidItem)).max(3),
+  observe: z.strictObject({ what: text(100), howLong: text(40), how: text(200) }).optional(),
+  upIf: z.array(text(ASK_LIMITS.signalItem)).max(3),
+  downIf: z.array(text(ASK_LIMITS.signalItem)).max(3),
+  /** 질문자 맞춤 한 줄(필수). 가족 역할은 적힌 그대로(엄마·아빠·할머니·할아버지). */
+  forAsker: text(160),
   limits: text(ASK_LIMITS.limits).optional(),
+});
+
+/** behavior 는 내용이 다 있어야 하고, not_behavior 는 단계 1에 요약·안내만(기록·근거를 싣지 않는다). */
+export const AnswerSchema = AnswerBase.superRefine((a, ctx) => {
+  const bad = (path: string) => {
+    ctx.addIssue({ code: "custom", path: [path], message: "kind_rule" });
+  };
+  if (a.kind === "not_behavior") {
+    if (a.level !== 1) bad("level");
+    if (a.fromRecords.length > 0) bad("fromRecords");
+    if (a.evidence.length > 0) bad("evidence");
+    if (a.tryNow.length > 0) bad("tryNow");
+    if (a.avoid.length > 0) bad("avoid");
+    if (a.upIf.length > 0) bad("upIf");
+    if (a.downIf.length > 0) bad("downIf");
+    if (a.observe !== undefined) bad("observe");
+    return;
+  }
+  if (a.evidence.length < 1) bad("evidence");
+  if (a.tryNow.length < 1) bad("tryNow");
+  if (a.avoid.length < 1) bad("avoid");
+  if (a.upIf.length < 1) bad("upIf");
+  if (a.downIf.length < 1) bad("downIf");
+  if (a.observe === undefined) bad("observe");
 });
 export type Answer = z.infer<typeof AnswerSchema>;
 

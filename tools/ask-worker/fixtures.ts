@@ -14,6 +14,7 @@ export function goodAnswer(over: Partial<Answer> = {}): Answer {
   const level = over.level ?? 4;
   const t = LEVEL_TEMPLATES[level];
   const base: Answer = {
+    kind: "behavior",
     level,
     levelTitle: levelTitle(level),
     levelReason: "30개월이고 며칠째 반복되지만 다른 활동에는 지장이 없어요.",
@@ -42,6 +43,7 @@ export function goodAnswer(over: Partial<Answer> = {}): Answer {
     },
     upIf: ["체중이 줄면 소아과에 물어봐요"],
     downIf: ["이틀 이상 잘 먹어요"],
+    forAsker: "엄마께: 오늘 저녁은 천천히 함께 앉아 먹어요",
   };
   return { ...base, ...over };
 }

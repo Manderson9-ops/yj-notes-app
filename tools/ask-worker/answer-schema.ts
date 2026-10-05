@@ -11,6 +11,7 @@ export const ISSUE_CATEGORIES = [
   "template", // 단계별 틀(개수·관찰 기간) 불일치
   "record_link", // 기록이 질문과 이어지지 않음
   "over_interpretation", // 근거 문장을 넘겨 해석
+  "recall", // 질문과 직접 이어지는 전수 검색 기록·근거 항목을 놓침(또는 있는데 없다고 함)
   "style", // 길이·말투
 ] as const;
 export type IssueCategory = (typeof ISSUE_CATEGORIES)[number];
@@ -23,12 +24,18 @@ export const DEDUCTIONS: Record<IssueCategory, number> = {
   template: 0.4,
   record_link: 0.3,
   over_interpretation: 0.3,
+  recall: 0.4,
   style: 0.1,
 };
 export const STYLE_CAP = 0.3;
 
 /** 재검토에서 새로 추가할 수 있는 종류(문체 트집 방지). */
-export const NEW_ISSUE_CATEGORIES: readonly IssueCategory[] = ["factual", "ungrounded", "safety"];
+export const NEW_ISSUE_CATEGORIES: readonly IssueCategory[] = [
+  "factual",
+  "ungrounded",
+  "safety",
+  "recall",
+];
 
 export const issueSchema = z.strictObject({
   category: z.enum(ISSUE_CATEGORIES),

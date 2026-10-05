@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ASK_LEVELS,
   checkLevelTemplate,
+  checkSpecialist,
   levelInfo,
   levelTemplateText,
 } from "../../shared/ask-levels";
@@ -15,7 +16,7 @@ import { questionTokens, snippetAround } from "./instant";
 import { syntheticAnswer } from "../test-utils/ask";
 
 describe("AnswerSchema", () => {
-  it("합성 답은 통과하고 선택 항목(forAsker·limits·say·grade)은 없어도 된다", () => {
+  it("합성 답은 통과하고 선택 항목(limits·say·grade)은 없어도 된다", () => {
     expect(AnswerSchema.safeParse(syntheticAnswer(1)).success).toBe(true);
     expect(
       AnswerSchema.safeParse(
@@ -60,6 +61,59 @@ describe("AnswerSchema", () => {
   });
 });
 
+const omit = (o: object, key: string) =>
+  Object.fromEntries(Object.entries(o).filter(([k]) => k !== key));
+
+describe("kind·forAsker·evidence 규칙", () => {
+  const notBehavior = (over: object = {}) => ({
+    kind: "not_behavior" as const,
+    level: 1,
+    levelTitle: "아주 흔한 발달 과정",
+    levelReason: "이곳은 아이의 행동·발달 걱정을 묻는 곳이에요",
+    summary: "아이와 상관없는 질문이에요",
+    fromRecords: [],
+    evidence: [],
+    tryNow: [],
+    avoid: [],
+    upIf: [],
+    downIf: [],
+    forAsker: "엄마께: 아이 걱정을 적어 주세요",
+    ...over,
+  });
+  it("forAsker 는 필수, kind 도 필수", () => {
+    const base = syntheticAnswer(5);
+    const noAsker = omit(base, "forAsker");
+    expect(AnswerSchema.safeParse(noAsker).success).toBe(false);
+    const noKind = omit(base, "kind");
+    expect(AnswerSchema.safeParse(noKind).success).toBe(false);
+  });
+  it("evidence 는 최대 3개", () => {
+    const base = syntheticAnswer(5);
+    const four = Array.from({ length: 4 }, () => base.evidence[0]);
+    expect(AnswerSchema.safeParse({ ...base, evidence: four }).success).toBe(false);
+  });
+  it("not_behavior: 단계 1에 요약·안내만 허용(서버가 강제)", () => {
+    expect(AnswerSchema.safeParse(notBehavior()).success).toBe(true);
+    expect(AnswerSchema.safeParse(notBehavior({ level: 5 })).success).toBe(false);
+    const behaviorOnly = syntheticAnswer(1);
+    expect(AnswerSchema.safeParse(notBehavior({ evidence: behaviorOnly.evidence })).success).toBe(
+      false,
+    );
+    expect(
+      AnswerSchema.safeParse(notBehavior({ fromRecords: behaviorOnly.fromRecords })).success,
+    ).toBe(false);
+    expect(AnswerSchema.safeParse(notBehavior({ observe: behaviorOnly.observe })).success).toBe(
+      false,
+    );
+  });
+  it("behavior 는 내용이 다 있어야 하고 observe 가 필수", () => {
+    const base = syntheticAnswer(5);
+    const noObserve = omit(base, "observe");
+    expect(AnswerSchema.safeParse(noObserve).success).toBe(false);
+    expect(AnswerSchema.safeParse({ ...base, upIf: [] }).success).toBe(false);
+  });
+});
+
 describe("단계별 답변 틀", () => {
   const ans = (level: number, n: number, howLong: string, upIf: string[]) => ({
     level,
@@ -82,6 +136,10 @@ describe("단계별 답변 틀", () => {
     expect(checkLevelTemplate(ans(9, 2, "진료·상담 전까지", ["119"]))).toEqual([]);
     expect(checkLevelTemplate(ans(10, 1, "지금", ["119에 전화해요"]))).toEqual([]);
     expect(checkLevelTemplate(ans(10, 4, "지금", ["119"])).length).toBe(1);
+    expect(checkSpecialist(7, ["어린이집 선생님께 말해요"])).toEqual([]);
+    expect(checkSpecialist(8, ["어린이집 선생님께 말해요"]).length).toBe(1);
+    expect(checkSpecialist(9, ["언어재활사와 상담해요"])).toEqual([]);
+    expect(checkSpecialist(10, ["소아정신건강의학과에 가요"])).toEqual([]);
   });
   it("모든 단계에 틀이 있고 안내 문장이 나온다", () => {
     for (let l = 1; l <= 10; l++) expect(levelTemplateText(l)).toContain("해 볼 것");
@@ -125,12 +183,12 @@ describe("JSON Schema", () => {
       };
     };
     expect(s.$schema).toContain("draft-07");
-    expect(s.required).toEqual(
-      expect.arrayContaining(["level", "summary", "observe", "upIf", "downIf"]),
-    );
-    expect(s.required).not.toContain("forAsker");
+    expect(s.required).toEqual(expect.arrayContaining(["level", "summary", "upIf", "downIf"]));
+    expect(s.required).toEqual(expect.arrayContaining(["kind", "forAsker"]));
+    expect(s.required).not.toContain("observe"); // 행동 질문이 아닌 답에는 없다
+    expect(s.required).not.toContain("limits");
     expect(s.additionalProperties).toBe(false);
-    expect(s.properties.tryNow).toMatchObject({ minItems: 1, maxItems: 3 });
+    expect(s.properties.tryNow).toMatchObject({ maxItems: 3 });
     expect(s.properties.level).toMatchObject({ minimum: 1, maximum: 10 });
   });
 });

@@ -9,6 +9,8 @@ export interface EvalRun {
   /** 지적 범주별 감점 */
   deductions: Deductions;
   totalMs: number;
+  /** 단계별 시간(ms): expand, pack, generate, review, rewrite, review2, total */
+  timings?: Record<string, number>;
 }
 
 export interface EvalItem {
@@ -28,10 +30,21 @@ export interface EvalSummary {
   levelChecked: number;
   inconsistentIds: string[];
   avgMs: number;
+  /** 단계별 평균 시간(ms) */
+  stageMsAvg: Record<string, number>;
 }
 
 const mean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 const r2 = (n: number): number => Math.round(n * 100) / 100;
+
+/** 단계 이름별 평균(그 단계가 있었던 실행만으로 계산). */
+export function stageAverages(runs: EvalRun[]): Record<string, number> {
+  const acc = new Map<string, number[]>();
+  for (const r of runs) {
+    for (const [k, v] of Object.entries(r.timings ?? {})) acc.set(k, [...(acc.get(k) ?? []), v]);
+  }
+  return Object.fromEntries([...acc].map(([k, v]) => [k, Math.round(mean(v))]));
+}
 
 export function summarize(items: EvalItem[]): EvalSummary {
   const ok = items.filter((i) => !i.error && i.runs.length > 0);
@@ -57,6 +70,7 @@ export function summarize(items: EvalItem[]): EvalSummary {
     levelChecked: checked,
     inconsistentIds: inconsistent,
     avgMs: Math.round(mean(runs.map((r) => r.totalMs))),
+    stageMsAvg: stageAverages(runs),
   };
 }
 
@@ -75,6 +89,12 @@ export function renderMarkdown(s: EvalSummary, items: EvalItem[], when: string):
     `- 평균 점수: ${s.avgScore} / 최저: ${s.minScore} (목표 평균 ≥ 9.5)`,
     `- 단계 일관성(같은 질문 2회, |Δ| ≤ 1): ${s.levelConsistent}/${s.levelChecked}`,
     `- 평균 소요: ${Math.round(s.avgMs / 1000)}s`,
+    "",
+    `- 단계별 평균 시간(ms): ${
+      Object.entries(s.stageMsAvg)
+        .map(([k, v]) => `${k} ${String(v)}`)
+        .join(", ") || "-"
+    }`,
     "",
     "## 지적 범주별 평균 감점",
     "",

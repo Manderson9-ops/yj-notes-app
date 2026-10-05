@@ -276,7 +276,7 @@ describe("answer", () => {
         link: "가".repeat(80),
         source: "알림장" as const,
       })),
-      evidence: Array.from({ length: 6 }, () => ({
+      evidence: Array.from({ length: 3 }, () => ({
         ref: "가".repeat(120),
         point: "가".repeat(200),
         grade: "B",

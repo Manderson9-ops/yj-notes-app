@@ -66,6 +66,8 @@ export interface WorkerConfig {
   targetScore: number;
   minPublishScore: number;
   claudeTimeoutMs: number;
+  /** 질문 확장에 쓰는 빠른 모델(기본 sonnet — 실측 haiku 보다 빨랐다. 안 되면 다른 쪽으로 한 번 더). */
+  expandModel: string;
   home: string;
 }
 
@@ -127,6 +129,9 @@ export function loadConfig(opts: LoadOptions = {}): WorkerConfig {
     targetScore: 9.5,
     minPublishScore: num(f.ASK_MIN_PUBLISH_SCORE, 8.5, 0, 10),
     claudeTimeoutMs: num(f.ASK_CLAUDE_TIMEOUT_MS, 240_000, 30_000, 900_000),
+    expandModel: /^[a-z0-9._-]{3,40}$/i.test(f.ASK_EXPAND_MODEL ?? "")
+      ? (f.ASK_EXPAND_MODEL ?? "sonnet")
+      : "sonnet",
     home,
   };
 }

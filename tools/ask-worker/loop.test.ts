@@ -38,6 +38,7 @@ const RESULT: PipelineResult = {
     template: 0,
     record_link: 0,
     over_interpretation: 0,
+    recall: 0,
     style: 0,
   },
   issues: [],

@@ -14,6 +14,10 @@ export class ClaudeError extends Error {
 }
 
 export interface ClaudeRequest {
+  /** 기본 opus. 질문 확장 같은 가벼운 호출은 haiku. */
+  model?: string;
+  /** 생각 깊이(--effort). 질문 확장처럼 가벼운 호출은 low. */
+  effort?: "low" | "medium" | "high";
   prompt: string;
   systemPromptFile: string;
   schemaJson: string;
@@ -46,7 +50,7 @@ export function claudeArgs(emptyMcp: string, req: ClaudeRequest): string[] {
   return [
     "-p",
     "--model",
-    "opus",
+    req.model ?? "opus",
     "--tools",
     "",
     "--strict-mcp-config",
@@ -61,6 +65,7 @@ export function claudeArgs(emptyMcp: string, req: ClaudeRequest): string[] {
     req.schemaJson,
     "--system-prompt-file",
     req.systemPromptFile,
+    ...(req.effort ? ["--effort", req.effort] : []),
   ];
 }
 

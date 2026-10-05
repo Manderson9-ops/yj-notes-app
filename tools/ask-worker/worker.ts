@@ -13,6 +13,8 @@ import { askHome, loadConfig, type WorkerConfig } from "./config.ts";
 import { abortableSleep, handleOne, runLoop, type LoopDeps } from "./loop.ts";
 import { createLogger, pruneLogs } from "./logger.ts";
 import { acquireLock } from "./lock.ts";
+import { loadEmergencyMd } from "./emergency.ts";
+import { expandQuery } from "./expand.ts";
 import { buildPack } from "./pack.ts";
 import { answerQuestion, type PipelineDeps } from "./pipeline.ts";
 import { ANSWER_SCHEMA_FILE, REVIEW_PROMPT_FILE, SYSTEM_PROMPT_FILE } from "./prompts.ts";
@@ -37,9 +39,26 @@ export function makePipelineDeps(
     home: cfg.home,
     timeoutMs: cfg.claudeTimeoutMs,
   });
+  // 질문 확장은 짧은 제한 시간의 빠른 모델 호출(실패해도 확장 없이 계속한다)
+  const runExpand = createClaudeRunner({
+    bin: cfg.claudeBin,
+    home: cfg.home,
+    timeoutMs: Math.min(cfg.claudeTimeoutMs, 25_000),
+  });
   return {
     runClaude,
-    buildPack: (question, signal) =>
+    expand: (q, signal) =>
+      expandQuery(
+        {
+          runClaude: runExpand,
+          model: cfg.expandModel,
+          fallbackModel: cfg.expandModel === "haiku" ? "sonnet" : "haiku",
+        },
+        q,
+        signal,
+      ),
+    emergencyMd: loadEmergencyMd(),
+    buildPack: (question, signal, expansion) =>
       buildPack(
         {
           pythonBin: cfg.pythonBin,
@@ -50,6 +69,7 @@ export function makePipelineDeps(
         },
         question,
         signal,
+        expansion,
       ),
     systemPromptFile: SYSTEM_PROMPT_FILE,
     reviewPromptFile: REVIEW_PROMPT_FILE,

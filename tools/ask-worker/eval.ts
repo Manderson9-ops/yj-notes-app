@@ -88,6 +88,7 @@ export async function main(args: string[]): Promise<number> {
           score: r.reviewScore,
           deductions: r.deductions,
           totalMs: r.workMs,
+          timings: r.timings,
         });
         if (saveAnswers) {
           saved.push({

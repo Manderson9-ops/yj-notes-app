@@ -34,6 +34,7 @@ const overview = (online: boolean) => ({
 });
 
 const ANSWER = {
+  kind: "behavior",
   level: 5,
   levelTitle: "예시",
   levelReason: "방법을 바꿔 보며 1주 적어 봐요",
@@ -255,6 +256,32 @@ describe("AskDetailPage (진행·답변·의견)", () => {
     expect(tags[0]?.textContent.trim()).toBe("일반 권고");
     expect(tags[0]?.closest("li")?.textContent).toContain("잠시 쉬기");
     expect(card.textContent).toContain("질문과 이어져요");
+  });
+
+  it("행동 질문이 아닌 답(not_behavior)은 단계 배지·기록 없이 요약과 안내 한 줄만 보인다", async () => {
+    const NB = {
+      kind: "not_behavior",
+      level: 1,
+      levelTitle: "아주 흔한 발달 과정",
+      levelReason: "이곳은 아이의 행동 걱정을 묻는 곳이에요",
+      summary: "아이와 상관없는 질문이에요",
+      fromRecords: [],
+      evidence: [],
+      tryNow: [],
+      avoid: [],
+      upIf: [],
+      downIf: [],
+      forAsker: "엄마께: 아이 걱정을 적어 주세요",
+    };
+    routes["GET /ask/7"] = () =>
+      json(200, detail("done", { answer: { level: 1, answer: NB, createdAt: "x", totalMs: 1 } }));
+    renderAt("/ask/7");
+    const card = await screen.findByRole("article", { name: "답변" });
+    expect(within(card).getByText("아이와 상관없는 질문이에요")).toBeInTheDocument();
+    expect(within(card).getByTestId("ask-guidance").textContent).toContain("행동 걱정을 묻는 곳");
+    expect(card.querySelectorAll("h3")).toHaveLength(0);
+    expect(card.textContent).not.toContain("아주 흔한 발달 과정");
+    expect(card.textContent).not.toContain("1단계");
   });
 
   it("품질 점수가 9.5 미만이면 참고용 안내를 보이고, 이상이거나 없으면 보이지 않는다", async () => {

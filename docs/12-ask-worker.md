@@ -16,7 +16,7 @@
 | `tools/ask-worker/scheduler.ts` | 작업 스케줄러 등록/삭제/상태 |
 | `tools/ask-worker/eval.ts` | 골든 세트 평가 |
 
-흐름: claim → progress(answering) → 근거 묶음 → 작성(claude) → 결정적 검사 → progress(reviewing) → 검토(claude)
+흐름: claim → progress(answering) → 질문 확장 → 근거 묶음 → 작성(claude) → 결정적 검사 → progress(reviewing) → 검토(claude)
 → 점수 < 9.5 면 지적만 고치는 재작성 **1회**·재검토(더 높은 점수 채택) → answer 업로드. 결정적 검사에서 걸리면 검토를 건너뛰고 바로 재작성한다. 품질 정책 상세는 docs/11 §3-2. 9.5 미만으로 게시된 답은 `reviewScore` 로 서버에 저장되고, 앱이 「품질 검사 기준보다 낮아 참고용이에요」를 작게 보여 준다.
 실패하면 `fail(code)` 로 되돌린다(3회 실패 시 서버가 failed 처리). 코드: `pack_failed`, `claude_exit`, `timeout`,
 `checks_failed`, `low_score`(게시 하한 8.5 미만), `review_invalid`, `upload_<HTTP>`, `worker_stopped`, `internal_error`.
@@ -50,6 +50,7 @@ DATA_DIR=<DATA_DIR 경로>
 # ASK_POLL_MS=10000
 # ASK_MIN_PUBLISH_SCORE=8.5
 # ASK_CLAUDE_TIMEOUT_MS=240000
+# ASK_EXPAND_MODEL=sonnet        (질문 확장용 모델. 안 되면 다른 쪽(haiku)으로 한 번 더. 실측: sonnet low 약 5초, haiku 12~19초)
 ```
 
 `DATA_DIR` 는 읽기 전용으로만 쓴다(알림장·guide·근거 DB). 최신 ingest export 는

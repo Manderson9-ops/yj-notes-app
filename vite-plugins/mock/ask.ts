@@ -39,6 +39,7 @@ function answerFor(level: number, askedBy: string) {
     10: "지금 바로 연락이 필요해요 (합성 예시)",
   };
   return {
+    kind: "behavior",
     level,
     levelTitle: "합성 예시",
     levelReason: reasons[level] ?? "합성 예시",

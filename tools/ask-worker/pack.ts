@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import type { Expansion } from "./expand.ts";
 
 export const CONTEXT_PY = join(dirname(fileURLToPath(import.meta.url)), "context.py");
 
@@ -22,6 +23,17 @@ export interface PackResult {
   runId: string;
   cacheHit: boolean;
   timingMs: Record<string, number>;
+  topics: string[];
+  search: SearchSummary;
+}
+
+/** 키워드 전수 검색 요약(결정적 검사용): 걸린 글 총 건수·날짜·낱말별 건수, 근거 DB 의 실천(INT-*) ref. */
+export interface SearchSummary {
+  total: number;
+  shown: number;
+  dates: string[];
+  keywords: Record<string, number>;
+  ints: string[];
 }
 
 const packSchema = z.object({
@@ -31,6 +43,14 @@ const packSchema = z.object({
   runId: z.string(),
   cacheHit: z.boolean(),
   timingMs: z.record(z.string(), z.number()),
+  topics: z.array(z.string()),
+  search: z.object({
+    total: z.number(),
+    shown: z.number(),
+    dates: z.array(z.string()),
+    keywords: z.record(z.string(), z.number()),
+    ints: z.array(z.string()),
+  }),
 });
 
 export interface PackOptions {
@@ -47,6 +67,7 @@ export function buildPack(
   o: PackOptions,
   question: string,
   signal?: AbortSignal,
+  expansion?: Expansion,
 ): Promise<PackResult> {
   const args = [CONTEXT_PY, "--data-dir", o.dataDir, "--cache-dir", o.cacheDir];
   if (o.ingestRoot) args.push("--ingest-root", o.ingestRoot);
@@ -84,6 +105,6 @@ export function buildPack(
       }
     });
     child.stdin.on("error", () => undefined);
-    child.stdin.end(JSON.stringify({ question }));
+    child.stdin.end(JSON.stringify({ question, ...(expansion ? { expansion } : {}) }));
   });
 }
