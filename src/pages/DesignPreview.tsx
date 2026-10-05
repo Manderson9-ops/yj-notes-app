@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { Chip } from "../components/Chip";
 import { Notice } from "../components/Notice";
 import { ThemeDecor } from "../components/decor/ThemeDecor";
-import { ContrastSwitch } from "../components/ContrastSwitch";
 import { SchemePicker } from "../components/SchemePicker";
+import { TextSettings } from "../components/TextSettings";
 import { ThemePicker } from "../components/ThemePicker";
 
 // S91 디자인 미리보기. 합성 자료만 쓴다: 이름은 테스트아이·교사A·친구A, 날짜는 2020-01-15 근처.
@@ -26,7 +26,10 @@ export function DesignPreview() {
         <strong>화면 밝기</strong>
       </p>
       <SchemePicker />
-      <ContrastSwitch />
+      <p>
+        <strong>글자·선명도</strong>
+      </p>
+      <TextSettings />
 
       <section aria-labelledby="pv-home">
         <h2 id="pv-home">홈</h2>
@@ -126,13 +129,13 @@ export function DesignPreview() {
             <p className="meta">만든 날 2020-01-15</p>
             <span className="badge">확인함 (예시)</span>
           </article>
-          <article className="card">
+          <Link to="/settings" className="card">
             <p>
               <strong>예시 가이드</strong>
             </p>
-            <p className="meta">만든 날 2020-01-10</p>
+            <p className="meta">만든 날 2020-01-10 (누르면 열려요)</p>
             <span className="badge">예시</span>
-          </article>
+          </Link>
         </div>
       </section>
 

@@ -2,19 +2,17 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { ContrastSwitch } from "../components/ContrastSwitch";
 import { SchemePicker } from "../components/SchemePicker";
+import { TextSettings } from "../components/TextSettings";
 import { ThemePicker } from "../components/ThemePicker";
 import { api } from "../lib/api";
 import { formatYmdKo, seoulDateOf } from "../lib/dateFormat";
 import { useOverview } from "../lib/notesApi";
-import { useLargeText } from "../lib/largeText";
 import { clearQueue, unsentCounts } from "../lib/logs/queue";
 import { handleUnauthorized } from "../lib/queryClient";
 
 export function SettingsPage() {
   const qc = useQueryClient();
-  const [large, setLarge] = useLargeText();
   const overview = useOverview();
   const lastLock = overview.data?.security.lastGlobalLockAt ?? null;
   const failures7d = overview.data?.security.failures7d ?? 0;
@@ -37,19 +35,6 @@ export function SettingsPage() {
   return (
     <>
       <h1>설정</h1>
-      <section className="settings-section">
-        <label className="setting-row">
-          <input
-            type="checkbox"
-            role="switch"
-            checked={large}
-            onChange={(e) => {
-              setLarge(e.target.checked);
-            }}
-          />
-          <span>큰 글씨</span>
-        </label>
-      </section>
       <section className="settings-section" aria-labelledby="set-theme">
         <h2 id="set-theme">화면 테마</h2>
         <ThemePicker />
@@ -58,8 +43,9 @@ export function SettingsPage() {
         <h2 id="set-scheme">화면 밝기</h2>
         <SchemePicker />
       </section>
-      <section className="settings-section" aria-label="선명하게 보기">
-        <ContrastSwitch />
+      <section className="settings-section" aria-labelledby="set-text">
+        <h2 id="set-text">글자·선명도</h2>
+        <TextSettings />
       </section>
       <section className="settings-section">
         <button

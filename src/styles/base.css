@@ -173,14 +173,6 @@ h2 {
   margin: var(--space-4) 0;
 }
 
-.setting-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--tap);
-  cursor: pointer;
-}
-
 .app-version {
   margin-top: var(--space-6);
   color: var(--c-muted);

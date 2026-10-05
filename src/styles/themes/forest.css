@@ -478,3 +478,11 @@
 .swatch[data-swatch="forest"] i:nth-child(3) {
   background: #f2d58a;
 }
+
+/* 꺼진 단추: 점선 + 보조 글자색 */
+:root[data-theme="forest"] :is(.btn, .btn-primary):disabled {
+  border: var(--bw) dashed var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-muted);
+  box-shadow: none;
+}

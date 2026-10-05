@@ -152,3 +152,10 @@
   color: var(--c-muted);
   opacity: 1;
 }
+
+/* 크레용: 고른 줄·칩의 강조색 손그림 선(border-image-source, 명시도가 더 높음)도 끄고 곧은 강조색 3px 테두리로 */
+:root[data-contrast="high"][data-theme="crayon"]
+  :is(.theme-option:has(input:checked), .chip[aria-pressed="true"]) {
+  border-image: none;
+  border: 3px solid var(--c-accent);
+}

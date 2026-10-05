@@ -79,7 +79,7 @@ for (const theme of THEMES) {
         await page.getByRole("link", { name: "설정", exact: true }).click();
         await expect(page.getByRole("heading", { level: 1, name: "설정" })).toBeVisible();
         await check();
-        await shot("settings");
+        await shot("settings", true);
 
         await page.getByRole("link", { name: "디자인 미리보기" }).click();
         await expect(
@@ -120,6 +120,16 @@ for (const theme of THEMES) {
       await expect(page.locator("html")).toHaveAttribute("data-contrast", "high");
       await settle(page);
       expect(await seriousViolations(page)).toEqual([]);
+      // 선택된 줄·칩: 손그림 선(border-image) 없이 강조색 3px 테두리 한 겹
+      const sel = await page.evaluate(`(() => {
+        const hex = getComputedStyle(document.documentElement).getPropertyValue("--c-accent").trim();
+        const n = parseInt(hex.slice(1), 16);
+        const accent = "rgb(" + [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(", ") + ")";
+        const els = [...document.querySelectorAll('.theme-option:has(input:checked), .chip[aria-pressed="true"]')];
+        return { count: els.length, accent, bad: els.map((e) => { const s = getComputedStyle(e); return [s.borderImageSource, s.borderTopWidth, s.borderTopColor]; }).filter(([bi, w, c]) => bi !== "none" || parseFloat(w) < 3 || c !== accent) };
+      })()`);
+      expect((sel as { count: number }).count).toBeGreaterThanOrEqual(4);
+      expect((sel as { bad: unknown[] }).bad).toEqual([]);
       if (info.project.name === "mobile-chromium") {
         await stableShot(page, `preview-${theme}-${scheme}-high`, true);
       }

@@ -54,9 +54,13 @@ mark {
   font-size: var(--fs-lg);
 }
 
+/* 꺼진 단추: 흐리게(opacity) 하지 않고 점선 테두리 + 보조 글자색 + 평평한 면 */
 .btn:disabled,
 .btn-primary:disabled {
-  opacity: 0.6;
+  border: 2px dashed var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-muted);
+  opacity: 1;
   cursor: default;
 }
 
@@ -128,10 +132,15 @@ mark {
 /* 눌러서 열리는 카드: 테두리를 더 진하게(--c-border), 오른쪽에 화살표. 안 눌리는 카드는 옅은 테두리(--c-line) */
 a.card,
 .card:has(> a) {
+  border-width: 2px;
   border-color: var(--c-border);
+  box-shadow: var(--lift, 0 1px 3px color-mix(in srgb, var(--c-shadow) 22%, transparent));
 }
 
 a.card {
+  display: block;
+  color: var(--c-fg);
+  text-decoration: none;
   padding-right: calc(var(--space-4) + 28px);
 }
 
@@ -312,7 +321,7 @@ a.card::after {
 
 /* 고른 줄: 링을 겹치지 않고 테두리 자체를 강조색·3px 로(+채운 점·굵은 글씨·중간 톤 면) */
 .theme-option:has(input:checked) {
-  padding: 0 calc(var(--space-4) - (3px - var(--bw)));
+  padding-inline: calc(var(--space-4) - (3px - var(--bw)));
   border: 3px solid var(--c-accent);
   background: var(--c-accent-soft);
   color: var(--c-on-accent-soft);
@@ -324,53 +333,24 @@ a.card::after {
   outline-offset: 2px;
 }
 
-/* 라디오·스위치(체크 상자): 안 고른 것은 진한 테두리 + 면, 고른 것은 강조색 채움 + 표시(모든 테마 공통) */
-.theme-option input[type="radio"],
-.setting-row input[type="checkbox"] {
+/* 라디오: 안 고른 것은 진한 테두리 + 면, 고른 것은 강조색 점(모든 테마 공통) */
+.theme-option input[type="radio"] {
   appearance: none;
   -webkit-appearance: none;
   display: grid;
   flex: none;
   place-content: center;
-  margin: 0;
-  border: 2px solid var(--c-border);
-  background: var(--c-surface);
-}
-
-.theme-option input[type="radio"] {
   width: 28px;
   height: 28px;
+  margin: 0;
+  border: 2px solid var(--c-border);
   border-radius: 50%;
+  background: var(--c-surface);
 }
 
 .theme-option input[type="radio"]:checked {
   border-color: var(--c-accent);
   background: radial-gradient(circle closest-side, var(--c-accent) 0 58%, var(--c-surface) 62%);
-}
-
-.setting-row input[type="checkbox"] {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-}
-
-.setting-row input[type="checkbox"]:checked {
-  border-color: var(--c-accent);
-  background: var(--c-accent);
-}
-
-.setting-row input[type="checkbox"]::before {
-  content: "";
-  width: 16px;
-  height: 9px;
-  border-bottom: 4px solid var(--c-on-accent);
-  border-left: 4px solid var(--c-on-accent);
-  transform: translateY(-2px) rotate(-45deg) scale(0);
-  transition: transform var(--dur) var(--ease);
-}
-
-.setting-row input[type="checkbox"]:checked::before {
-  transform: translateY(-2px) rotate(-45deg) scale(1);
 }
 
 /* 진짜 스위치 줄(선명하게 보기): 라디오 줄과 같은 모양 + 켜짐/꺼짐 글자 + 트랙·손잡이 */
@@ -388,14 +368,31 @@ a.card::after {
   cursor: pointer;
 }
 
+.theme-option.switch-row {
+  min-height: 64px;
+  padding-block: var(--space-3);
+}
+
 .switch-row .switch-help {
   display: block;
+  color: var(--c-muted);
   font-size: var(--fs-sm);
   font-weight: 400;
 }
 
+/* 트랙 아래에 켜짐/꺼짐 글자를 쌓는다(큰 글씨에서도 옆 줄과 겹치지 않게) */
+.switch-ctl {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
 .switch-state {
+  font-size: var(--fs-sm);
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .switch-track {

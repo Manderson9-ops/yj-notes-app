@@ -215,3 +215,30 @@ test("header settings button shows icon and the visible label 설정, at least 4
   const box = await btn.boundingBox();
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(48);
 });
+
+for (const theme of ["basic", "crayon", "forest"] as const) {
+  for (const scheme of ["light", "dark"] as const) {
+    test(`눌리는 카드는 안 눌리는 카드보다 테두리가 굵다: ${theme} ${scheme}`, async ({ page }) => {
+      await page.addInitScript(
+        ({ t, s }) => {
+          localStorage.setItem("yj.theme", t);
+          localStorage.setItem("yj.scheme", s);
+        },
+        { t: theme, s: scheme },
+      );
+      await login(page);
+      await page.getByRole("link", { name: "설정", exact: true }).click();
+      await page.getByRole("link", { name: "디자인 미리보기" }).click();
+      await expect(page.getByRole("heading", { level: 1, name: "디자인 미리보기" })).toBeVisible();
+      const w = async (sel: string) =>
+        Number(
+          await page.evaluate(
+            `parseFloat(getComputedStyle(document.querySelector(${JSON.stringify(sel)})).borderTopWidth)`,
+          ),
+        );
+      const tappable = await w("a.card");
+      const fixed = await w("article.card");
+      expect(tappable).toBeGreaterThan(fixed);
+    });
+  }
+}

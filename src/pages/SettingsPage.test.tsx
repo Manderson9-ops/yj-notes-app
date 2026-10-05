@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -197,13 +197,29 @@ describe("화면 밝기 · 선명하게 보기", () => {
     const sw = screen.getByRole("switch", { name: "선명하게 보기" });
     expect(sw).not.toBeChecked();
     expect(sw).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByText("꺼짐")).toBeInTheDocument();
+    const row = sw.closest("label") as HTMLElement;
+    expect(within(row).getByText("꺼짐")).toBeInTheDocument();
     await userEvent.click(sw);
     expect(sw).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByText("켜짐")).toBeInTheDocument();
+    expect(within(row).getByText("켜짐")).toBeInTheDocument();
     expect(document.documentElement.dataset.contrast).toBe("high");
     expect(localStorage.getItem("yj.contrast")).toBe("high");
     await userEvent.click(sw);
     expect(document.documentElement.dataset.contrast).toBeUndefined();
+  });
+});
+
+describe("글자·선명도", () => {
+  it("groups the large-text and high-contrast switches under one heading", async () => {
+    await setup([]);
+    expect(screen.getByRole("heading", { level: 2, name: "글자·선명도" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "큰 글씨" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    expect(screen.getByRole("switch", { name: "선명하게 보기" })).toBeInTheDocument();
+    const order = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(order.indexOf("화면 테마")).toBeLessThan(order.indexOf("화면 밝기"));
+    expect(order.indexOf("화면 밝기")).toBeLessThan(order.indexOf("글자·선명도"));
   });
 });

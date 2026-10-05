@@ -119,7 +119,7 @@ for (const { theme, large, scheme } of COMBOS) {
       await page.getByRole("link", { name: "설정", exact: true }).click();
       await expect(page.getByRole("heading", { level: 1, name: "설정" })).toBeVisible();
       await check();
-      await shot("settings");
+      await shot("settings", true);
 
       await page.getByRole("link", { name: "디자인 미리보기" }).click();
       await expect(page.getByRole("heading", { level: 1, name: "디자인 미리보기" })).toBeVisible();
