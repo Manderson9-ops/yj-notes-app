@@ -106,7 +106,7 @@ function renderAt(path: string) {
   );
 }
 
-describe("AskPage (S30 입력·목록)", () => {
+describe("AskPage (S50 입력·목록)", () => {
   beforeEach(() => {
     routes["GET /overview"] = () => json(200, overview(true));
     routes["GET /ask"] = () =>

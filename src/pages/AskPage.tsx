@@ -17,7 +17,7 @@ import "../styles/ask.css";
 
 const BODY_MAX = 1000;
 
-/** S30 물어보기: 질문 입력(위급 신호는 쓰는 즉시 경고) + 최근 질문 목록. */
+/** S50 물어보기: 질문 입력(위급 신호는 쓰는 즉시 경고) + 최근 질문 목록. */
 export default function AskPage() {
   const navigate = useNavigate();
   const overview = useOverview();

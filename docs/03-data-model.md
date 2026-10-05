@@ -128,6 +128,44 @@ CREATE TABLE app_setting (key TEXT PRIMARY KEY, value TEXT NOT NULL);  -- sessio
 - 검색(F4)은 1차에서 `LIKE` 로 충분하다(483행, 행 크기 작음, D1 `LIKE` 패턴 50바이트 제한 → 입력 길이 제한 40자). 한국어 부분 일치용 FTS5 trigram 은 M3 스파이크로 검증 후 도입 여부 결정(D-05).
 - 날짜: 알림장 `date` 는 원 날짜, 시각은 KST 문자열(기존 `EXTRACTION.md` §4 와 동일).
 
+### 2-ask. 물어보기 표 (마이그레이션 `0008_ask.sql`, T-Q1, 설명은 `11`)
+
+```sql
+CREATE TABLE ask_question (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  asked_by TEXT NOT NULL,                 -- 기록자 이름(기존 기록자 체계, 1~12자)
+  body TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 1000),
+  status TEXT NOT NULL CHECK (status IN ('pending','claimed','answering','reviewing','done','failed')),
+  red_flag INTEGER NOT NULL DEFAULT 0,    -- 결정적 키워드 검사(server/ask/redflags.ts). 1 이면 답은 10단계 고정
+  created_at TEXT NOT NULL,               -- ISO8601 UTC 고정 폭(문자열 비교 = 시간 순서)
+  claimed_at TEXT, lease_until TEXT,      -- 워커가 집은 시각 / 리스(5분) 끝. 지나면 다시 집을 수 있다
+  attempts INTEGER NOT NULL DEFAULT 0,    -- 집은 횟수. 3 이면 더는 집지 않는다
+  fail_code TEXT, updated_at TEXT NOT NULL, deleted_at TEXT   -- 소프트 삭제
+);
+CREATE INDEX idx_ask_question_status ON ask_question(status, created_at);
+
+CREATE TABLE ask_answer (
+  question_id INTEGER PRIMARY KEY REFERENCES ask_question(id),
+  level INTEGER NOT NULL CHECK (level BETWEEN 1 AND 10),
+  answer_json TEXT NOT NULL CHECK (length(answer_json) <= 61440),   -- shared/ask-schema.ts AnswerSchema 로 검증된 JSON
+  review_score REAL, model TEXT,
+  wait_ms INTEGER, work_ms INTEGER, total_ms INTEGER,               -- 질문→집음 / 집음→업로드(워커 보고) / 질문→게시(서버 계산)
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE ask_feedback (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  question_id INTEGER NOT NULL REFERENCES ask_question(id),
+  by TEXT NOT NULL, helpful INTEGER CHECK (helpful IN (0, 1)),      -- 도움이 됐어요(1)/아니에요(0)/없음(NULL)
+  note TEXT CHECK (note IS NULL OR length(note) <= 500),            -- 「해 봤어요」 메모
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE worker_auth_fail (at TEXT NOT NULL);                   -- 워커 토큰 실패 기록(PIN 의 auth_attempt 와 별도 집계)
+```
+- app_setting 키: `ask_worker_seen_at`(워커 생존 표시, 최대 60초에 한 번 갱신), `ask_worker_locked_until`(토큰 실패 잠금 해제 시각).
+- 질문 본문·답은 가족 자료(S1)다. 로그·오류 응답에 쓰지 않는다.
+
 ## 3. 가족 기록 종류 (`log_type.schema_json`)
 
 | code | 필드 (모두 목록 선택, 메모 제외) | 출처 |
