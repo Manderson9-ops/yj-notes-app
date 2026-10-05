@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { claudeArgs, createClaudeRunner, parseEnvelope } from "./claude.ts";
-import { parseGolden } from "./eval.ts";
+import { parseGolden, savedLevel } from "./eval.ts";
 import { renderMarkdown, summarize, type EvalItem } from "./eval-stats.ts";
 import { acquireLock } from "./lock.ts";
 import { createLogger, sanitizeFields } from "./logger.ts";
@@ -201,5 +201,39 @@ describe("eval 통계", () => {
       parseGolden('{"id":"a","question":"질문"}\n\n{"id":"b","question":"q","redFlag":true}\n'),
     ).toHaveLength(2);
     expect(() => parseGolden('{"id":"","question":"q"}')).toThrow();
+  });
+});
+
+describe("eval --save-answers 단계", () => {
+  it("not_behavior 는 null, behavior 는 그대로", () => {
+    expect(savedLevel({ kind: "not_behavior" }, 1)).toBeNull();
+    expect(savedLevel({ kind: "behavior" }, 4)).toBe(4);
+  });
+});
+
+describe("프롬프트 규칙 문구", () => {
+  const sys = readFileSync(new URL("./prompts/system.md", import.meta.url), "utf8");
+  const rev = readFileSync(new URL("./prompts/review.md", import.meta.url), "utf8");
+  it("system: 권장 단계 그대로·가족 말·식사 기록표·오래된 기록·규준 금지·최소 단계", () => {
+    for (const w of [
+      "단계는 이 값과 같게",
+      "최소 4단계",
+      "최소 9단계",
+      "기다리지 않고 바로 상담",
+      "evidence.ref 와 tryNow.basis 에만",
+      "어린이집 반 동생들",
+      "지금 쓰고 계신 2주 저녁 식사 기록표",
+      "「있다면」「쓰고 계시면」",
+      "최근 6개월",
+      "12개월보다 오래된 기록",
+      "규준을 지어내지 않아요",
+    ]) {
+      expect(sys, w).toContain(w);
+    }
+  });
+  it("review: 규준 지어내기·오래된 기록·단계 문구 모순 점검표", () => {
+    expect(rev).toContain("규준을 지어냈나");
+    expect(rev).toContain("12개월보다 오래된 기록");
+    expect(rev).toContain("앞뒤로 어긋나나");
   });
 });

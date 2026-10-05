@@ -44,7 +44,7 @@ export function questionBlock(q: PromptQuestion): string {
     ...(q.topic ? [`주제(사전 분류): ${q.topic.replace(/[\r\n]+/g, " ").slice(0, 40)}`] : []),
     ...(q.suggested
       ? [
-          `권장 단계(사전 계산): ${String(q.suggested.level)} — ${q.suggested.why}. 이 단계의 ±1 안에서 고르고, 벗어나려면 levelReason 에 그렇게 보는 기록·근거를 적어요`,
+          `권장 단계(사전 계산): ${String(q.suggested.level)} — ${q.suggested.why}. ${q.suggested.min !== undefined ? `${String(q.suggested.min)}단계 미만으로는 쓰지 않아요. ` : ""}단계는 이 값과 **같게** 써요. ±1 로 바꾸려면 levelReason 에 그렇게 보는 특정 기록(날짜·알림장)이나 근거를 적어요. 「권장」이라는 말 자체는 답에 쓰지 않아요`,
         ]
       : []),
     OPEN,

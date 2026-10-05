@@ -482,12 +482,12 @@ describe("관련 없는 기록 · 식사 가이드 기록", () => {
   it("가이드 §3-1 이 묶음에 있는 식사 질문은 기존 식사기록을 언급해야 한다", () => {
     const refs = ["note:2020-03-02", "SYN-IV-01", "guide:05-식사#§3-1"];
     const base = info({ domains: ["feeding"], refs });
-    expect(checkAnswer(goodAnswer(), base, false).issues.join()).toContain("식사기록");
+    expect(checkAnswer(goodAnswer(), base, false).issues.join()).toContain("식사 기록표");
     const ok = goodAnswer({
       observe: {
         what: "먹은 양",
         howLong: "3~4일",
-        how: "이미 쓰는 2주 저녁 기록(records/식사기록)에 이어서 적어요",
+        how: "지금 쓰고 계신 2주 저녁 식사 기록표에 이어서 적어요",
       },
     });
     expect(checkAnswer(ok, base, false).ok).toBe(true);
@@ -583,7 +583,7 @@ describe("위급 질문: 안전·응급 규칙만(주제·말씨·식사·단계
       chokeInfo,
       false,
     );
-    expect(r.issues.join()).toContain("식사기록");
+    expect(r.issues.join()).toContain("식사 기록표");
     expect(r.issues.join()).toContain("2인칭");
   });
   it("위급에서도 막는 것: 단계≠10, 금지어, 119 안내 미루기, 내부 규칙·건수 노출은 HARD", () => {
@@ -667,7 +667,7 @@ describe("HARD / SOFT 분류", () => {
       category: "template",
     });
     const ok = checkAnswer(
-      goodAnswer({ level: 5, levelReason: "알림장 기록에서 반복돼요" }),
+      goodAnswer({ level: 3, levelReason: "알림장 기록에서 반복돼요" }),
       info({ suggested: { level: 2, why: "x" } }),
       false,
     );
@@ -682,5 +682,207 @@ describe("HARD / SOFT 분류", () => {
     expect(softToReviewIssues([{ severity: "hard", category: "forbidden", text: "x" }])).toEqual(
       [],
     );
+  });
+});
+
+describe("교정 라운드: 권장 단계 HARD/SOFT, 내부 표지 누수, 식사 기록표, 오래된 기록, 모순", () => {
+  const sg = (level: number, min?: number) => ({ level, why: "테스트", ...(min ? { min } : {}) });
+
+  it("권장과 같으면 통과, 다르면 SOFT, 최소(공격 4·퇴행 9) 미만이면 HARD level", () => {
+    expect(checkAnswer(goodAnswer({ level: 4 }), info({ suggested: sg(4, 4) }), false).ok).toBe(
+      true,
+    );
+    const soft = checkAnswer(
+      goodAnswer({ level: 4, levelReason: "30개월이에요" }),
+      info({ suggested: sg(3) }),
+      false,
+    );
+    expect(soft.hard).toHaveLength(0);
+    expect(soft.soft.map((i) => i.category)).toContain("template");
+    const hard = checkAnswer(goodAnswer({ level: 3 }), info({ suggested: sg(4, 4) }), false);
+    expect(hard.hard.map((i) => i.category)).toEqual(["level"]);
+    const skill = checkAnswer(goodAnswer({ level: 8 }), info({ suggested: sg(9, 9) }), false);
+    expect(skill.hard.map((i) => i.category)).toContain("level");
+    expect(
+      checkAnswer(goodAnswer({ level: 9 }), info({ suggested: sg(9, 9) }), false).hard,
+    ).toHaveLength(0);
+  });
+  it("말 더듬 4주 이상(noWait)은 「며칠 지켜보기」를 쓰면 SOFT", () => {
+    const s = { level: 5, why: "x", noWait: true };
+    const bad = goodAnswer({
+      level: 5,
+      observe: { what: "더듬는 횟수", howLong: "1주", how: "며칠 지켜봐요" },
+      upIf: ["언어재활사에게 연락해요"],
+    });
+    expect(checkAnswer(bad, info({ suggested: s }), false).issues.join()).toContain(
+      "며칠 지켜보기",
+    );
+  });
+  it("단계 4 이상 권장이면 「질문에 빈도가 없으면 3 이하」 규칙을 건너뛴다", () => {
+    const r = checkAnswer(
+      goodAnswer({ level: 9 }),
+      info({
+        suggested: sg(9, 9),
+        severity: { frequency: null, duration: null, impact: null, aggression: null },
+      }),
+      false,
+    );
+    expect(r.issues.join()).not.toContain("3 이하");
+  });
+
+  it("내부 표지·파일·ID 를 가족 글에 쓰면 HARD leak(ref 칸은 허용)", () => {
+    for (const bad of [
+      "권장보다 한 단계 높여요",
+      "권장 단계가 3이에요",
+      "어린이집(장소 모름) 기록이에요",
+      "(반 친구일 수 있음) 이야기예요",
+      "records/식사기록 에 적어요",
+      "가이드 §3-1 을 따라요",
+      "guide:05-식사#§3-1 참고",
+      "묶음에 있어요",
+      "전수 검색에서 봤어요",
+      "INT-FEED-01 을 써요",
+      "NORM-FEED-01 에 따라요",
+    ]) {
+      const r = checkAnswer(goodAnswer({ forAsker: `엄마께: ${bad}` }), info(), false);
+      expect(
+        r.hard.map((i) => i.category),
+        bad,
+      ).toContain("leak");
+    }
+    // 가족 글 칸마다
+    for (const over of [
+      { summary: "묶음 기준으로 봤어요" },
+      { levelReason: "권장 단계예요" },
+      { avoid: ["records/ 를 쓰지 않아요"] },
+      { upIf: ["INT- 를 봐요 소아과에 물어봐요"] },
+      { downIf: ["guide:05 를 봐요"] },
+      { observe: { what: "a", howLong: "3~4일", how: "가이드 § 를 봐요" } },
+      {
+        tryNow: [
+          { action: "NORM-1 대로 해요", basis: "일반 권고" },
+          { action: "b", basis: "일반 권고" },
+        ],
+      },
+      { fromRecords: [{ date: "2020-03-02", what: "(장소 모름)", link: "x", source: "알림장" }] },
+    ] as Partial<ReturnType<typeof goodAnswer>>[]) {
+      expect(
+        checkAnswer(goodAnswer(over), info(), false).hard.map((i) => i.category),
+        JSON.stringify(over),
+      ).toContain("leak");
+    }
+    const ok = checkAnswer(
+      goodAnswer({
+        fromRecords: [
+          {
+            date: "2020-03-02",
+            what: "선생님 알림장: 반 동생들 이야기일 수 있어요",
+            link: "엄마 댓글과 이어져요",
+            source: "알림장",
+          },
+        ],
+      }),
+      info(),
+      false,
+    );
+    expect(ok.hard).toHaveLength(0);
+    expect(
+      checkAnswer(goodAnswer(), info({ refs: ["SYN-IV-01", "note:2020-03-02"] }), false).ok,
+    ).toBe(true); // basis·evidence.ref 의 SYN-… 는 허용
+  });
+  it("위급 질문에서도 내부 표지는 HARD", () => {
+    const r = checkAnswer(
+      goodAnswer({ level: 10, upIf: ["119에 바로 전화해요"], summary: "묶음 기준" }),
+      info(),
+      true,
+    );
+    expect(r.hard.map((i) => i.category)).toContain("leak");
+  });
+
+  const dinnerPack =
+    "## A-3. 가족 사실\n- 가족이 2020-03-02부터 2주 저녁 식사 기록표를 쓰고 있어요(가이드 05 §3-1)";
+  it("식사 기록표 사실이 있는데 조건·부재로 말하면 SOFT ungrounded", () => {
+    const base = info({ pack: `${BASE_PACK}\n${dinnerPack}` });
+    for (const bad of [
+      "식사 기록표가 있다면 이어서 써요",
+      "저녁 식사 기록표를 쓰고 계시면 거기에 적어요",
+      "식사 기록은 따로 없어요",
+      "기록표가 있으시면 확인해요",
+    ]) {
+      const r = checkAnswer(goodAnswer({ forAsker: `엄마께: ${bad}` }), base, false);
+      expect(
+        r.soft.map((i) => i.category),
+        bad,
+      ).toContain("ungrounded");
+    }
+    const good = goodAnswer({
+      forAsker: "엄마께: 지금 쓰고 계신 2주 저녁 식사 기록표에 이어서 적어요",
+    });
+    expect(checkAnswer(good, base, false).items.some((i) => i.category === "ungrounded")).toBe(
+      false,
+    );
+    // 사실이 묶음에 없으면 검사하지 않는다
+    const none = checkAnswer(
+      goodAnswer({ forAsker: "엄마께: 식사 기록표가 있다면 써요" }),
+      info(),
+      false,
+    );
+    expect(none.items.some((i) => i.category === "ungrounded")).toBe(false);
+  });
+
+  it("12개월보다 오래된 기록은 link 에 변화 설명이 없으면 SOFT record_link, 최근은 통과", () => {
+    const rec = (date: string, link: string) =>
+      goodAnswer({ fromRecords: [{ date, what: "점심을 반만 먹었어요", link, source: "알림장" }] });
+    const base = info({
+      today: "2020-09-01",
+      pack: `${BASE_PACK}\n[2019-05-01][작성자: 교사][장소: 어린이집]`,
+    });
+    const old = checkAnswer(rec("2019-05-01", "밥 먹는 일과 이어져요"), base, false);
+    expect(old.soft.map((i) => i.category)).toContain("record_link");
+    const explained = checkAnswer(
+      rec("2019-05-01", "그때부터 지금까지 많이 달라졌는지 비교돼요"),
+      base,
+      false,
+    );
+    expect(explained.items.some((i) => i.text.includes("12개월"))).toBe(false);
+    const recent = checkAnswer(rec("2020-03-02", "밥 먹는 일과 이어져요"), base, false);
+    expect(recent.items.some((i) => i.text.includes("12개월"))).toBe(false);
+    // 오늘 날짜가 없으면(합성 환경) 건너뛴다
+    expect(
+      checkAnswer(rec("2019-05-01", "이어져요"), info(), false).items.some((i) =>
+        i.text.includes("12개월"),
+      ),
+    ).toBe(false);
+  });
+  it("「지금과는 달라요」를 인정하는 기록은 빼라고 알린다", () => {
+    const r = checkAnswer(
+      goodAnswer({
+        fromRecords: [
+          { date: "2020-03-02", what: "점심", link: "지금과는 달라요", source: "알림장" },
+        ],
+      }),
+      info(),
+      false,
+    );
+    expect(r.issues.join()).toContain("관련 없는 기록은 빼요");
+  });
+
+  it("단계 문구 모순(8단계 「다음 진료 때」 + 「기다리지 말고」)은 SOFT template", () => {
+    const r = checkAnswer(
+      goodAnswer({
+        level: 8,
+        tryNow: [
+          { action: "다음 진료 때 말씀드려요", basis: "일반 권고" },
+          { action: "기다리지 말고 상담을 예약해요", basis: "일반 권고" },
+        ],
+        upIf: ["소아과에 연락해요"],
+        observe: { what: "a", howLong: "진료·상담 전까지", how: "b" },
+      }),
+      info(),
+      false,
+    );
+    expect(r.issues.join()).toContain("앞뒤로 어긋나요");
+    expect(r.hard).toHaveLength(0);
+    expect(checkAnswer(goodAnswer(), info(), false).issues.join()).not.toContain("앞뒤로");
   });
 });

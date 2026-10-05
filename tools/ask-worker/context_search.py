@@ -286,3 +286,26 @@ def guide_top_sections(
             scored.append((s, f"guide:{f.stem}#{idx}", " ".join(sec.split())))
     scored.sort(key=lambda t: (-t[0], t[1]))
     return [(ref, txt) for _s, ref, txt in scored[:limit]]
+
+
+_DINNER_REF = re.compile(r"^guide:05.*#§3-1$")
+_DATE_FORMS = (
+    re.compile(r"(\d{4})[-./]\s*(\d{1,2})[-./]\s*(\d{1,2})"),
+    re.compile(r"(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일"),
+)
+
+
+def dinner_log_fact(guide: list[tuple[str, str]]) -> tuple[str, str] | None:
+    """가이드 05 §3-1(2주 저녁 기록)이 묶음에 있으면 가족이 이미 쓰고 있다는 사실 한 줄. 시작일은 가이드 글에서 읽는다(없으면 날짜 없이)."""
+    for ref, text in guide:
+        if not _DINNER_REF.match(ref):
+            continue
+        start = ""
+        for rx in _DATE_FORMS:
+            m = rx.search(text)
+            if m:
+                start = f"{int(m.group(1)):04d}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+                break
+        when = f"{start}부터 " if start else ""
+        return ref, f"가족이 {when}2주 저녁 식사 기록표를 쓰고 있어요(가이드 05 §3-1)"
+    return None

@@ -35,11 +35,17 @@ function opt(args: string[], name: string): string | undefined {
 export interface SavedAnswer {
   id: string;
   run: number;
-  level: number;
+  /** not_behavior 는 null(워커는 스키마상 1을 보내지만 화면에는 단계가 없다). */
+  level: number | null;
   score: number;
   rewrites: number;
   issues: ReviewIssue[];
   answer: unknown;
+}
+
+/** 저장용 단계: not_behavior 이면 null. */
+export function savedLevel(answer: { kind?: string }, level: number): number | null {
+  return answer.kind === "not_behavior" ? null : level;
 }
 
 export async function main(args: string[]): Promise<number> {
@@ -94,7 +100,7 @@ export async function main(args: string[]): Promise<number> {
           saved.push({
             id: g.id,
             run: n,
-            level: r.level,
+            level: savedLevel(r.answer, r.level),
             score: r.reviewScore,
             rewrites: r.rewrites,
             issues: r.issues,

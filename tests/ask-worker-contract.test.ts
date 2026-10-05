@@ -101,7 +101,7 @@ function loopDeps(runClaude: ClaudeRunner, stages: string[] = []): LoopDeps {
 
 describe("워커 클라이언트 ↔ 실제 앱 계약", () => {
   it("질문 생성 → claim → progress → answer → GET 이 done + level, 검토 점수 저장", async () => {
-    const id = await create("테스트아이가 밥을 잘 안 먹어요");
+    const id = await create("테스트아이가 밥을 잘 안 먹어요 친구를 때려요");
     expect((await detail(id)).status).toBe("pending");
     const stages: string[] = [];
     const r = await handleOne(loopDeps(fakeClaude(), stages), new AbortController().signal);
@@ -123,7 +123,7 @@ describe("워커 클라이언트 ↔ 실제 앱 계약", () => {
   });
 
   it("실패 경로: fail(code) 로 되돌아가고 3번째 시도 뒤에는 failed", async () => {
-    const id = await create("테스트아이가 낮잠을 안 자요");
+    const id = await create("테스트아이가 낮잠을 안 자요 친구를 때려요");
     const deps = loopDeps(fakeClaude({ failWith: "claude_exit" }));
     const sig = new AbortController().signal;
     await handleOne(deps, sig);
@@ -151,7 +151,7 @@ describe("워커 클라이언트 ↔ 실제 앱 계약", () => {
   });
 
   it("잘못된 토큰의 워커는 아무것도 못 한다(401), 질문은 그대로 pending", async () => {
-    const id = await create("테스트아이가 밥을 안 먹어요");
+    const id = await create("테스트아이가 밥을 안 먹어요 친구를 때려요");
     const bad = createClient({
       origin: ORIGIN,
       token: "wrong-token-0123456789",

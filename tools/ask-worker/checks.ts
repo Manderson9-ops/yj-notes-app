@@ -11,7 +11,7 @@ import {
   type IssueCategory,
   type ReviewIssue,
 } from "./answer-schema.ts";
-import { levelNearSuggestion, type LevelSuggestion } from "./level-suggest.ts";
+import { levelProblem, type LevelSuggestion } from "./level-suggest.ts";
 import { levelTitle } from "./levels.ts";
 import type { SearchSummary } from "./pack.ts";
 import { refDomain, textMatchesDomain } from "./topics.ts";
@@ -27,6 +27,8 @@ export interface PackInfo {
   domains?: string[] | undefined;
   /** 질문에 적힌 빈도·지속·영향·공격성(확장 실패면 undefined → 단계 보정 검사 안 함). */
   severity?: Severity | undefined;
+  /** 오늘 날짜(YYYY-MM-DD). 있으면 12개월보다 오래된 기록을 검사한다(없으면 건너뜀). */
+  today?: string | undefined;
   /** 질문자 호칭(엄마·아빠·할머니…): summary 에서 3인칭으로 부르지 않는지 본다. */
   askedBy?: string | undefined;
   /** 질문에서 계산한 권장 단계(위급이면 없음). 모델 단계가 ±1 밖이면 근거를 대야 한다. */
@@ -43,7 +45,7 @@ export interface Severity {
 /** 결정적 검사 지적. HARD 는 막고(재작성 필요), SOFT 는 막지 않고 재작성 지시 + 감점으로 넘어간다. */
 export type CheckSeverity = "hard" | "soft";
 export type CheckCategory =
-  IssueCategory | "schema" | "redflag" | "kind" | "forbidden" | "leak" | "emergency";
+  IssueCategory | "schema" | "redflag" | "kind" | "forbidden" | "leak" | "emergency" | "level";
 
 export interface CheckIssue {
   severity: CheckSeverity;
@@ -97,13 +99,41 @@ const INTERNAL_PHRASE =
   /보수적인\s*쪽|더\s*일찍\s*확인을\s*권하는\s*쪽|월령\s*규준\s*경계|규준이\s*둘|연령대\s*경계|내부\s*규칙|전수\s*검색/;
 const SEARCH_COUNT = /\d+\s*건/;
 /** 질문과 관련 없는 기록을 「관련 없다」고 적어 두는 말. */
-const UNRELATED = /직접\s*관련(?:은|이)?\s*없|관련\s*없|관련이\s*적|관련은\s*적|상관\s*없/;
+const UNRELATED =
+  /직접\s*관련(?:은|이)?\s*없|관련\s*없|관련이\s*적|관련은\s*적|상관\s*없|지금과(?:는)?\s*(?:많이\s*)?달라/;
+/** 가족에게 보이는 글에 쓰면 안 되는 내부 표지·파일·ID(refs 는 evidence.ref·tryNow.basis 에만). */
+export const INTERNAL_LABEL =
+  /권장\s*보다|권장\s*단계|[(（]\s*장소\s*모름\s*[)）]|장소\s*모름|[(（]\s*반\s*친구일\s*수\s*있음\s*[)）]|records\/|가이드\s*§|guide:|묶음|전수|INT-|NORM-|EMERG-/;
+/** 판단을 기다리라는 말 / 기다리지 말라는 말(한 답 안에서 함께 나오면 모순). */
+const WAIT_WORDS = /다음\s*(?:진료|검진|방문)\s*때|며칠\s*(?:더\s*)?지켜|더\s*지켜보|두고\s*보/;
+const NO_WAIT_WORDS = /기다리지\s*말|미루지\s*말|지금\s*바로|바로\s*(?:상담|연락|진료|예약)/;
+/** 가족이 쓰고 있는 2주 저녁 식사 기록표를 가정하는 말(사실이 묶음에 있는데 조건·부재로 말함). */
+const LOG_HEDGE =
+  /(?:식사\s*기록(?:표)?|기록표)[^.。\n]{0,16}(?:있다면|있으시면|있으면|쓰고\s*계시면|쓰고\s*계신다면|쓰신다면|쓰시면|시작해|남겨\s*보세요)|(?:있다면|쓰고\s*계시면|쓰고\s*계신다면)[^.。\n]{0,16}(?:식사\s*기록|기록표)|식사\s*기록(?:은|이|표는)?[^.。\n]{0,12}없/;
+export const DINNER_FACT = "저녁 식사 기록표를 쓰고 있어요";
+const MONTH_MS = 30.4375 * 24 * 3600 * 1000;
 /** summary·levelReason 의 질환·병 낱말(위급 질문 제외). 병원은 해당하지 않는다. */
 const ILLNESS = /질환|(?:^|[^가-힣])병(?:이|을|에|은|는|도|일|인|으로|명|증|리|세|$|[^가-힣])/;
 const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** 119 안내에 처치를 미루는 말(구체 처치 동사가 없을 때만 문제). */
 const DEFER_119 = /119[^.。\n]*안내(?:에|를)\s*따/;
 const FIRST_AID_VERB = /두드리|밀어|압박|눕|지혈|눌러|치우|옆으로|돌려|꺼내|기침|뒤집/;
+
+/** 가족 화면에 글로 보이는 칸(근거 ref·basis·날짜는 작은 출처 표시라 제외). */
+export function familyStrings(a: Answer): string[] {
+  return collectStrings({
+    summary: a.summary,
+    levelReason: a.levelReason,
+    fromRecords: a.fromRecords.map((r) => [r.what, r.link]),
+    tryNow: a.tryNow.map((t) => [t.action, t.say]),
+    avoid: a.avoid,
+    observe: a.observe,
+    upIf: a.upIf,
+    downIf: a.downIf,
+    forAsker: a.forAsker,
+    limits: (a as { limits?: unknown }).limits,
+  });
+}
 
 export function stripAxisTags<T>(v: T): T {
   if (typeof v === "string")
@@ -244,6 +274,13 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
       "내부 규칙(보수적인 쪽 등)과 검색 건수(「N건」)는 가족에게 보이는 글에 쓰지 않아요: 지우고 내용만 말해요",
     );
   }
+  const family = familyStrings(answer);
+  if (family.some((s) => INTERNAL_LABEL.test(s))) {
+    hard(
+      "leak",
+      "가족에게 보이는 글에 내부 표지·파일·ID(권장 단계·장소 모름·반 친구일 수 있음·records/·가이드 §·guide:·묶음·전수·INT-·NORM-)를 쓰지 않아요: 「어린이집 반 동생들」「선생님 알림장」「엄마 댓글」처럼 가족 말로 바꾸고, 근거 ID 는 evidence.ref·tryNow.basis 에만 써요",
+    );
+  }
   if (info.isBehavior === false && answer.kind === "behavior" && !redFlag) {
     hard("kind", "행동 질문이 아니에요: kind 를 not_behavior 로 하고 요약과 안내 한 줄만 써요");
   }
@@ -371,7 +408,7 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
 
   // 단계 보정: 4단계 이상은 질문이 빈도·지속·영향·공격성을 적었거나 기록이 반복을 보여 줄 때만
   const sev = info.severity;
-  if (sev && answer.level >= 4) {
+  if (sev && answer.level >= 4 && (info.suggested?.level ?? 0) < 4) {
     const stated = [sev.frequency, sev.duration, sev.impact, sev.aggression].some(
       (v) => v !== null && v.trim() !== "",
     );
@@ -390,15 +427,66 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
       }
     }
   }
-  // 낮은 단계 안정화: 질문에서 계산한 권장 단계 ±1
+  // 단계 권장값: 모델 단계는 권장과 같아야 한다(±1 은 특정 기록·근거를 댈 때만). 공격·퇴행 최소 단계 미만은 HARD.
   const sg = info.suggested;
-  if (sg && !levelNearSuggestion(answer.level, sg, answer.levelReason, [...refs])) {
+  if (sg) {
+    const p = levelProblem(answer.level, sg, answer.levelReason);
+    if (p?.severity === "hard") hard("level", p.text);
+    else if (p) soft("template", p.text);
+    if (sg.noWait) {
+      const waits = [
+        answer.observe?.howLong ?? "",
+        answer.observe?.how ?? "",
+        ...answer.tryNow.map((t) => t.action),
+        ...answer.downIf,
+      ];
+      if (waits.some((w) => /며칠\s*(?:더\s*)?지켜|지켜보기만/.test(w))) {
+        soft(
+          "template",
+          "말 더듬이 4주 이상 이어졌으면 「며칠 지켜보기」가 아니라 언어재활사·소아과 상담을 안내해요",
+        );
+      }
+    }
+  }
+  // 한 답 안의 모순: 기다리라는 말과 기다리지 말라는 말이 함께 있으면 안 된다
+  {
+    const body = [
+      answer.summary,
+      answer.levelReason,
+      ...answer.tryNow.map((t) => t.action),
+      ...answer.upIf,
+      ...answer.downIf,
+      answer.observe?.how ?? "",
+    ].join(" ");
+    if (WAIT_WORDS.test(body) && NO_WAIT_WORDS.test(body)) {
+      soft(
+        "template",
+        `${String(answer.level)}단계 안내가 앞뒤로 어긋나요: 「다음 진료 때·지켜보기」와 「기다리지 말고·바로 상담」이 함께 있어요. 단계에 맞는 한쪽으로 통일해요(하던 것을 못 하게 되면 9단계)`,
+      );
+    }
+  }
+  // 12개월보다 오래된 기록은 link 에 지금 질문과 이어지는 이유(시간에 따른 변화)가 있어야 한다
+  if (info.today) {
+    const cutoff = Date.parse(info.today) - 12 * MONTH_MS;
+    for (const r of answer.fromRecords) {
+      if (
+        Date.parse(r.date) < cutoff &&
+        !/변화|달라졌|바뀌|늘었|줄었|계속|여전|이후|처음|예전부터|그때부터/.test(r.link)
+      ) {
+        soft(
+          "record_link",
+          `fromRecords ${r.date}: 12개월 넘은 기록이에요 — 최근 6개월 기록을 먼저 쓰고, 오래된 기록은 link 에 지금까지 어떻게 달라졌는지 적거나 빼요`,
+        );
+      }
+    }
+  }
+  // 가족이 쓰는 저녁 식사 기록표가 사실로 있는데 조건(있다면)이나 부재(없어요)로 말함
+  if (info.pack.includes(DINNER_FACT) && strings.some((x) => LOG_HEDGE.test(x))) {
     soft(
-      "template",
-      `질문 내용으로 계산한 권장 단계는 ${String(sg.level)}(${sg.why})예요. ±1 안으로 하거나 levelReason 에 그보다 높이거나 낮추는 기록·근거를 적어요`,
+      "ungrounded",
+      "가족은 지금 2주 저녁 식사 기록표를 쓰고 있어요(사실): 「있다면·쓰고 계시면」「기록이 없어요」로 말하지 말고 「지금 쓰고 계신 2주 저녁 식사 기록표」라고 분명히 써요",
     );
   }
-
   // 근거–행동 주제 대조: 그 ref 가 직접 뒷받침하는 행동에만 basis 로 쓴다
   if (info.domains !== undefined) {
     const wanted = new Set(info.domains);
@@ -417,11 +505,11 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
   if (
     info.domains?.includes("feeding") === true &&
     [...refs].some((r) => /^guide:05.*#§3-1$/.test(r)) &&
-    !strings.some((x) => x.includes("식사기록"))
+    !strings.some((x) => /식사\s*기록/.test(x))
   ) {
     soft(
       "recall",
-      "가이드 §3-1 의 기존 2주 저녁 기록(records/식사기록)을 이어서 쓰도록 안내해요(새 기록을 시작하지 않아요)",
+      "지금 쓰고 계신 2주 저녁 식사 기록표를 이어서 쓰도록 안내해요(새 기록을 시작하지 않아요)",
     );
   }
 

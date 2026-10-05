@@ -394,3 +394,21 @@ def test_search_summary_exposes_day_stats(env):
     assert s["days"] >= 3 and s["keywordDays"] and s["keywordDates"]
     assert all(len(v) <= 4 for v in s["keywordDates"].values())
     assert isinstance(s["multi"], list)
+
+
+def test_dinner_log_fact_is_in_pack_with_start_date_from_guide(env):
+    out = pack(env)
+    assert "가족이 2020-03-02부터 2주 저녁 식사 기록표를 쓰고 있어요(가이드 05 §3-1)" in out["pack"]
+    assert "## A-3. 가족 사실" in out["pack"]
+
+
+def test_dinner_log_fact_reads_date_forms_and_is_absent_without_section():
+    ref = "guide:05-식사#§3-1"
+    assert cs.dinner_log_fact([(ref, "### 3-1. 기록 2026.9.29부터 2주")]) == (
+        ref,
+        "가족이 2026-09-29부터 2주 저녁 식사 기록표를 쓰고 있어요(가이드 05 §3-1)",
+    )
+    assert "2026-10-01부터" in cs.dinner_log_fact([(ref, "2026년 10월 1일에 시작")])[1]
+    assert "부터" not in cs.dinner_log_fact([(ref, "날짜 없는 본문")])[1]  # 하드코딩 안 함
+    assert cs.dinner_log_fact([("guide:05-식사#§3", "2026-09-29")]) is None
+    assert cs.dinner_log_fact([("guide:04-x#§3-1", "2026-09-29")]) is None

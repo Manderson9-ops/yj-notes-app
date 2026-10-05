@@ -18,7 +18,7 @@ import { goodAnswer, PACK, review } from "./fixtures.ts";
 import { answerQuestion, type PipelineDeps } from "./pipeline.ts";
 import { ClaudeError } from "./claude.ts";
 
-const q = { body: "테스트아이가 밥을 안 먹어요", askedBy: "엄마", redFlag: false };
+const q = { body: "테스트아이가 친구를 때려요 밥도 안 먹어요", askedBy: "엄마", redFlag: false };
 const GOOD: Expansion = {
   keywords: ["밥", "안 먹"],
   synonyms: ["식사", "점심"],

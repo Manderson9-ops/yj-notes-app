@@ -58,6 +58,7 @@ export function makePipelineDeps(
         signal,
       ),
     emergencyMd: loadEmergencyMd(),
+    today: () => process.env.YJ_TODAY ?? new Date().toISOString().slice(0, 10),
     buildPack: (question, signal, expansion) =>
       buildPack(
         {

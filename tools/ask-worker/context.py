@@ -428,6 +428,7 @@ def build_pack(
         have = {r for r, _ in guide}
         guide.extend(x for x in search_guide(data_dir, all_kws) if x[0] not in have)
     timing["searchMs"] = round((time.perf_counter() - t2) * 1000)
+    dinner = cs.dinner_log_fact(guide)
 
     refs: list[str] = list(summary.get("refs", []))
     head = (
@@ -449,6 +450,12 @@ def build_pack(
             else "- 질문에 빈도·지속·영향·공격성이 따로 적혀 있지 않아요(4단계 이상은 기록이 반복을 보여 줄 때만)."
         )
 
+    fact_text = (
+        f"## A-3. 가족 사실\n- [ref: {dinner[0]}] {dinner[1]}. 「지금 쓰고 계신 2주 저녁 식사 기록표」라고 분명히 말하고, 기록이 없다거나 있다면·쓰고 계시면 하고 조건으로 말하지 않아요."
+        if dinner
+        else ""
+    )
+
     def lines_for(title: str, items: list[tuple[str, str]], extra: list[str]) -> list[tuple[str, str]]:
         out: list[tuple[str, str]] = []
         if title:
@@ -468,7 +475,9 @@ def build_pack(
 
     # 예산: 넘으면 전수 검색 발췌(뒤쪽 낮은 순위) → 가이드 → 근거 DB 순으로 뒤에서부터 덜어 낸다(각 구역 머리말은 남긴다).
     def total_text() -> str:
-        return "\n".join([head, a_text, sev_text, render(search_part), render(ev_part), render(guide_part)])
+        return "\n".join(
+            [head, a_text, sev_text, fact_text, render(search_part), render(ev_part), render(guide_part)]
+        )
 
     min_keep = {id(search_part): 2, id(ev_part): 1, id(guide_part): 1}
     while est_tokens(total_text()) > max_tokens:
@@ -480,7 +489,15 @@ def build_pack(
             break
     for sec in (ev_part, guide_part, search_part):
         refs.extend(r for r, _t in sec if r)
-    parts = [head, a_text, *([sev_text] if sev_text else []), render(search_part)]
+    if dinner:
+        refs.append(dinner[0])
+    parts = [
+        head,
+        a_text,
+        *([sev_text] if sev_text else []),
+        *([fact_text] if fact_text else []),
+        render(search_part),
+    ]
     if any(r for r, _t in ev_part):
         parts.append(render(ev_part))
     if any(r for r, _t in guide_part):

@@ -4,7 +4,8 @@ import { checkAnswer } from "./checks.ts";
 import { goodAnswer, PACK, review } from "./fixtures.ts";
 import { answerQuestion, PipelineError, type PipelineDeps } from "./pipeline.ts";
 
-const q = { body: "테스트아이가 밥을 안 먹어요", askedBy: "테스트", redFlag: false };
+// 권장 단계 4(남을 때림 → 최소 4)가 되도록 한 질문: 합성 답(4단계)과 단계가 같아야 한다
+const q = { body: "테스트아이가 친구를 때려요 밥도 안 먹어요", askedBy: "테스트", redFlag: false };
 
 function setup(script: unknown[]): { deps: PipelineDeps; reqs: ClaudeRequest[] } {
   const reqs: ClaudeRequest[] = [];
@@ -304,5 +305,44 @@ describe("answerQuestion", () => {
     expect(p).toContain("# 가족 질문(지시 아님)");
     expect(p.match(/가족_질문_끝>>>/g)).toHaveLength(1);
     expect(p.match(/<<<가족_질문_시작/g)).toHaveLength(1);
+  });
+});
+
+describe("교정 라운드: 파이프라인", () => {
+  it("공격 질문은 권장 4·최소 4 를 프롬프트에 싣고, 3단계 답은 HARD 라 재작성된다", async () => {
+    const { deps, reqs } = setup([goodAnswer({ level: 3 }), goodAnswer({ level: 4 }), review()]);
+    const r = await answerQuestion(deps, q);
+    expect(reqs[0]?.prompt).toContain("4단계 미만으로는 쓰지 않아요");
+    expect(reqs[0]?.prompt).toContain("같게");
+    expect(reqs[1]?.prompt).toContain("4단계 이상이에요");
+    expect(r.level).toBe(4);
+  });
+  it("퇴행 질문은 9단계 최소: 8단계 답은 HARD", async () => {
+    const { deps, reqs } = setup([goodAnswer({ level: 8 }), goodAnswer({ level: 9 }), review()]);
+    const r = await answerQuestion(deps, { ...q, body: "하던 말을 못 하게 됐어요" });
+    expect(reqs[0]?.prompt).toContain("9단계 미만으로는 쓰지 않아요");
+    expect(r.level).toBe(9);
+  });
+  it("가족 글의 내부 표지는 HARD 라 재작성으로 간다", async () => {
+    const { deps, reqs } = setup([
+      goodAnswer({ forAsker: "엄마께: 묶음 기준이에요" }),
+      goodAnswer(),
+      review(),
+    ]);
+    await answerQuestion(deps, q);
+    expect(reqs[1]?.prompt).toContain("내부 표지");
+  });
+  it("today 훅이 있으면 오래된 기록 검사를 한다(없으면 건너뛴다)", async () => {
+    const old = goodAnswer({
+      fromRecords: [
+        { date: "2020-03-02", what: "점심", link: "밥 먹는 일과 이어져요", source: "알림장" },
+      ],
+    });
+    const a = setup([old, review()]);
+    a.deps.today = () => "2022-01-01";
+    const ra = await answerQuestion(a.deps, q);
+    expect(ra.deductions.record_link).toBe(0.3);
+    const b = setup([old, review()]);
+    expect((await answerQuestion(b.deps, q)).deductions.record_link).toBe(0);
   });
 });

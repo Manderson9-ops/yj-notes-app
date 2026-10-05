@@ -32,6 +32,8 @@ export class PipelineError extends Error {
 
 export interface PipelineDeps {
   runClaude: ClaudeRunner;
+  /** 오늘 날짜 YYYY-MM-DD(없으면 오래된 기록 검사를 건너뛴다). */
+  today?: () => string;
   buildPack: (
     question: string,
     signal?: AbortSignal,
@@ -158,7 +160,9 @@ export async function answerQuestion(
     : undefined;
   const pq: PromptQuestion = {
     ...q,
-    suggested: q.redFlag ? undefined : suggestLevel(q.body, sevOf),
+    suggested: q.redFlag
+      ? undefined
+      : suggestLevel(q.body, sevOf, exp?.ok ? exp.expansion.domains : []),
     isBehavior: exp?.ok ? exp.expansion.isBehaviorQuestion : undefined,
     topic: exp?.ok ? exp.expansion.topic : undefined,
   };
@@ -175,6 +179,7 @@ export async function answerQuestion(
       : undefined,
     askedBy: q.askedBy,
     suggested: pq.suggested,
+    today: deps.today?.(),
   };
   if (q.redFlag && deps.emergencyMd) {
     const em = buildEmergencySection(deps.emergencyMd, detectRedFlag(q.body).rules);
