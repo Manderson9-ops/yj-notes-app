@@ -12,7 +12,7 @@ import { buildDigest, DIGEST_FILE, writeDigest } from "./digest.ts";
 import { createHistoryCache } from "./family.ts";
 import { parseHistory, parseReask } from "./inject.ts";
 import type { HistoryItem } from "../../shared/ask-schema.ts";
-import { createClaudeRunner } from "./claude.ts";
+import { createClaudeRunner, withExitRetry } from "./claude.ts";
 import { askHome, loadConfig, type WorkerConfig } from "./config.ts";
 import { abortableSleep, handleOne, runLoop, type LoopDeps } from "./loop.ts";
 import { createLogger, pruneLogs } from "./logger.ts";
@@ -40,11 +40,13 @@ export function makePipelineDeps(
   /** 가족 의견 가져오기(없으면 가족 결과 없이 답한다). */
   getHistory?: () => Promise<HistoryItem[]>,
 ): PipelineDeps {
-  const runClaude = createClaudeRunner({
-    bin: cfg.claudeBin,
-    home: cfg.home,
-    timeoutMs: cfg.claudeTimeoutMs,
-  });
+  const runClaude = withExitRetry(
+    createClaudeRunner({
+      bin: cfg.claudeBin,
+      home: cfg.home,
+      timeoutMs: cfg.claudeTimeoutMs,
+    }),
+  );
   // 질문 확장은 짧은 제한 시간의 빠른 모델 호출(실패해도 확장 없이 계속한다)
   const runExpand = createClaudeRunner({
     bin: cfg.claudeBin,
