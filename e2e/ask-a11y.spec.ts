@@ -111,7 +111,7 @@ test("보내기 → 접수 → 작성 중 → 검토 중 → 답변, 의견 남�
   await up.click();
   await expect(up).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("ask-vote-live")).toContainText("반영했어요");
-  await page.getByLabel("해 봤어요 메모").fill("안아 주니 그쳤어요");
+  await page.getByRole("textbox", { name: "해 봤어요 메모" }).fill("안아 주니 그쳤어요");
   await page.getByRole("button", { name: "메모 남기기" }).click();
   await expect(page.getByText("안아 주니 그쳤어요")).toBeVisible();
 });
