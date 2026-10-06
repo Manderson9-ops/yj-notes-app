@@ -123,14 +123,85 @@ export const AskCreateSchema = z.strictObject({
   askedBy: AskerSchema,
 });
 
-export const AskFeedbackSchema = z
+/** 해 봤어요 메모만(도움 여부는 PUT /api/ask/:id/vote). helpful 은 받지 않는다(strict). */
+export const AskFeedbackSchema = z.strictObject({
+  by: AskerSchema,
+  note: z.string().trim().min(1).max(ASK_NOTE_MAX),
+});
+
+export const ASK_VOTE_REASON_MAX = 200;
+export const ASK_REASK_MAX = 3;
+export const ASK_REASK_TEXT_MAX = 280;
+export const ASK_REASK_REASON_MAX = 300;
+/** 한 질문에 표를 남길 수 있는 서로 다른 사람 수 상한(가족 규모 기준 남용 방지). */
+export const ASK_VOTERS_MAX = 12;
+
+/** 표: helpful true/false, null 이면 취소(삭제). 이유는 👎 때만. */
+export const AskVoteSchema = z
   .strictObject({
     by: AskerSchema,
-    helpful: z.boolean().nullable().optional(),
-    note: z.string().trim().min(1).max(ASK_NOTE_MAX).optional(),
+    helpful: z.boolean().nullable(),
+    reason: z.string().trim().min(1).max(ASK_VOTE_REASON_MAX).optional(),
   })
-  .refine((v) => (v.helpful !== undefined && v.helpful !== null) || v.note !== undefined);
+  .refine((v) => v.reason === undefined || v.helpful === false);
 
+/** 다시 답변 이유 선택지. */
+export const REASK_CHOICES = [
+  "너무 일반적이에요",
+  "이미 해 봤어요",
+  "우리 상황과 달라요",
+  "더 자세히 알고 싶어요",
+] as const;
+export type ReaskChoice = (typeof REASK_CHOICES)[number];
+
+export const AskReaskSchema = z.strictObject({
+  by: AskerSchema,
+  choice: z.enum(REASK_CHOICES),
+  text: z.string().trim().min(1).max(ASK_REASK_TEXT_MAX).optional(),
+});
+
+/** 저장·전달용 이유 한 줄: 「선택지」 또는 「선택지 · 자유 글」(≤300자). */
+export function joinReaskReason(choice: ReaskChoice, text?: string): string {
+  return text === undefined ? choice : `${choice} · ${text}`;
+}
+
+/** 이유 한 줄에서 선택지와 자유 글을 나눈다(선택지가 아니면 choice null). */
+export function splitReaskReason(reason: string): { choice: ReaskChoice | null; text: string } {
+  for (const c of REASK_CHOICES) {
+    if (reason === c) return { choice: c, text: "" };
+    if (reason.startsWith(`${c} · `)) return { choice: c, text: reason.slice(c.length + 3) };
+  }
+  return { choice: null, text: reason };
+}
+
+/** 워커 history 응답 크기 상한(바이트). */
+export const ASK_HISTORY_MAX_BYTES = 200 * 1024;
+export const ASK_HISTORY_DEFAULT_LIMIT = 60;
+export const ASK_HISTORY_MAX_LIMIT = 100;
+
+export const HistoryItemSchema = z.object({
+  id: z.number().int(),
+  body: z.string(),
+  askedBy: z.string(),
+  createdAt: z.string(),
+  level: z.number().int().min(1).max(10),
+  tryNowActions: z.array(z.string()),
+  votes: z.array(
+    z.object({ by: z.string(), helpful: z.boolean(), reason: z.string().nullable() }),
+  ),
+  notes: z.array(z.object({ by: z.string(), note: z.string(), createdAt: z.string() })),
+});
+export type HistoryItem = z.infer<typeof HistoryItemSchema>;
+export const HistoryResponseSchema = z.object({ items: z.array(HistoryItemSchema) });
+
+/** claim 응답의 reask 덩어리. */
+export const ClaimReaskSchema = z.object({
+  count: z.number().int().min(1),
+  reason: z.string(),
+  by: z.string(),
+  previousAnswer: AnswerSchema.nullable(),
+});
+export type ClaimReask = z.infer<typeof ClaimReaskSchema>;
 export const WorkerAnswerSchema = z.strictObject({
   level: z.number().int().min(1).max(10),
   answer: AnswerSchema,

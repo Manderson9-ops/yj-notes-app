@@ -99,6 +99,20 @@ overviewRoutes.get("/api/overview", async (c) => {
         ? (times[mid] ?? null)
         : Math.round(((times[mid - 1] ?? 0) + (times[mid] ?? 0)) / 2);
 
+  // 최근 7일 가족 의견 수(숫자만, 본문 없음).
+  const since7 = new Date(nowMs - 7 * 24 * 60 * 60_000).toISOString();
+  const fbVotes = await db
+    .prepare(
+      `SELECT COALESCE(SUM(helpful), 0) AS up, COALESCE(SUM(1 - helpful), 0) AS down
+       FROM ask_vote WHERE updated_at > ?1`,
+    )
+    .bind(since7)
+    .first<{ up: number; down: number }>();
+  const fbNotes = await db
+    .prepare("SELECT COUNT(*) AS n FROM ask_feedback WHERE note IS NOT NULL AND created_at > ?1")
+    .bind(since7)
+    .first<{ n: number }>();
+
   const observedN = observed?.n ?? 0;
   const body: Overview = {
     noteDays: days?.n ?? 0,
@@ -110,7 +124,12 @@ overviewRoutes.get("/api/overview", async (c) => {
     lastIngest: ingest
       ? { at: ingest.at, status: ingest.status, commit: ingest.source_commit }
       : null,
-    ask: { pending: askPending?.n ?? 0, worker: await readWorkerSeen(db, nowMs), medianTotalMs7d },
+    ask: {
+      pending: askPending?.n ?? 0,
+      worker: await readWorkerSeen(db, nowMs),
+      medianTotalMs7d,
+      feedback7d: { up: fbVotes?.up ?? 0, down: fbVotes?.down ?? 0, notes: fbNotes?.n ?? 0 },
+    },
     milestones: { observed: observedN, unobserved: Math.max(0, (total?.n ?? 0) - observedN) },
     recentNotes: recentNotes.results.map((r) => ({
       date: r.date,
