@@ -186,6 +186,7 @@ describe("empty database", () => {
     expect(res.status).toBe(200);
     const o = overviewSchema.parse(await res.json());
     expect(o).toEqual({
+      ask: { pending: 0, worker: { online: false, seenAt: null }, medianTotalMs7d: null },
       noteDays: 0,
       reports: 0,
       comments: 0,

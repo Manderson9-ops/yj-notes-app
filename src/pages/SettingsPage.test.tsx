@@ -127,6 +127,7 @@ describe("R1-3: global lock notice", () => {
     ingestState: "idle",
     security: { lastGlobalLockAt, failures7d },
     lastIngest: null,
+    ask: { pending: 0, worker: { online: true, seenAt: null }, medianTotalMs7d: null },
     milestones: { observed: 0, unobserved: 0 },
     recentNotes: [],
     recentLogs: [],

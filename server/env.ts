@@ -16,4 +16,6 @@ export interface Env {
   IP_HASH_SALT: string;
   /** Optional build/version label shown by /api/health. */
   APP_VERSION?: string;
+  /** 선택(집 PC 워커 연결 시 필수). 워커 Bearer 토큰의 SHA-256 hex(64자). 없거나 형식이 틀리면 /api/worker/* 는 503 (fail closed). 비밀값. */
+  ASK_WORKER_TOKEN_HASH?: string;
 }

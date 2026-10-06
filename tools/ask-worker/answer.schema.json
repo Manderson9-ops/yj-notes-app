@@ -1,0 +1,207 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "behavior",
+        "not_behavior"
+      ]
+    },
+    "level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "levelTitle": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "levelReason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 220
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "fromRecords": {
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "what": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140
+          },
+          "link": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "알림장",
+              "관찰",
+              "검진",
+              "가족기록"
+            ]
+          }
+        },
+        "required": [
+          "date",
+          "what",
+          "link",
+          "source"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "evidence": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "point": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "grade": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "ref",
+          "point"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tryNow": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "say": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "basis": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "action",
+          "basis"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "avoid": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      }
+    },
+    "observe": {
+      "type": "object",
+      "properties": {
+        "what": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "howLong": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "how": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "what",
+        "howLong",
+        "how"
+      ],
+      "additionalProperties": false
+    },
+    "upIf": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      }
+    },
+    "downIf": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      }
+    },
+    "forAsker": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "limits": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    }
+  },
+  "required": [
+    "kind",
+    "level",
+    "levelTitle",
+    "levelReason",
+    "summary",
+    "fromRecords",
+    "evidence",
+    "tryNow",
+    "avoid",
+    "upIf",
+    "downIf",
+    "forAsker"
+  ],
+  "additionalProperties": false
+}

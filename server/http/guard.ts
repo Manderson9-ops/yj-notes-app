@@ -1,6 +1,9 @@
 // functions/_middleware.ts 의 실제 로직 (docs/04 §4, docs/05).
 // 순서: 경로 정규화 -> (API) Origin 확인 403 -> 세션 확인 401 -> JSON content-type 415 -> next().
+// /api/worker/* (집 PC 워커) 는 별도 영역: 세션이 아니라 Bearer 토큰만 인증한다(evaluateWorker). 영역 판정은 정규화 경로(대소문자 무시),
+// 통과는 원본 경로가 정식 소문자 형태일 때만 — 라우터가 다르게 해석할 여지를 없앤다.
 // 어떤 경우에도 마지막에 보안 헤더를 덮어쓴다. 인증 검사 중 예외가 나면 fail closed(500/503).
+import { authenticateWorker, isCanonicalWorkerPath, isWorkerRealm } from "../auth/worker";
 import type { Deps } from "../deps";
 import type { Env } from "../env";
 import { authRequired, errorResponse, toErrorResponse } from "./errors";
@@ -22,8 +25,12 @@ const API_PATH = /^\/api(\/|$)/i;
 
 export type Authenticate = (request: Request, env: Env, nowMs: number) => Promise<boolean>;
 
+export type AuthenticateWorker = typeof authenticateWorker;
+
 export interface GuardOptions {
   authenticate: Authenticate;
+  /** 시험용 대체. 기본은 server/auth/worker.ts. */
+  authenticateWorker?: AuthenticateWorker;
   deps: Pick<Deps, "now">;
 }
 
@@ -75,13 +82,57 @@ async function hasBody(request: Request): Promise<boolean> {
   }
 }
 
+/** 워커 영역: Origin(있으면 자기 origin) -> Bearer 토큰(+실패 제한) -> JSON content-type. 세션 쿠키는 보지 않는다. */
+async function evaluateWorker(
+  request: Request,
+  env: Env,
+  next: () => Promise<Response>,
+  rawPath: string,
+  options: GuardOptions,
+): Promise<Response> {
+  if (!isCanonicalWorkerPath(rawPath)) return errorResponse(404, "not_found", "찾을 수 없어요.");
+  // 브라우저는 Bearer 를 자동으로 붙이지 않아 CSRF 대상이 아니다. 대신 브라우저가 보낸 다른 origin 요청은 거절한다.
+  const origin = request.headers.get("Origin");
+  if (origin !== null && origin !== new URL(request.url).origin) {
+    return errorResponse(403, "bad_origin", "허용되지 않은 요청이에요.");
+  }
+  const auth = await (options.authenticateWorker ?? authenticateWorker)(
+    request,
+    env,
+    options.deps.now(),
+  );
+  if (!auth.ok) {
+    if (auth.status === 503)
+      return errorResponse(503, "worker_disabled", "워커 연결이 설정되지 않았어요.");
+    if (auth.status === 429) {
+      const retry = String(auth.retryAfterSec ?? 900);
+      return errorResponse(
+        429,
+        "locked",
+        "시도 횟수가 너무 많아요. 잠시 후 다시 시도해 주세요.",
+        { retryAfterSec: Number(retry) },
+        { "Retry-After": retry },
+      );
+    }
+    return authRequired();
+  }
+  if (!SAFE_METHODS.has(request.method.toUpperCase()) && (await hasBody(request))) {
+    if (!JSON_CONTENT_TYPE.test(request.headers.get("Content-Type") ?? "")) {
+      return errorResponse(415, "unsupported_media_type", "JSON 형식으로 보내 주세요.");
+    }
+  }
+  return next();
+}
+
 async function evaluate(
   request: Request,
   env: Env,
   next: () => Promise<Response>,
   path: string,
+  rawPath: string,
   options: GuardOptions,
 ): Promise<Response> {
+  if (isWorkerRealm(path)) return evaluateWorker(request, env, next, rawPath, options);
   const method = request.method.toUpperCase();
 
   // 1) CSRF: 변경 요청은 Origin 이 자기 origin 과 정확히 같아야 한다 (없거나 "null" 이면 거부).
@@ -128,7 +179,7 @@ export async function guardMiddleware(
   const isApi = isApiPath(path);
   let res: Response;
   try {
-    res = isApi ? await evaluate(request, env, next, path, options) : await next();
+    res = isApi ? await evaluate(request, env, next, path, rawPath, options) : await next();
   } catch (e) {
     res = toErrorResponse(e, request.method, rawPath);
   }

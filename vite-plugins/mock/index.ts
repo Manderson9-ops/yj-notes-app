@@ -4,6 +4,7 @@ import { overviewMock } from "./overview.ts";
 import { checkupsMock, growthMock } from "./health.ts";
 import { libraryMock } from "./library.ts";
 import { logsModule, logTypesModule } from "./logs.ts";
+import { askModule } from "./ask.ts";
 
 /**
  * FAKE API modules for `npm run dev:mock` (local UI work and e2e only, never in a build).
@@ -33,4 +34,5 @@ export const MOCK_MODULES: MockModule[] = [
   growthMock,
   logsModule,
   logTypesModule,
+  askModule,
 ];

@@ -17,10 +17,12 @@
 | `PIN_HASH`, `PIN_SALT` | Cloudflare Pages secret | PIN 변경 시 |
 | `SESSION_SECRET` | Cloudflare Pages secret | 6개월 또는 사고 시 |
 | `IP_HASH_SALT` | Cloudflare Pages secret | 1년 |
+| `ASK_WORKER_TOKEN_HASH` (선택, 물어보기 워커용) | Cloudflare Pages secret | 1년 또는 집 PC 침해 시 |
 | `CLOUDFLARE_API_TOKEN` (배포용, Pages 편집만) | GitHub Actions secret | 1년 |
 | `CLOUDFLARE_API_TOKEN` (적재용, D1·R2 편집) | 관리자 PC 환경변수만 | 1년 |
 
 - `PIN_LENGTH`(선택, 4~12): 로그인 화면이 이 자릿수에서 자동 전송한다. 비밀은 아니지만 운영 값은 Pages secret 으로 둔다(저장소·`wrangler.toml` 에 쓰지 않음). 그 밖의 값·미설정이면 4~12자리 + '확인' 방식.
+- `ASK_WORKER_TOKEN_HASH`(선택, T-Q): 집 PC 워커 Bearer 토큰의 **SHA-256 hex**(64자). 토큰 원본은 서버에 두지 않는다. 생성: 관리자 PC 에서 32바이트 이상 무작위 토큰을 만들고(예: `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`) 같은 값을 워커 `worker.env` 의 `ASK_WORKER_TOKEN` 에 넣은 뒤, 그 SHA-256 hex 를 `npx wrangler pages secret put ASK_WORKER_TOKEN_HASH --project-name yj-notes-app` 로 등록하고 **재배포**한다. 값이 없거나 형식이 틀리면 `/api/worker/*` 는 전부 503(워커 연결 꺼짐, 앱의 다른 기능은 영향 없음). 교체·폐기: 새 해시 등록 후 재배포(이전 토큰 즉시 무효). 자세한 위협 모델은 `04` §3-2.
 - 배포 토큰과 적재 토큰을 **분리**한다. GitHub 에는 D1·R2 권한이 없는 토큰만 둔다.
 - **PIN 자릿수 설정(관리자)**: PIN 을 바꾸거나 처음 정할 때 자릿수도 맞춘다. `npx wrangler pages secret put PIN_LENGTH --project-name yj-notes-app` (예: 6 입력) 후 **재배포**해야 반영된다. 자릿수와 실제 PIN 길이가 다르면 로그인할 수 없으니 `PIN_HASH`·`PIN_SALT` 와 같은 순서로 함께 바꾼다.
 - **PIN 규칙(R1-1)**: PIN 은 **무작위 6자리 이상**(6~12)이어야 하고 생일·전화번호는 안 된다. `pin:hash` 는 6자리 미만을 거부한다.
@@ -114,7 +116,7 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 ### 5-1. 백업 복구 절차 (2026-10-05 연습으로 확정)
 `wrangler d1 export` 백업은 report_doc 본문을 한 문장으로 써서 `wrangler d1 execute --file` 로 통째로 되넣으면 `SQLITE_TOOBIG`(문장 100KB 초과)으로 실패한다. 그래서 두 갈래로 복구한다.
 1. **다시 만들 수 있는 표**(알림장·관측·근거·검진·문서): `npm run db:migrate:prod` → `npm run ingest:export` → `ingest:verify` → `ingest:upload -- --remote --yes` (DATA_DIR 가 정본).
-2. **앱에만 있는 표**(`family_log`, `family_log_history`, `app_setting`): `python tools/admin/backup-extract.py <백업.sql> <출력.sql>` → `npx wrangler d1 execute DB --remote --file <출력.sql>`. 출력 파일은 S1 이므로 저장소 밖에 두고 적용 후 지운다.
+2. **앱에만 있는 표**(`family_log`, `family_log_history`, `ask_question`, `ask_answer`, `ask_feedback`, `app_setting`): `python tools/admin/backup-extract.py <백업.sql> <출력.sql>` → `npx wrangler d1 execute DB --remote --file <출력.sql>`. 출력 파일은 S1 이므로 저장소 밖에 두고 적용 후 지운다. 일시 상태인 `worker_auth_fail` 표와 `app_setting` 의 `session_epoch`·`last_global_lock_at`·`ask_worker_seen_at`·`ask_worker_locked_until` 은 되살리지 않는다.
 3. `npm run ingest:status -- --remote --yes` 가 `matches_manifest: true` 인지, 앱에서 기록 목록이 보이는지 확인.
 - 7일 이내 사고는 D1 Time Travel(`wrangler d1 time-travel restore`)이 더 빠르다.
 

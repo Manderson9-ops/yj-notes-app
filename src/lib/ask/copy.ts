@@ -1,0 +1,27 @@
+// font-subset: skip (본문 글만: 장식 글꼴 대상이 아니다 — tools/fonts/collect.ts)
+// 물어보기 화면의 본문 안내 문구. 한 문장씩 나눠 둔다(번들 한글 장문 검사 G7).
+export const COPY = {
+  intro1: "아이 행동이 궁금하면 적어 주세요.",
+  intro2: "집 PC가 기록을 보고 답해요.",
+  off1: "집 PC가 꺼져 있어요.",
+  off2: "켜지면 답변해요.",
+  bodyLabel: "궁금한 것",
+  bodyHint: "예: 밥 먹을 때 자꾸 숟가락을 던져요",
+  many1: "질문을 너무 많이 보냈어요.",
+  many2: "잠시 뒤에 다시 해 주세요.",
+  sendFail: "보내지 못했어요. 다시 해 주세요.",
+  pickWho: "질문하는 사람을 골라 주세요.",
+  none: "아직 질문이 없어요.",
+  redBadge: "위급 신호",
+  noteLabel: "해 봤어요 메모",
+  noteHint: "예: 안아 주니 금방 그쳤어요",
+  noteFail: "남기지 못했어요. 다시 해 주세요.",
+  noInstant: "비슷한 알림장이나 자료를 찾지 못했어요.",
+  offWait: "집 PC가 켜지면 답변해요.",
+  fail1: "답을 만들지 못했어요.",
+  fail2: "다시 질문해 주세요.",
+  noAnswer: "답변을 불러오지 못했어요.",
+  notFound: "찾는 질문이 없어요.",
+  delNote: "지우면 목록에서 사라져요.",
+  delFail: "지우지 못했어요. 다시 해 주세요.",
+} as const;

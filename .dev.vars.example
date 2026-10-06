@@ -8,3 +8,5 @@ PIN_LENGTH=4
 SESSION_SECRET=FAKE_PLACEHOLDER_session_secret_change_me
 # IP_HASH_SALT: auth_attempt 에 저장하는 IP 해시용 솔트. 무작위 값, SESSION_SECRET 과 다르게.
 IP_HASH_SALT=FAKE_PLACEHOLDER_ip_hash_salt
+# ASK_WORKER_TOKEN_HASH (선택, 물어보기 집 PC 워커용): 워커 Bearer 토큰의 SHA-256 hex(64자). 토큰 원본은 서버에 두지 않는다(docs/09 §2, docs/04 §3-2). 없거나 64자 hex 가 아니면(아래 자리표시자 포함) /api/worker/* 는 503.
+ASK_WORKER_TOKEN_HASH=FAKE_PLACEHOLDER_ask_worker_token_hash

@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { jsonResponse } from "../http/errors";
+import { readWorkerSeen } from "../ask/seen";
 import { readIngestState } from "../lib/ingest-state";
 import { previewOfDay } from "../../src/lib/notePreview";
 import type { Overview } from "../../src/lib/notesSchemas";
@@ -77,6 +78,27 @@ overviewRoutes.get("/api/overview", async (c) => {
 
   const ingestState = await readIngestState(db, c.get("deps").now());
 
+  const nowMs = c.get("deps").now();
+  const askPending = await db
+    .prepare(
+      "SELECT COUNT(*) AS n FROM ask_question WHERE deleted_at IS NULL AND status IN ('pending','claimed','answering','reviewing')",
+    )
+    .first<{ n: number }>();
+  const askTimes = await db
+    .prepare(
+      "SELECT total_ms FROM ask_answer WHERE total_ms IS NOT NULL AND created_at > ?1 ORDER BY total_ms LIMIT 1000",
+    )
+    .bind(new Date(nowMs - 7 * 24 * 60 * 60_000).toISOString())
+    .all<{ total_ms: number }>();
+  const times = askTimes.results.map((r) => r.total_ms);
+  const mid = Math.floor(times.length / 2);
+  const medianTotalMs7d =
+    times.length === 0
+      ? null
+      : times.length % 2 === 1
+        ? (times[mid] ?? null)
+        : Math.round(((times[mid - 1] ?? 0) + (times[mid] ?? 0)) / 2);
+
   const observedN = observed?.n ?? 0;
   const body: Overview = {
     noteDays: days?.n ?? 0,
@@ -88,6 +110,7 @@ overviewRoutes.get("/api/overview", async (c) => {
     lastIngest: ingest
       ? { at: ingest.at, status: ingest.status, commit: ingest.source_commit }
       : null,
+    ask: { pending: askPending?.n ?? 0, worker: await readWorkerSeen(db, nowMs), medianTotalMs7d },
     milestones: { observed: observedN, unobserved: Math.max(0, (total?.n ?? 0) - observedN) },
     recentNotes: recentNotes.results.map((r) => ({
       date: r.date,

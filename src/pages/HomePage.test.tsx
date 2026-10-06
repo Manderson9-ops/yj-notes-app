@@ -14,6 +14,7 @@ const overview = (ingestState: "idle" | "running" | "failed") => ({
   ingestState,
   security: { lastGlobalLockAt: null, failures7d: 0 },
   lastIngest: null,
+  ask: { pending: 0, worker: { online: true, seenAt: null }, medianTotalMs7d: null },
   milestones: { observed: 0, unobserved: 0 },
   recentNotes: [],
   recentLogs: [],
@@ -56,6 +57,11 @@ describe("HomePage ingest banner (R1-6)", () => {
     renderHome("failed");
     expect(await screen.findByText("마지막 갱신이 실패했어요.")).toBeInTheDocument();
     expect(screen.getByText("관리자에게 알려 주세요.")).toBeInTheDocument();
+  });
+  it("상단에 물어보기 큰 버튼이 있다", async () => {
+    renderHome("idle");
+    const link = await screen.findByRole("link", { name: "물어보기" });
+    expect(link).toHaveAttribute("href", "/ask");
   });
   it("idle: no banner", async () => {
     renderHome("idle");

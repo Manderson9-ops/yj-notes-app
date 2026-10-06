@@ -19,5 +19,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["functions", "server", "tests"]
+  "include": ["functions", "server", "shared", "tests"]
 }

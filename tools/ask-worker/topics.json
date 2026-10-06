@@ -1,0 +1,83 @@
+{
+  "feeding": {
+    "label": "식사",
+    "words": ["밥", "식사", "먹", "편식", "반찬", "간식", "급식", "우유", "숟가락", "뱉"],
+    "int": ["INT-FEED", "INT-MEAL"],
+    "norm": ["NORM-FEED", "NORM-MEAL"],
+    "guide": [["05", ["3", "3-1"]]],
+    "note": "가족 저녁 식사 기록은 앱의 가족 기록(records/식사기록)에 있을 수 있어요. 이 묶음에는 없으니 있다고 단정하지 않고, 가이드의 기존 가족 계획을 먼저 보세요."
+  },
+  "sleep": {
+    "label": "수면",
+    "words": ["잠", "수면", "낮잠", "밤잠", "깨", "재우", "새벽"],
+    "int": ["INT-SLEEP"],
+    "norm": ["NORM-SLEEP"],
+    "guide": [],
+    "note": ""
+  },
+  "tantrum": {
+    "label": "떼쓰기",
+    "words": ["떼", "울화", "고집", "짜증", "드러눕", "소리"],
+    "int": ["INT-TANTRUM"],
+    "norm": ["NORM-TANTRUM"],
+    "guide": [],
+    "note": ""
+  },
+  "fear": {
+    "label": "무서움·불안",
+    "words": ["무서", "겁", "불안", "낯가", "울음", "놀라"],
+    "int": ["INT-FEAR"],
+    "norm": ["NORM-FEAR"],
+    "guide": [],
+    "note": ""
+  },
+  "fluency": {
+    "label": "말 더듬",
+    "words": ["더듬", "말막", "말이막", "버벅", "반복해서말"],
+    "int": ["INT-FLUENCY"],
+    "norm": ["NORM-FLUENCY"],
+    "guide": [],
+    "note": "말 더듬은 근거 DB 의 금기·한계에 적힌 전문가(언어재활사)를 upIf 에 이름으로 적어요."
+  },
+  "media": {
+    "label": "영상·화면",
+    "words": ["영상", "폰", "스마트폰", "유튜브", "tv", "태블릿", "화면"],
+    "int": ["INT-MEDIA"],
+    "norm": ["NORM-MEDIA"],
+    "guide": [],
+    "note": ""
+  },
+  "skill_loss": {
+    "label": "하던 것을 못 함(퇴행)",
+    "words": ["퇴행", "못하게", "못 하게", "잃", "예전엔", "하던", "안 하게"],
+    "int": [],
+    "norm": [],
+    "guide": [["04", null]],
+    "dbwords": ["lost skills", "퇴행", "잃", "기술을 잃"],
+    "note": "하던 말·행동을 잃는 것은 CDC 「lost skills」 규칙과 가이드 04 로 다뤄요. 「일반 권고」가 아니라 이 묶음의 ref 를 basis 로 써요."
+  },
+  "aggression": {
+    "label": "공격 행동",
+    "words": ["때리", "물기", "던지", "깨물", "밀"],
+    "int": ["INT-AGGR"],
+    "norm": [],
+    "guide": [],
+    "note": ""
+  },
+  "toileting": {
+    "label": "배변",
+    "words": ["배변", "기저귀", "변기", "오줌", "응가"],
+    "int": ["INT-TOILET"],
+    "norm": [],
+    "guide": [],
+    "note": ""
+  },
+  "separation": {
+    "label": "헤어짐·분리",
+    "words": ["분리", "등원", "헤어", "어린이집가기싫"],
+    "int": ["INT-SEPAR"],
+    "norm": [],
+    "guide": [],
+    "note": ""
+  }
+}

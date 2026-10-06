@@ -27,6 +27,7 @@
   lastIngest: {at, status:'ok', commit} | null,  // 마지막 성공 적재(finished_at, 없으면 started_at)
   ingestState: 'idle'|'running'|'failed',        // R1-6: 가장 최근 ingest_run 상태(running 6시간 초과는 failed 로 본다)
   security: {lastGlobalLockAt: string | null},   // R1-3: 마지막 전체 잠금(ISO UTC)
+  ask: {pending, worker:{online, seenAt}, medianTotalMs7d},   // T-Q1: 답 기다리는 질문 수·워커 상태·7일 답 시간 중앙값(ms, 없으면 null)
   milestones: {observed, unobserved},            // observation 에 나온 이정표 수 / 나머지
   recentNotes: [{date, ageMonths, firstLine, nComments}] ×3,   // 홈 카드용(문서 초안에 없던 필드)
   recentLogs: [{id, type, typeLabel, occurredOn, recorder, note}] ×5  // family_log, 삭제 제외
@@ -89,6 +90,37 @@
 - 경고: 정의의 규칙에 걸린 (기록, 규칙) 쌍의 목록(최신순)과 `alertCount`.
 - `type` 을 생략하면 주차별 `count`·경고만(종류가 섞이므로 필드 지표 없음).
 - 검증: `server/routes/logs.test.ts` 가 `fixtures/seed` 합성 기록(저녁 식사 5건)을 손으로 센 값과 대조한다.
+
+## 물어보기 (T-Q1, `11`)
+
+세션 API(가족). 정본: `server/routes/ask.ts`, 입력·답변 스키마 `shared/ask-schema.ts`, 화면용 응답 스키마 `src/lib/ask/api.ts`.
+
+| 메서드 | 경로 | 요청/응답 |
+|---|---|---|
+| POST | `/ask` | `{body(1~1000자), askedBy(1~12자)}` → `201 {id, status:"pending", redFlag, instant:{notes:[{date,snippet,id}], docs:[{slug,title}]}}`. instant = 알림장 본문·자료 제목/요약의 `LIKE` 검색(각 최대 5, AI 없음). `redFlag` 는 결정적 키워드 검사. 같은 질문자가 10분 안 10건을 넘기면 `429 too_many`. `422` 검증 오류 |
+| GET | `/ask?before=<id>` | 최신순 20개 `{items:[{id,askedBy,bodyPreview(80자),status,redFlag,level?,createdAt}], nextBefore}` |
+| GET | `/ask/:id` | `{question:{id,askedBy,body,createdAt}, status, redFlag, answer?:{level(not_behavior 답은 null), answer(AnswerSchema), createdAt, totalMs, reviewScore(0~10, 없으면 null)}, feedback:[{id,by,helpful,note,createdAt}]}` / `404`(없음·삭제됨·번호 형식 오류). 화면이 5초마다 조회(완료·실패면 멈춤) |
+| GET | `/ask/:id/instant` | `{notes, docs}` — 목록에서 연 질문의 즉시 결과 다시 보기(명세 보강: 폴링에 검색 쿼리를 싣지 않으려고 분리) |
+| POST | `/ask/:id/feedback` | `{by, helpful?: bool|null, note?(≤500)}`(둘 중 하나 이상) → `201 {id}`. 질문당 50건 한도 `429` |
+| DELETE | `/ask/:id` | 소프트 삭제 `204`(질문자 구분 없이 가족 누구나, 기록 삭제 정책과 같다) / `404` |
+
+`/overview` 에 `ask: {pending, worker:{online, seenAt}, medianTotalMs7d}` 가 더해진다(`pending` = 답 기다리는 질문 수, `online` = 2분 안 워커 신호, 중앙값은 최근 7일 `total_ms`).
+
+### 워커 API (집 PC 전용, 세션 아님)
+
+경로 접두사 `/api/worker/`. **인증은 `Authorization: Bearer <토큰>` 뿐**이다: 서버는 `ASK_WORKER_TOKEN_HASH`(토큰의 SHA-256 hex)와 상수 시간 비교한다. 세션 쿠키로는 들어올 수 없고, Bearer 로는 다른 `/api/*` 에 들어올 수 없다(`04` §3-2).
+`ASK_WORKER_TOKEN_HASH` 가 없거나 형식이 틀리면 `503 worker_disabled`(fail closed). 토큰이 없거나 틀리면 `401`, 실패 10분 20회 초과 시 15분 `429`(PIN 시도와 별도 집계). Origin 이 있으면 자기 origin 이어야 한다(`403`).
+
+| 메서드 | 경로 | 요청/응답 |
+|---|---|---|
+| POST | `/worker/ask/claim` | `200 {question:{id,body,askedBy,createdAt,redFlag}}` / `204`(없음). 한 SQL 문으로 원자적으로 집는다(`status='claimed'`, 리스 5분, `attempts+1`). 위급 우선 → 오래된 순. 리스가 끝났는데 시도 3번이면 `failed(too_many_attempts)` |
+| POST | `/worker/ask/:id/progress` | `{status:"answering"|"reviewing"}` → `204`, 리스 5분 연장 / `409`(진행 중이 아님) |
+| POST | `/worker/ask/:id/answer` | `{level, answer, reviewScore(0~10), model, workMs}` → `200 {status:"done", totalMs}`. `422`: 스키마 위반·`level` 불일치(`level_mismatch`)·60KB 초과(`too_large`)·금지어(`forbidden_word`)·위급 질문인데 10단계가 아님(`redflag_level`). `409`: 진행 중이 아님·이미 답 있음 |
+| POST | `/worker/ask/:id/fail` | `{code: [a-z0-9_]{1,40}}` → `200 {status}`: 시도가 남으면 `pending`, 아니면 `failed` |
+| GET | `/worker/ping` | `204`(생존 표시 갱신) |
+
+- 모든 호출은 `ask_worker_seen_at` 을 갱신한다(60초에 한 번만 D1 에 쓴다). 오류 응답에 질문·답 본문을 넣지 않는다.
+- 경로가 정식 형태(`/api/worker/...` 소문자, 퍼센트 인코딩·이중 슬래시·끝 슬래시 없음)가 아니면 `404`.
 
 ## 관리
 

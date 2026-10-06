@@ -18,7 +18,7 @@ function renderPreview() {
 }
 
 describe("DesignPreview", () => {
-  it("shows the theme picker and all eight sample sections", () => {
+  it("shows the theme picker and all nine sample sections", () => {
     renderPreview();
     expect(screen.getByRole("heading", { level: 1, name: "디자인 미리보기" })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "화면 테마" })).toBeInTheDocument();
@@ -30,6 +30,7 @@ describe("DesignPreview", () => {
       "기록 입력",
       "알림장 검색",
       "자료",
+      "물어보기",
       "안내 상자",
       "검진",
       "빈 상태",
@@ -39,7 +40,8 @@ describe("DesignPreview", () => {
 
   it("has four notices, a serious checkup card, and highlighted matches", () => {
     const { container } = renderPreview();
-    expect(container.querySelectorAll(".notice")).toHaveLength(4);
+    // 안내 상자 4개 + 물어보기의 위급 경고 카드 1개
+    expect(container.querySelectorAll(".notice")).toHaveLength(5);
     expect(container.querySelector('.card[data-tone="serious"]')).not.toBeNull();
     expect(container.querySelectorAll("mark").length).toBeGreaterThanOrEqual(2);
   });

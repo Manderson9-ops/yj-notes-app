@@ -3,6 +3,7 @@
 import { createApp } from "../app";
 import { hashPin } from "../auth/pin";
 import { isAuthenticated } from "../auth/session";
+import { sha256Hex } from "../auth/worker";
 import type { Deps } from "../deps";
 import type { Env } from "../env";
 import { guardMiddleware } from "../http/guard";
@@ -11,6 +12,8 @@ import { createFakeD1, type FakeD1 } from "./fake-d1";
 export const ORIGIN = "https://app.example.test";
 export const TEST_PIN = "135790";
 export const TEST_SALT_B64 = "AAECAwQFBgcICQoLDA0ODw==";
+/** 합성 워커 토큰(진짜 값 아님). 서버에는 SHA-256 hex 만 둔다. */
+export const TEST_WORKER_TOKEN = "test-worker-token-0123456789abcdef";
 export const START_MS = Date.parse("2030-01-01T00:00:00.000Z");
 
 export interface Harness {
@@ -28,14 +31,15 @@ export interface Harness {
 
 export async function createHarness(): Promise<Harness> {
   const fake = createFakeD1();
-  const env = {
+  const env: Env = {
     DB: fake.db,
     FILES: {} as R2Bucket,
     PIN_HASH: await hashPin(TEST_PIN, TEST_SALT_B64),
     PIN_SALT: TEST_SALT_B64,
     SESSION_SECRET: "test-session-secret-0123456789abcdef",
     IP_HASH_SALT: "test-ip-salt-0123456789abcdef",
-  } satisfies Env;
+    ASK_WORKER_TOKEN_HASH: await sha256Hex(TEST_WORKER_TOKEN),
+  };
   const clock = { t: START_MS };
   const sleeps: number[] = [];
   const deps: Deps = {
