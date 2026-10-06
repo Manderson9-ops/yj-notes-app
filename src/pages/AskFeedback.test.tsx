@@ -100,6 +100,12 @@ function renderAt() {
     </QueryClientProvider>,
   );
 }
+/** 목록의 n 번째 요소(없으면 시험 실패). */
+function at(list: HTMLElement[], n: number): HTMLElement {
+  const el = list[n];
+  if (!el) throw new Error(`요소 ${String(n)} 없음`);
+  return el;
+}
 const puts = () => calls.filter((c) => c.method === "PUT").map((c) => c.body);
 
 describe("표 (aria-pressed 토글)", () => {
@@ -331,7 +337,7 @@ describe("공유하기 · 복사하기", () => {
     Object.defineProperty(navigator, "share", { value: share, configurable: true });
     try {
       renderAt();
-      await userEvent.click((await screen.findAllByRole("button", { name: "공유하기" }))[0]!);
+      await userEvent.click(at(await screen.findAllByRole("button", { name: "공유하기" }), 0));
       expect(share).toHaveBeenCalledTimes(1);
       const arg = (
         share.mock.calls as unknown as [{ title: string; text: string; url: string }][]
@@ -351,13 +357,13 @@ describe("공유하기 · 복사하기", () => {
     Object.defineProperty(navigator, "share", { value: share, configurable: true });
     try {
       renderAt();
-      const full = (await screen.findAllByRole("button", { name: "전체" }))[0]!;
+      const full = at(await screen.findAllByRole("button", { name: "전체" }), 0);
       await userEvent.click(full);
       expect((await screen.findAllByRole("button", { name: "전체" }))[1]).toHaveAttribute(
         "aria-pressed",
         "true",
       );
-      await userEvent.click(screen.getAllByRole("button", { name: "공유하기" })[1]!);
+      await userEvent.click(at(screen.getAllByRole("button", { name: "공유하기" }), 1));
       const arg = (share.mock.calls as unknown as [{ text: string }][])[0]?.[0];
       expect(arg?.text).toContain("📌 상황 요약");
       expect(arg?.text).toContain("🔎 근거");
@@ -370,7 +376,7 @@ describe("공유하기 · 복사하기", () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     renderAt();
-    await userEvent.click((await screen.findAllByRole("button", { name: "공유하기" }))[0]!);
+    await userEvent.click(at(await screen.findAllByRole("button", { name: "공유하기" }), 0));
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(await screen.findByText("복사했어요.")).toBeInTheDocument();
   });
@@ -379,7 +385,7 @@ describe("공유하기 · 복사하기", () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     renderAt();
-    await userEvent.click((await screen.findAllByRole("button", { name: "복사하기" }))[1]!);
+    await userEvent.click(at(await screen.findAllByRole("button", { name: "복사하기" }), 1));
     expect(writeText).toHaveBeenCalledTimes(1);
   });
 
@@ -388,7 +394,7 @@ describe("공유하기 · 복사하기", () => {
     Object.defineProperty(navigator, "share", { value: share, configurable: true });
     try {
       renderAt();
-      await userEvent.click((await screen.findAllByRole("button", { name: "공유하기" }))[0]!);
+      await userEvent.click(at(await screen.findAllByRole("button", { name: "공유하기" }), 0));
       expect(screen.queryByRole("alert")).toBeNull();
     } finally {
       Reflect.deleteProperty(navigator, "share");
@@ -397,7 +403,7 @@ describe("공유하기 · 복사하기", () => {
       value: { writeText: () => Promise.reject(new Error("denied")) },
       configurable: true,
     });
-    await userEvent.click(screen.getAllByRole("button", { name: "복사하기" })[0]!);
+    await userEvent.click(at(screen.getAllByRole("button", { name: "복사하기" }), 0));
     expect(screen.queryByText("복사했어요.")).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
   });
