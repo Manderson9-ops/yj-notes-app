@@ -116,7 +116,7 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 ### 5-1. 백업 복구 절차 (2026-10-05 연습으로 확정)
 `wrangler d1 export` 백업은 report_doc 본문을 한 문장으로 써서 `wrangler d1 execute --file` 로 통째로 되넣으면 `SQLITE_TOOBIG`(문장 100KB 초과)으로 실패한다. 그래서 두 갈래로 복구한다.
 1. **다시 만들 수 있는 표**(알림장·관측·근거·검진·문서): `npm run db:migrate:prod` → `npm run ingest:export` → `ingest:verify` → `ingest:upload -- --remote --yes` (DATA_DIR 가 정본).
-2. **앱에만 있는 표**(`family_log`, `family_log_history`, `ask_question`, `ask_answer`, `ask_feedback`, `app_setting`): `python tools/admin/backup-extract.py <백업.sql> <출력.sql>` → `npx wrangler d1 execute DB --remote --file <출력.sql>`. 출력 파일은 S1 이므로 저장소 밖에 두고 적용 후 지운다. 일시 상태인 `worker_auth_fail` 표와 `app_setting` 의 `session_epoch`·`last_global_lock_at`·`ask_worker_seen_at`·`ask_worker_locked_until` 은 되살리지 않는다.
+2. **앱에만 있는 표**(`family_log`, `family_log_history`, `ask_question`, `ask_answer`, `ask_feedback`, `ask_vote`, `ask_answer_history`, `app_setting`): `python tools/admin/backup-extract.py <백업.sql> <출력.sql>` → `npx wrangler d1 execute DB --remote --file <출력.sql>`. 출력 파일은 S1 이므로 저장소 밖에 두고 적용 후 지운다. 일시 상태인 `worker_auth_fail` 표와 `app_setting` 의 `session_epoch`·`last_global_lock_at`·`ask_worker_seen_at`·`ask_worker_locked_until` 은 되살리지 않는다.
 3. `npm run ingest:status -- --remote --yes` 가 `matches_manifest: true` 인지, 앱에서 기록 목록이 보이는지 확인.
 - 7일 이내 사고는 D1 Time Travel(`wrangler d1 time-travel restore`)이 더 빠르다.
 

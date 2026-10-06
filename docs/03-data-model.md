@@ -163,6 +163,36 @@ CREATE TABLE ask_feedback (
 
 CREATE TABLE worker_auth_fail (at TEXT NOT NULL);                   -- 워커 토큰 실패 기록(PIN 의 auth_attempt 와 별도 집계)
 ```
+
+### 2-ask-2. 물어보기 2차 표 (마이그레이션 `0009_ask_feedback_v2.sql`, T-Q3)
+
+```sql
+CREATE TABLE ask_vote (                      -- 사람당 질문당 한 표(바꾸기 가능, 같은 표를 다시 누르면 삭제)
+  question_id INTEGER NOT NULL REFERENCES ask_question(id),
+  by TEXT NOT NULL,
+  helpful INTEGER NOT NULL CHECK (helpful IN (0, 1)),
+  reason TEXT CHECK (reason IS NULL OR (helpful = 0 AND length(reason) <= 200)),   -- 👎 때만
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (question_id, by)
+);
+CREATE TABLE ask_answer_history (            -- 다시 답변 때 이전 답을 옮긴다(버전 1부터, 최신 답은 ask_answer)
+  question_id INTEGER NOT NULL REFERENCES ask_question(id),
+  version INTEGER NOT NULL,
+  level INTEGER NOT NULL CHECK (level BETWEEN 1 AND 10),
+  answer_json TEXT NOT NULL CHECK (length(answer_json) <= 61440),
+  review_score REAL, model TEXT, total_ms INTEGER, created_at TEXT NOT NULL,
+  PRIMARY KEY (question_id, version)
+);
+ALTER TABLE ask_question ADD COLUMN reask_count INTEGER NOT NULL DEFAULT 0;      -- 질문당 최대 3
+ALTER TABLE ask_question ADD COLUMN reask_reason TEXT CHECK (reask_reason IS NULL OR length(reask_reason) <= 300);
+ALTER TABLE ask_question ADD COLUMN reask_by TEXT;
+ALTER TABLE ask_question ADD COLUMN reask_at TEXT;   -- 마지막 요청 시각(명세 보강): 대기·소요 시간을 이 시각부터 센다
+```
+- **데이터 이동**: 마이그레이션이 `ask_feedback.helpful` 이 있는 행을 `ask_vote` 로 옮긴다(같은 사람은 마지막 값). `ask_feedback` 은 **메모 전용**으로 남고 `helpful` 열은 더 쓰지 않는다(지우지 않음: 되돌릴 수 있게). 옮긴 표에는 이유가 없다.
+- `reask_reason` = 「선택지」 또는 「선택지 · 자유 글」(선택지 4종: 너무 일반적이에요 / 이미 해 봤어요 / 우리 상황과 달라요 / 더 자세히 알고 싶어요). 다시 답변이 시작되면 `ask_answer` 의 현재 행을 `ask_answer_history` 로 옮기고 지운다(그동안 질문은 `pending`).
+- 백업 추출(`tools/admin/backup-extract.py`)의 앱 표 목록에 `ask_vote`·`ask_answer_history` 가 들어 있다(`09` §5-1).
+- 표·메모·이력은 가족 자료(S1)다. 로그·오류에 쓰지 않는다.
+
 - app_setting 키: `ask_worker_seen_at`(워커 생존 표시, 최대 60초에 한 번 갱신), `ask_worker_locked_until`(토큰 실패 잠금 해제 시각).
 - 질문 본문·답은 가족 자료(S1)다. 로그·오류 응답에 쓰지 않는다.
 

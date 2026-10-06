@@ -98,13 +98,15 @@
 | 메서드 | 경로 | 요청/응답 |
 |---|---|---|
 | POST | `/ask` | `{body(1~1000자), askedBy(1~12자)}` → `201 {id, status:"pending", redFlag, instant:{notes:[{date,snippet,id}], docs:[{slug,title}]}}`. instant = 알림장 본문·자료 제목/요약의 `LIKE` 검색(각 최대 5, AI 없음). `redFlag` 는 결정적 키워드 검사. 같은 질문자가 10분 안 10건을 넘기면 `429 too_many`. `422` 검증 오류 |
-| GET | `/ask?before=<id>` | 최신순 20개 `{items:[{id,askedBy,bodyPreview(80자),status,redFlag,level?,createdAt}], nextBefore}` |
-| GET | `/ask/:id` | `{question:{id,askedBy,body,createdAt}, status, redFlag, answer?:{level(not_behavior 답은 null), answer(AnswerSchema), createdAt, totalMs, reviewScore(0~10, 없으면 null)}, feedback:[{id,by,helpful,note,createdAt}]}` / `404`(없음·삭제됨·번호 형식 오류). 화면이 5초마다 조회(완료·실패면 멈춤) |
+| GET | `/ask?before=<id>` | 최신순 20개 `{items:[{id,askedBy,bodyPreview(80자),status,redFlag,level?,createdAt,votes:{up,down}}], nextBefore}` |
+| GET | `/ask/:id` | `{question:{id,askedBy,body,createdAt}, status, redFlag, answer?:{level(not_behavior 답은 null), answer(AnswerSchema), createdAt, totalMs, reviewScore(0~10, 없으면 null)}, feedback:[{id,by,note,createdAt}](메모만), votes:[{by,helpful,reason,updatedAt}], history:[{version,level,createdAt,answer}](이전 답, 오래된 것부터. 최신 답은 `answer`), reask:{count,reason,by}}` / `404`(없음·삭제됨·번호 형식 오류). 화면이 5초마다 조회(완료·실패면 멈춤) |
 | GET | `/ask/:id/instant` | `{notes, docs}` — 목록에서 연 질문의 즉시 결과 다시 보기(명세 보강: 폴링에 검색 쿼리를 싣지 않으려고 분리) |
-| POST | `/ask/:id/feedback` | `{by, helpful?: bool|null, note?(≤500)}`(둘 중 하나 이상) → `201 {id}`. 질문당 50건 한도 `429` |
+| PUT | `/ask/:id/vote` | `{by, helpful: true|false|null, reason?(≤200, 👎 일 때만)}` → `200 {votes:[{by,helpful,reason,updatedAt}]}`. 사람당 질문당 한 표(upsert), `null` 이면 취소(없는 표 취소도 `200`). 끝난(`done`) 질문만 `409`, 서로 다른 12명 넘으면 `429`(이미 표가 있는 사람의 바꾸기는 통과). `422` 검증 오류 |
+| POST | `/ask/:id/feedback` | `{by, note(1~500)}`(메모만. `helpful` 은 받지 않고 `422`) → `201 {id}`. 질문당 50건 한도 `429` |
+| POST | `/ask/:id/reask` | `{by, choice: 「너무 일반적이에요」|「이미 해 봤어요」|「우리 상황과 달라요」|「더 자세히 알고 싶어요」, text?(≤280)}` → `200 {status:"pending", reaskCount}`. `done` 인 질문만(`409`), 질문당 최대 3회(초과 `429`). 한 묶음(트랜잭션)으로 현재 답을 `ask_answer_history` 로 옮기고 `pending`·`attempts=0` 으로 돌린다 — 동시에 두 번 눌러도 한 번만 먹는다(둘째는 `409`) |
 | DELETE | `/ask/:id` | 소프트 삭제 `204`(질문자 구분 없이 가족 누구나, 기록 삭제 정책과 같다) / `404` |
 
-`/overview` 에 `ask: {pending, worker:{online, seenAt}, medianTotalMs7d}` 가 더해진다(`pending` = 답 기다리는 질문 수, `online` = 2분 안 워커 신호, 중앙값은 최근 7일 `total_ms`).
+`/overview` 에 `ask: {pending, worker:{online, seenAt}, medianTotalMs7d, feedback7d:{up,down,notes}}` 가 더해진다(`pending` = 답 기다리는 질문 수, `online` = 2분 안 워커 신호, 중앙값은 최근 7일 `total_ms`, `feedback7d` = 최근 7일 표(👍/👎)·메모 수: 숫자만, 설정 화면 한 줄).
 
 ### 워커 API (집 PC 전용, 세션 아님)
 
@@ -113,10 +115,11 @@
 
 | 메서드 | 경로 | 요청/응답 |
 |---|---|---|
-| POST | `/worker/ask/claim` | `200 {question:{id,body,askedBy,createdAt,redFlag}}` / `204`(없음). 한 SQL 문으로 원자적으로 집는다(`status='claimed'`, 리스 5분, `attempts+1`). 위급 우선 → 오래된 순. 리스가 끝났는데 시도 3번이면 `failed(too_many_attempts)` |
+| POST | `/worker/ask/claim` | `200 {question:{id,body,askedBy,createdAt,redFlag}, reask?:{count,reason,by,previousAnswer}}` / `204`(없음). `reask` 는 다시 답변일 때만(이전 답=가장 최근 이력, 읽을 수 없으면 `previousAnswer: null`). 한 SQL 문으로 원자적으로 집는다(`status='claimed'`, 리스 5분, `attempts+1`). 위급 우선 → 오래된 순. 리스가 끝났는데 시도 3번이면 `failed(too_many_attempts)` |
 | POST | `/worker/ask/:id/progress` | `{status:"answering"|"reviewing"}` → `204`, 리스 5분 연장 / `409`(진행 중이 아님) |
 | POST | `/worker/ask/:id/answer` | `{level, answer, reviewScore(0~10), model, workMs}` → `200 {status:"done", totalMs}`. `422`: 스키마 위반·`level` 불일치(`level_mismatch`)·60KB 초과(`too_large`)·금지어(`forbidden_word`)·위급 질문인데 10단계가 아님(`redflag_level`). `409`: 진행 중이 아님·이미 답 있음 |
 | POST | `/worker/ask/:id/fail` | `{code: [a-z0-9_]{1,40}}` → `200 {status}`: 시도가 남으면 `pending`, 아니면 `failed` |
+| GET | `/worker/ask/history?limit=60` | `200 {items:[{id, body, askedBy, createdAt, level, tryNowActions:[string], votes:[{by,helpful,reason,updatedAt}], notes:[{by,note,createdAt}]}]}` — 최근 끝난(`done`) 행동 질문(최신순, `limit` 1~100 정수 아니면 `400`). **본문이 들어 있어 Bearer 전용·`Cache-Control: no-store`·로그 금지**, 응답은 **200KB 상한**(넘으면 오래된 항목부터 뺀다). 질문당 표 12·메모 10개까지. 워커가 claim 직후 받아 60초 캐시해 관련 이전 질문을 고른다(`11` §7, `04` §3-2) |
 | GET | `/worker/ping` | `204`(생존 표시 갱신) |
 
 - 모든 호출은 `ask_worker_seen_at` 을 갱신한다(60초에 한 번만 D1 에 쓴다). 오류 응답에 질문·답 본문을 넣지 않는다.
