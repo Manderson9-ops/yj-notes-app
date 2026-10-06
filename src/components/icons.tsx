@@ -76,6 +76,15 @@ export function BackspaceIcon() {
   );
 }
 
+/** 펼침 쐐기(▸): 닫힘은 오른쪽, 열림은 CSS 로 아래로 돌린다. */
+export function ChevronIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Icon width={size} height={size} className="chevron">
+      <path d="m9 6 6 6-6 6" />
+    </Icon>
+  );
+}
+
 export function CheckIcon({ size = 18 }: { size?: number }) {
   return (
     <Icon width={size} height={size} strokeWidth="3" className="chip-check">

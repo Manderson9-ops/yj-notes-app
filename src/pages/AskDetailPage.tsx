@@ -5,7 +5,7 @@ import { ShareBar } from "../components/ask/ShareBar";
 import { VoteBar } from "../components/ask/VoteBar";
 import { RedFlagCard } from "../components/ask/RedFlagCard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { CheckIcon } from "../components/icons";
+import { CheckIcon, ChevronIcon } from "../components/icons";
 import { Notice } from "../components/Notice";
 import { QueryError } from "../components/QueryError";
 import {
@@ -182,7 +182,10 @@ function OldAnswers({ detail }: { detail: AskDetail }) {
       <h2 id="ask-old">{LABELS.oldTitle}</h2>
       {[...detail.history].reverse().map((h) => (
         <details key={h.version} className="ask-old">
-          <summary>{oldAnswerLine(h.version, h.createdAt)}</summary>
+          <summary>
+            <ChevronIcon size={20} />
+            <span>{oldAnswerLine(h.version, h.createdAt)}</span>
+          </summary>
           <AnswerCard level={h.level ?? h.answer.level} answer={h.answer} />
         </details>
       ))}

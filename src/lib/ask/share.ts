@@ -71,37 +71,67 @@ export function stripUrgency(action: string): string {
   return action.replace(/^(?:(?:지금|바로)\s*)+/, "").trim();
 }
 
-/** 각 구역은 줄 목록(첫 줄이 머리). 길이가 넘으면 뒤쪽(덜 중요한) 구역부터 뺀다. */
-function behaviorSections(a: Answer, level: number | null, mode: ShareMode): string[][] {
-  const out: string[][] = [];
+interface Section {
+  id: string;
+  lines: string[];
+}
+
+/** 길이가 넘을 때 빼는 순서(앞에서부터). 단계·해 볼 것은 빼지 않고, 「이럴 땐 상담」은 가장 마지막에 뺀다. */
+const DROP_ORDER = [
+  "limits",
+  "forAsker",
+  "evidence",
+  "records",
+  "summary",
+  "observe",
+  "avoid",
+  "contact",
+] as const;
+
+/** 구역(표시 순서). */
+function behaviorSections(a: Answer, level: number | null, mode: ShareMode): Section[] {
+  const out: Section[] = [];
   // level 이 null 이면 단계 줄 자체를 만들지 않는다.
-  out.push(
-    level === null
-      ? [a.levelReason]
-      : [`📊 단계 ${String(level)}/10 · ${levelInfo(level).title}`, a.levelReason],
-  );
-  if (mode === "full") out.push(["📌 상황 요약", a.summary]);
-  out.push([
-    "✅ 지금 해 볼 것",
-    ...a.tryNow.flatMap((t, i) => [
-      `${String(i + 1)}. ${t.action}`,
-      ...(t.say ? [`   👉 「${t.say}」`] : []),
-    ]),
-  ]);
-  out.push(["❌ 피할 것", ...a.avoid.map((x) => `- ${x}`)]);
-  if (a.observe) out.push([`👀 지켜볼 것: ${a.observe.what} (${a.observe.howLong})`]);
+  out.push({
+    id: "level",
+    lines:
+      level === null
+        ? [a.levelReason]
+        : [`📊 단계 ${String(level)}/10 · ${levelInfo(level).title}`, a.levelReason],
+  });
+  if (mode === "full") out.push({ id: "summary", lines: ["📌 상황 요약", a.summary] });
+  out.push({
+    id: "try",
+    lines: [
+      "✅ 지금 해 볼 것",
+      ...a.tryNow.flatMap((t, i) => [
+        `${String(i + 1)}. ${t.action}`,
+        ...(t.say ? [`   👉 「${t.say}」`] : []),
+      ]),
+    ],
+  });
+  out.push({ id: "avoid", lines: ["❌ 피할 것", ...a.avoid.map((x) => `- ${x}`)] });
+  if (a.observe)
+    out.push({
+      id: "observe",
+      lines: [`👀 지켜볼 것: ${a.observe.what} (${a.observe.howLong})`],
+    });
   const contacts = a.upIf.filter((u) => CONTACT.test(u));
-  if (contacts.length > 0) out.push(["⬆️ 이럴 땐 상담", ...contacts.map((c) => `- ${c}`)]);
+  if (contacts.length > 0)
+    out.push({ id: "contact", lines: ["⬆️ 이럴 땐 상담", ...contacts.map((c) => `- ${c}`)] });
   if (mode === "full") {
     if (a.fromRecords.length > 0) {
-      out.push([
-        "📖 기록에서 본 것",
-        ...a.fromRecords.map((r) => `- ${monthDay(r.date)} ${r.what} (${r.link})`),
-      ]);
+      out.push({
+        id: "records",
+        lines: [
+          "📖 기록에서 본 것",
+          ...a.fromRecords.map((r) => `- ${monthDay(r.date)} ${r.what} (${r.link})`),
+        ],
+      });
     }
-    out.push(["🔎 근거", ...a.evidence.map((e) => `- ${e.point}`)]);
-    out.push(["🙋 질문하신 분께", a.forAsker]);
-    if (a.limits) out.push(["ℹ️ 한계", a.limits]);
+    out.push({ id: "evidence", lines: ["🔎 근거", ...a.evidence.map((e) => `- ${e.point}`)] });
+    out.push({ id: "forAsker", lines: ["🙋 질문하신 분께", a.forAsker] });
+    if (a.limits) out.push({ id: "limits", lines: ["ℹ️ 한계", a.limits] });
   }
   return out;
 }
@@ -126,28 +156,29 @@ export function buildShareText(input: ShareInput): string {
     );
   }
 
-  const sections: string[][] = notBehavior
-    ? [["ℹ️ 안내", a.summary, a.levelReason]]
+  const sections: Section[] = notBehavior
+    ? [{ id: "notice", lines: ["ℹ️ 안내", a.summary, a.levelReason] }]
     : behaviorSections(a, input.level, mode);
 
   /** 구역은 빈 줄로 나눈다(구분선 바로 뒤에는 빈 줄 없음). */
-  const body = (secs: string[][]): string[] =>
-    secs.flatMap((s, i) => (i === 0 ? s : [BLANK, ...s]));
-  const build = (question: string, secs: string[][]): string =>
+  const body = (secs: Section[]): string[] =>
+    secs.flatMap((s, i) => (i === 0 ? s.lines : [BLANK, ...s.lines]));
+  const build = (question: string, secs: Section[]): string =>
     [...red, head, BAR, "💬 질문", question, BAR, ...body(secs), BAR, foot].join("\n");
 
   let secs = sections;
   let question = input.body.trim();
   let text = build(question, secs);
-  // 1) 뒤쪽 구역부터 뺀다(해 볼 것까지는 남긴다)
-  const keep = notBehavior ? secs.length : 3;
-  while (text.length > SHARE_MAX && secs.length > keep) {
-    secs = secs.slice(0, -1);
-    text = build(question, secs);
-  }
-  // 2) 질문 글을 줄인다
+  // 1) 질문 글을 먼저 400자로 줄인다
   if (text.length > SHARE_MAX) {
     question = clip(question, 400);
+    text = build(question, secs);
+  }
+  // 2) 그래도 길면 덜 중요한 구역부터 뺀다(상담 구역이 마지막, 단계·해 볼 것은 남긴다)
+  for (const id of DROP_ORDER) {
+    if (text.length <= SHARE_MAX) break;
+    if (!secs.some((x) => x.id === id)) continue;
+    secs = secs.filter((x) => x.id !== id);
     text = build(question, secs);
   }
   // 3) 그래도 길면 가운데를 자르되 끝의 구분선과 링크 줄은 지킨다

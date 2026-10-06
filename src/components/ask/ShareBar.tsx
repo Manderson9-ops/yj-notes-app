@@ -112,7 +112,7 @@ export function ShareBar({
           className="field field-area ask-copybox"
           readOnly
           rows={6}
-          aria-label={COPY.shareBtn}
+          aria-label={COPY.shareText}
           value={msg.text}
           onFocus={(e) => {
             e.currentTarget.select();

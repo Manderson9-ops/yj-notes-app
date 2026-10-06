@@ -247,3 +247,38 @@ describe("옵션 칸·특수 경우", () => {
     }
   });
 });
+
+describe("길이 초과 시 줄이는 순서(질문 400자 → 선택 구역 → 상담은 마지막)", () => {
+  const sec = (over: Partial<Answer>): Answer => ({ ...answer, ...over });
+  const longUpIf = ["소아과에 물어봐요"];
+  it("질문 글을 먼저 400자로 줄이고, 그것만으로 충분하면 구역은 그대로", () => {
+    const x = buildShareText({
+      ...base,
+      body: "질".repeat(2900),
+      answer: sec({ upIf: longUpIf }),
+    });
+    expect(x.length).toBeLessThanOrEqual(SHARE_MAX);
+    expect(x).toContain("질".repeat(399) + "…");
+    for (const h of ["❌ 피할 것", "👀 지켜볼 것", "⬆️ 이럴 땐 상담"]) expect(x).toContain(h);
+  });
+
+  it("그래도 길면 자세히 구역 → 지켜볼 것 → 피할 것 순으로 빼고, 상담은 마지막까지 남는다", () => {
+    let sawContactOnly = false;
+    for (let n = 2700; n <= 2800; n += 1) {
+      const x = buildShareText({
+        ...base,
+        answer: sec({ levelReason: "가".repeat(n), upIf: longUpIf }),
+      });
+      expect(x.length, String(n)).toBeLessThanOrEqual(SHARE_MAX);
+      const has = (h: string) => x.includes(h);
+      // 지켜볼 것이 남았다면 피할 것도, 피할 것이 남았다면 상담도 남아 있다(빠지는 순서의 거꾸로)
+      if (has("👀 지켜볼 것")) expect(has("❌ 피할 것"), String(n)).toBe(true);
+      if (has("❌ 피할 것")) expect(has("⬆️ 이럴 땐 상담"), String(n)).toBe(true);
+      expect(has("✅ 지금 해 볼 것"), String(n)).toBe(true);
+      if (has("⬆️ 이럴 땐 상담") && !has("❌ 피할 것") && !has("👀 지켜볼 것"))
+        sawContactOnly = true;
+    }
+    // 지켜볼 것·피할 것이 다 빠진 뒤에도 상담이 남는 구간이 있다
+    expect(sawContactOnly).toBe(true);
+  });
+});

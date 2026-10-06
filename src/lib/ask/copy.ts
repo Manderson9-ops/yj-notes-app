@@ -33,6 +33,7 @@ export const COPY = {
   voteLine: "가족 의견:",
   copyFail: "복사하지 못했어요. 글을 길게 눌러 복사해 주세요.",
   shareBtn: "공유하기",
+  shareText: "공유할 글",
   copyBtn: "복사하기",
   shareRange: "보낼 내용",
   shareShort: "짧게",

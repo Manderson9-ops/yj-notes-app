@@ -408,6 +408,10 @@ describe("다시 작성 중·이전 답변", () => {
     const details = summary.closest("details");
     expect(details).not.toBeNull();
     expect(details).not.toHaveAttribute("open");
+    // 쐐기 아이콘(20px, 스크린리더에서 숨김)
+    const chevron = summary.closest("summary")?.querySelector("svg.chevron");
+    expect(chevron).toHaveAttribute("aria-hidden", "true");
+    expect(chevron).toHaveAttribute("width", "20");
     expect(screen.queryByRole("button", { name: "공유하기" })).toBeNull();
     expect(screen.queryByText("이 답이 도움이 됐나요?")).toBeNull();
   });
@@ -581,7 +585,7 @@ describe("공유하기 · 복사하기 (맨 아래 한 곳)", () => {
     const msg = await screen.findByText("복사하지 못했어요. 글을 길게 눌러 복사해 주세요.");
     expect(msg).toBeVisible();
     expect(msg.closest("[aria-live]")).not.toBeNull();
-    const box = screen.getByRole("textbox", { name: "공유하기" });
+    const box = screen.getByRole("textbox", { name: "공유할 글" });
     expect(box).toHaveAttribute("readonly");
     expect((box as HTMLTextAreaElement).value).toContain("📝 아이 물어보기");
   });

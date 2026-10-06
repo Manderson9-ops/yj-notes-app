@@ -1,7 +1,8 @@
 /* 물어보기 (S50) 화면. 색·모양은 토큰만 쓴다(공용 상태색 토큰 재사용: 새 색 없음). 테마 분기 없음. */
 
 .ask-field-label {
-  margin: var(--space-4) 0 var(--space-2);
+  display: block;
+  margin: var(--space-3) 0 var(--space-2);
   font-weight: 700;
 }
 
@@ -216,14 +217,12 @@
 }
 
 /* 표 · 다시 답변 UI 다듬기 (T-Q3 2차) */
+/* 비어 있어도 접근성 트리에 남는다(display:none 이면 스크린리더가 나중에 채워진 글을 읽지 못한다): 자리만 접는다 */
 .ask-vote-live:empty,
 .ask-share-live:empty {
-  display: none;
-}
-
-.ask-reask .ask-field-label,
-.ask-field-label {
-  margin-top: var(--space-3);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .ask-linkbtn {
@@ -256,8 +255,11 @@
   font-weight: 700;
 }
 
-/* 이전 답변 펼침: 마커 대신 쐐기(▸ 닫힘 / ▾ 열림) */
+/* 이전 답변 펼침: 쐐기 아이콘(aria-hidden, 20px) — 열리면 아래로 돌린다. 모션 줄이기에서는 돌리기만 하고 전환은 없다 */
 .ask-old > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   list-style: none;
 }
 
@@ -265,18 +267,17 @@
   display: none;
 }
 
-.ask-old > summary::before {
-  content: "▸";
-  display: inline-block;
-  width: var(--space-5);
-  text-align: center;
+.ask-old .chevron {
+  flex: none;
+  transition: transform var(--dur) var(--ease);
 }
 
-.ask-old[open] > summary::before {
-  content: "▾";
+.ask-old[open] .chevron {
+  transform: rotate(90deg);
 }
 
-/* 장식 글꼴에 없는 글자가 든 버튼은 글 전체를 본문 글꼴로(글꼴이 한 버튼 안에서 섞이지 않게) */
-:root:root .btn.ask-bodyfont {
-  font-family: var(--font-body);
+@media (prefers-reduced-motion: reduce) {
+  .ask-old .chevron {
+    transition: none;
+  }
 }
