@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnswerCard } from "../components/ask/AnswerCard";
+import { ShareBar } from "../components/ask/ShareBar";
+import { VoteBar } from "../components/ask/VoteBar";
 import { RedFlagCard } from "../components/ask/RedFlagCard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CheckIcon } from "../components/icons";
@@ -14,6 +16,7 @@ import {
   type AskDetail,
 } from "../lib/ask/api";
 import { COPY } from "../lib/ask/copy";
+import type { ShareMode } from "../lib/ask/share";
 import { STATUS_LINE, STEPS, stepIndex, whenKo } from "../lib/ask/format";
 import { formatShortKo } from "../lib/dateFormat";
 import { getDefaultRecorder } from "../lib/logs/ids";
@@ -21,7 +24,15 @@ import { useOverview } from "../lib/notesApi";
 import "../styles/notes.css";
 import "../styles/ask.css";
 
-function Progress({ status }: { status: AskDetail["status"] }) {
+/** 다시 답변 중이면 줄 문구를 「다시 작성」 쪽으로 바꾼다(단계 모양은 그대로). */
+function lineOf(status: AskDetail["status"], reasking: boolean): string {
+  if (!reasking) return STATUS_LINE[status];
+  if (status === "reviewing") return COPY.reaskReview;
+  if (status === "pending") return COPY.reaskPending;
+  return `${COPY.reaskLine1} ${COPY.reaskLine2}`;
+}
+
+function Progress({ status, reasking }: { status: AskDetail["status"]; reasking: boolean }) {
   const at = stepIndex(status);
   return (
     <>
@@ -37,12 +48,12 @@ function Progress({ status }: { status: AskDetail["status"] }) {
             ) : (
               <span aria-hidden="true">{i + 1}</span>
             )}
-            <span>{label}</span>
+            <span>{reasking && label === "작성 중" ? "다시 작성 중" : label}</span>
           </li>
         ))}
       </ol>
       <p role="status" aria-live="polite" className="ask-status-line">
-        {STATUS_LINE[status]}
+        {lineOf(status, reasking)}
       </p>
     </>
   );
@@ -84,42 +95,25 @@ function Instant({ id }: { id: number }) {
   );
 }
 
-function Feedback({ detail }: { detail: AskDetail }) {
+/** 해 봤어요 메모: 해 본 방법과 결과를 적으면 다음 답변에 반영돼요(도움 여부는 위 표). */
+function Memo({ detail }: { detail: AskDetail }) {
   const id = detail.question.id;
   const send = useAskFeedback(id);
   const by = getDefaultRecorder() ?? "가족";
   const [note, setNote] = useState("");
   return (
     <section aria-labelledby="ask-feedback">
-      <h2 id="ask-feedback">의견</h2>
-      <div className="chip-row">
-        <button
-          type="button"
-          className="btn"
-          disabled={send.isPending}
-          onClick={() => {
-            send.mutate({ by, helpful: true });
-          }}
-        >
-          도움이 됐어요
-        </button>
-        <button
-          type="button"
-          className="btn"
-          disabled={send.isPending}
-          onClick={() => {
-            send.mutate({ by, helpful: false });
-          }}
-        >
-          도움이 안 됐어요
-        </button>
-      </div>
+      <h2 id="ask-feedback">{COPY.noteLabel}</h2>
+      <p className="meta" id="ask-note-guide">
+        {COPY.noteGuide}
+      </p>
       <div className="field-row">
-        <label htmlFor="ask-note" className="ask-field-label">
+        <label htmlFor="ask-note" className="sr-only">
           {COPY.noteLabel}
         </label>
         <textarea
           id="ask-note"
+          aria-describedby="ask-note-guide"
           className="field field-area"
           rows={3}
           maxLength={500}
@@ -161,14 +155,30 @@ function Feedback({ detail }: { detail: AskDetail }) {
                   {f.by} · {whenKo(f.createdAt)}
                 </span>
                 <br />
-                {f.helpful === true && <strong>도움이 됐어요</strong>}
-                {f.helpful === false && <strong>도움이 안 됐어요</strong>}
-                {f.note ? <span className="ask-note">{f.note}</span> : null}
+                <span className="ask-note">{f.note}</span>
               </span>
             </div>
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+/** 이전 답변(다시 답변 전의 답): 접어 둔다. */
+function OldAnswers({ detail }: { detail: AskDetail }) {
+  if (detail.history.length === 0) return null;
+  return (
+    <section aria-labelledby="ask-old">
+      <h2 id="ask-old">{COPY.oldAnswers}</h2>
+      {[...detail.history].reverse().map((h) => (
+        <details key={h.version} className="ask-old">
+          <summary>
+            {COPY.oldAnswerN} {h.version} · {whenKo(h.createdAt)}
+          </summary>
+          <AnswerCard level={h.level ?? h.answer.level} answer={h.answer} />
+        </details>
+      ))}
     </section>
   );
 }
@@ -249,6 +259,8 @@ function Body({
 }) {
   const { question, status } = detail;
   const waiting = status === "pending" || status === "claimed";
+  const reasking = detail.reask.count > 0 && status !== "done" && status !== "failed";
+  const [mode, setMode] = useState<ShareMode>("summary");
   return (
     <>
       {detail.redFlag && <RedFlagCard />}
@@ -265,7 +277,7 @@ function Body({
       {status !== "done" && (
         <section aria-labelledby="ask-progress">
           <h2 id="ask-progress">진행 상황</h2>
-          <Progress status={status} />
+          <Progress status={status} reasking={reasking} />
           {waiting && workerOffline && (
             <Notice tone="info">
               <span>{COPY.offWait}</span>
@@ -292,18 +304,24 @@ function Body({
         <section aria-labelledby="ask-answer">
           <h2 id="ask-answer">답변</h2>
           {detail.answer ? (
-            <AnswerCard
-              level={detail.answer.level ?? detail.answer.answer.level}
-              answer={detail.answer.answer}
-              reviewScore={detail.answer.reviewScore}
-            />
+            <>
+              <AnswerCard
+                level={detail.answer.level ?? detail.answer.answer.level}
+                answer={detail.answer.answer}
+                reviewScore={detail.answer.reviewScore}
+                afterSummary={<ShareBar detail={detail} mode={mode} onMode={setMode} where="top" />}
+              />
+              <ShareBar detail={detail} mode={mode} onMode={setMode} where="bottom" />
+            </>
           ) : (
             <Notice tone="warn">{COPY.noAnswer}</Notice>
           )}
         </section>
       )}
 
-      {status === "done" && <Feedback detail={detail} />}
+      {status === "done" && <VoteBar detail={detail} />}
+      {status === "done" && <Memo detail={detail} />}
+      <OldAnswers detail={detail} />
 
       <p>
         <button type="button" className="btn" onClick={onDelete}>

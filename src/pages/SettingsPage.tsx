@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { FeedbackLine } from "../components/ask/FeedbackLine";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { SchemePicker } from "../components/SchemePicker";
 import { TextSettings } from "../components/TextSettings";
@@ -16,6 +17,7 @@ export function SettingsPage() {
   const overview = useOverview();
   const lastLock = overview.data?.security.lastGlobalLockAt ?? null;
   const failures7d = overview.data?.security.failures7d ?? 0;
+  const fb = overview.data?.ask.feedback7d;
   const logout = useMutation({
     mutationFn: () => api("DELETE", "/session"),
     onSettled: () => {
@@ -70,6 +72,12 @@ export function SettingsPage() {
           <p className="muted" data-testid="pin-failures-7d">
             최근 7일 PIN 실패: {failures7d}회
           </p>
+        </section>
+      )}
+      {fb && (
+        <section className="settings-section" aria-labelledby="set-ask">
+          <h2 id="set-ask">물어보기</h2>
+          <FeedbackLine up={fb.up} down={fb.down} notes={fb.notes} />
         </section>
       )}
       <section className="settings-section" aria-labelledby="set-more">

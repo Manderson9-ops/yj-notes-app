@@ -173,3 +173,44 @@
   color: var(--c-on-accent-soft);
   font-weight: 700;
 }
+
+/* 표 · 다시 답변 · 공유 (T-Q3). 선택 모양은 공용 .chip[aria-pressed] 규칙을 그대로 쓴다. */
+.ask-vote-live,
+.ask-share-live {
+  min-height: var(--space-5);
+  margin: var(--space-2) 0;
+  font-weight: 600;
+}
+
+.ask-vote-summary {
+  margin: var(--space-2) 0;
+  overflow-wrap: anywhere;
+}
+
+.ask-reask {
+  margin-top: var(--space-3);
+}
+
+.ask-reask .actions,
+.ask-share .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.ask-share {
+  margin: var(--space-3) 0;
+}
+
+.ask-old {
+  margin: var(--space-2) 0;
+}
+
+.ask-old > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-weight: 700;
+  cursor: pointer;
+}

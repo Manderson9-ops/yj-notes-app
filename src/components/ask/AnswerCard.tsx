@@ -1,4 +1,5 @@
 // font-subset: skip (본문 글만: 장식 글꼴 대상이 아니다 — tools/fonts/collect.ts)
+import type { ReactNode } from "react";
 import { GENERAL_BASIS, type Answer } from "../../../shared/ask-schema";
 import { LevelBadge } from "./LevelBadge";
 
@@ -14,10 +15,13 @@ export function AnswerCard({
   level,
   answer,
   reviewScore,
+  afterSummary,
 }: {
   level: number;
   answer: Answer;
   reviewScore?: number | null | undefined;
+  /** 상황 요약 바로 아래에 끼워 넣는 것(공유하기 버튼). */
+  afterSummary?: ReactNode;
 }) {
   if (answer.kind === "not_behavior") {
     // 행동 질문이 아닌 글: 단계 배지·기록·근거 없이 요약과 안내 한 줄만 보인다.
@@ -43,6 +47,7 @@ export function AnswerCard({
 
       <h3>상황 요약</h3>
       <p>{answer.summary}</p>
+      {afterSummary}
 
       {answer.fromRecords.length > 0 && (
         <>
