@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { settle, stableShot } from "./helpers";
 
 // 물어보기(S50)의 접근성(axe serious/critical 0), 3테마 × 라이트/다크, 큰 글씨, 터치 영역, 진행 흐름.
-// 목업 API(vite-plugins/mock/ask.ts): 1 완료(단계 5) · 2 완료(단계 1) · 3 완료(위급, 단계 10) · 4 대기 · 5 작성 중. 합성 자료만.
+// 목업 API(vite-plugins/mock/ask.ts): 1 완료(단계 5) · 2 완료(단계 1) · 3 완료(위급, 단계 10) · 4 대기 · 5 작성 중 · 6 다시 작성 중. 합성 자료만.
 // 360px 스크린샷은 e2e/__screenshots__/ask-<화면>-<테마>-<scheme>.png (mobile-chromium 만).
 
 const THEMES = ["basic", "crayon", "forest"] as const;
@@ -55,7 +55,7 @@ for (const theme of THEMES) {
         // 목록 + 입력
         await page.goto("/ask");
         await expect(page.getByRole("heading", { level: 1, name: "물어보기" })).toBeVisible();
-        await expect(page.locator("a.ask-row")).toHaveCount(5);
+        await expect(page.locator("a.ask-row")).toHaveCount(6);
         await check();
         await shot("list", true);
 
@@ -107,8 +107,10 @@ test("보내기 → 접수 → 작성 중 → 검토 중 → 답변, 의견 남�
   await expect(page.getByRole("article", { name: "답변" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("list", { name: "진행 단계" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "도움이 됐어요", exact: true }).click();
-  await expect(page.getByText("도움이 됐어요", { exact: true }).nth(1)).toBeVisible();
+  const up = page.getByRole("button", { name: "도움이 됐어요", exact: true });
+  await up.click();
+  await expect(up).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("ask-vote-live")).toContainText("반영했어요");
   await page.getByLabel("해 봤어요 메모").fill("안아 주니 그쳤어요");
   await page.getByRole("button", { name: "메모 남기기" }).click();
   await expect(page.getByText("안아 주니 그쳤어요")).toBeVisible();
@@ -160,7 +162,7 @@ test.describe("큰 글씨", () => {
         expect(await seriousViolations(page)).toEqual([]);
       };
       await page.goto("/ask");
-      await expect(page.locator("a.ask-row")).toHaveCount(5);
+      await expect(page.locator("a.ask-row")).toHaveCount(6);
       await noOverflow("ask");
       await page.goto("/ask/1");
       await expect(page.getByRole("article", { name: "답변" })).toBeVisible();

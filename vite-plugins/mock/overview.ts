@@ -26,6 +26,7 @@ export const overviewMock: MockModule = {
         pending: 1,
         worker: { online: true, seenAt: "2020-01-15T00:00:00.000Z" },
         medianTotalMs7d: 150000,
+        feedback7d: { up: 3, down: 1, notes: 2 },
       },
       milestones: { observed: 4, unobserved: 6 },
       recentNotes: recent.map((d) => ({
