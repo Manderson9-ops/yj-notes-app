@@ -171,10 +171,16 @@ workerRoutes.get("/api/worker/ask/history", async (c) => {
     }>();
   const votes = await db
     .prepare(
-      `SELECT question_id, by, helpful, reason FROM ask_vote WHERE question_id IN (${base}) ORDER BY updated_at`,
+      `SELECT question_id, by, helpful, reason, updated_at FROM ask_vote WHERE question_id IN (${base}) ORDER BY updated_at`,
     )
     .bind(limit)
-    .all<{ question_id: number; by: string; helpful: number; reason: string | null }>();
+    .all<{
+      question_id: number;
+      by: string;
+      helpful: number;
+      reason: string | null;
+      updated_at: string;
+    }>();
   const notes = await db
     .prepare(
       `SELECT question_id, by, note, created_at FROM ask_feedback
@@ -202,7 +208,12 @@ workerRoutes.get("/api/worker/ask/history", async (c) => {
       votes: votes.results
         .filter((v) => v.question_id === r.id)
         .slice(0, 12)
-        .map((v) => ({ by: v.by, helpful: v.helpful === 1, reason: v.reason })),
+        .map((v) => ({
+          by: v.by,
+          helpful: v.helpful === 1,
+          reason: v.reason,
+          updatedAt: v.updated_at,
+        })),
       notes: notes.results
         .filter((n) => n.question_id === r.id)
         .slice(-10)
@@ -212,7 +223,10 @@ workerRoutes.get("/api/worker/ask/history", async (c) => {
   }
   // 크기 상한: 오래된 항목부터 버린다(목록은 최신순).
   const enc = new TextEncoder();
-  while (items.length > 0 && enc.encode(JSON.stringify({ items })).byteLength > ASK_HISTORY_MAX_BYTES) {
+  while (
+    items.length > 0 &&
+    enc.encode(JSON.stringify({ items })).byteLength > ASK_HISTORY_MAX_BYTES
+  ) {
     items.pop();
   }
   return jsonResponse(200, { items });

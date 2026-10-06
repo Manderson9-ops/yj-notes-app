@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { goodAnswer, PACK } from "../tools/ask-worker/fixtures.ts";
 import { createClient } from "../tools/ask-worker/client.ts";
 import { ClaudeError, type ClaudeRunner } from "../tools/ask-worker/claude.ts";
+import { createHistoryCache } from "../tools/ask-worker/family.ts";
 import { handleOne, type LoopDeps } from "../tools/ask-worker/loop.ts";
 import { answerQuestion, type PipelineDeps } from "../tools/ask-worker/pipeline.ts";
 import { REVIEW_PROMPT_FILE } from "../tools/ask-worker/prompts.ts";
@@ -72,7 +73,7 @@ function fakeClaude(opts: { failWith?: string; firstLevelWrong?: boolean } = {})
   };
 }
 
-function loopDeps(runClaude: ClaudeRunner, stages: string[] = []): LoopDeps {
+function loopDeps(runClaude: ClaudeRunner, stages: string[] = [], withHistory = false): LoopDeps {
   const pipe: PipelineDeps = {
     runClaude,
     buildPack: () => Promise.resolve(PACK),
@@ -88,6 +89,11 @@ function loopDeps(runClaude: ClaudeRunner, stages: string[] = []): LoopDeps {
     fetchFn: ((url: string, init: RequestInit) =>
       h.handle(new Request(url, init))) as unknown as typeof fetch,
   });
+  if (withHistory) {
+    const cache = createHistoryCache(() => client.history(60));
+    pipe.getHistory = () => cache.get();
+    pipe.today = () => "2030-01-02";
+  }
   return {
     client,
     process: (q, hooks, signal) =>
@@ -160,5 +166,85 @@ describe("워커 클라이언트 ↔ 실제 앱 계약", () => {
     });
     await expect(bad.claim()).rejects.toMatchObject({ status: 401 });
     expect(row(id).status).toBe("pending");
+  });
+});
+
+describe("가족 의견·다시 답변 계약 (T-Q3)", () => {
+  /** 프롬프트를 기록하는 가짜 claude. */
+  const recording = (prompts: string[]): ClaudeRunner => {
+    const inner = fakeClaude();
+    return (req, signal) => {
+      if (req.systemPromptFile !== REVIEW_PROMPT_FILE) prompts.push(req.prompt);
+      return inner(req, signal);
+    };
+  };
+  const call = (method: string, path: string, json?: unknown) =>
+    sessionCall(h, cookie, method, path, json);
+
+  it("실제 앱 history 응답으로 워커가 가족 결과를 묶음에 넣는다(표·메모 포함)", async () => {
+    const first = await create("테스트아이가 밥을 안 먹어요 친구를 때려요");
+    await handleOne(loopDeps(fakeClaude()), new AbortController().signal);
+    await call("PUT", `/api/ask/${String(first)}/vote`, {
+      by: "할머니",
+      helpful: false,
+      reason: "효과 없었어요",
+    });
+    await call("POST", `/api/ask/${String(first)}/feedback`, {
+      by: "엄마",
+      note: "식사 시간을 정해 뒀는데 효과 없었어요",
+    });
+    const client = createClient({
+      origin: ORIGIN,
+      token: TEST_WORKER_TOKEN,
+      fetchFn: ((url: string, init: RequestInit) =>
+        h.handle(new Request(url, init))) as unknown as typeof fetch,
+    });
+    const hist = await client.history(60);
+    expect(hist).toHaveLength(1);
+    expect(hist[0]).toMatchObject({ id: first, askedBy: "엄마", level: 4 });
+    expect(hist[0]?.votes[0]).toMatchObject({ by: "할머니", helpful: false });
+    expect(hist[0]?.notes[0]?.note).toContain("효과 없었어요");
+
+    h.clock.t += 1000;
+    await create("테스트아이가 점심 밥을 안 먹고 친구를 때려요");
+    const prompts: string[] = [];
+    await handleOne(loopDeps(recording(prompts), [], true), new AbortController().signal);
+    // 질문 확장이 없어도 본문 낱말(밥) 겹침으로 관련 질문이 골라진다
+    expect(prompts[0]).toContain("[ref: FAMILY-Q" + String(first) + "]");
+    expect(prompts[0]).toContain("효과 없었어요");
+  });
+
+  it("다시 답변: 앱의 reask → 워커 claim 이 이전 답·이유를 받아 새 답을 올리고, 이력이 남는다", async () => {
+    const id = await create("테스트아이가 밥을 안 먹어요 친구를 때려요");
+    await handleOne(loopDeps(fakeClaude()), new AbortController().signal);
+    const res = await call("POST", `/api/ask/${String(id)}/reask`, {
+      by: "아빠",
+      choice: "이미 해 봤어요",
+      text: "간식도 줄였어요",
+    });
+    expect(res.status).toBe(200);
+    const prompts: string[] = [];
+    h.clock.t += 5000;
+    await handleOne(loopDeps(recording(prompts)), new AbortController().signal);
+    expect(prompts[0]).toContain("## 다시 답변 요청");
+    expect(prompts[0]).toContain("이전 해 볼 것 1: 식사 시간을 정해 두어요");
+    expect(prompts[0]).toContain("간식도 줄였어요");
+    const d = await (
+      await call("GET", `/api/ask/${String(id)}`)
+    ).json<{
+      status: string;
+      history: { version: number }[];
+      reask: { count: number };
+    }>();
+    expect(d.status).toBe("done");
+    expect(d.history).toHaveLength(1);
+    expect(d.reask.count).toBe(1);
+  });
+
+  it("세션 쿠키로는 history 를 못 읽는다(Bearer 전용)", async () => {
+    const res = await h.handle(
+      new Request(ORIGIN + "/api/worker/ask/history", { headers: { Cookie: cookie } }),
+    );
+    expect(res.status).toBe(401);
   });
 });

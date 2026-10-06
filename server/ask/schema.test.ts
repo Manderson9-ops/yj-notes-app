@@ -167,8 +167,12 @@ describe("질문·의견 입력", () => {
   it("표: 이유는 👎 때만, 200자 이하", () => {
     expect(AskVoteSchema.safeParse({ by: "엄마", helpful: true }).success).toBe(true);
     expect(AskVoteSchema.safeParse({ by: "엄마", helpful: null }).success).toBe(true);
-    expect(AskVoteSchema.safeParse({ by: "엄마", helpful: true, reason: "가" }).success).toBe(false);
-    expect(AskVoteSchema.safeParse({ by: "엄마", helpful: false, reason: "가" }).success).toBe(true);
+    expect(AskVoteSchema.safeParse({ by: "엄마", helpful: true, reason: "가" }).success).toBe(
+      false,
+    );
+    expect(AskVoteSchema.safeParse({ by: "엄마", helpful: false, reason: "가" }).success).toBe(
+      true,
+    );
     expect(
       AskVoteSchema.safeParse({ by: "엄마", helpful: false, reason: "가".repeat(201) }).success,
     ).toBe(false);
@@ -182,7 +186,10 @@ describe("질문·의견 입력", () => {
     const joined = joinReaskReason("이미 해 봤어요", "간식 줄이기");
     expect(joined.length).toBeLessThanOrEqual(300);
     expect(splitReaskReason(joined)).toEqual({ choice: "이미 해 봤어요", text: "간식 줄이기" });
-    expect(splitReaskReason("너무 일반적이에요")).toEqual({ choice: "너무 일반적이에요", text: "" });
+    expect(splitReaskReason("너무 일반적이에요")).toEqual({
+      choice: "너무 일반적이에요",
+      text: "",
+    });
     expect(splitReaskReason("다른 글").choice).toBeNull();
   });
 });

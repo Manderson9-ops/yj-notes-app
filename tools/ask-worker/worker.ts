@@ -8,6 +8,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "./client.ts";
+import { buildDigest, DIGEST_FILE, writeDigest } from "./digest.ts";
+import { createHistoryCache } from "./family.ts";
+import { parseHistory, parseReask } from "./inject.ts";
+import type { HistoryItem } from "../../shared/ask-schema.ts";
 import { createClaudeRunner } from "./claude.ts";
 import { askHome, loadConfig, type WorkerConfig } from "./config.ts";
 import { abortableSleep, handleOne, runLoop, type LoopDeps } from "./loop.ts";
@@ -33,6 +37,8 @@ export const SYNTHETIC_QUESTION =
 export function makePipelineDeps(
   cfg: WorkerConfig,
   pack: { dataDir: string; ingestRoot?: string; cacheDir: string },
+  /** 가족 의견 가져오기(없으면 가족 결과 없이 답한다). */
+  getHistory?: () => Promise<HistoryItem[]>,
 ): PipelineDeps {
   const runClaude = createClaudeRunner({
     bin: cfg.claudeBin,
@@ -47,6 +53,7 @@ export function makePipelineDeps(
   });
   return {
     runClaude,
+    ...(getHistory ? { getHistory } : {}),
     expand: (q, signal) =>
       expandQuery(
         {
@@ -112,13 +119,22 @@ async function dryRun(args: string[]): Promise<number> {
   process.env.YJ_TODAY = "2020-03-06"; // 합성 픽스처 날짜에 맞춘다(월령 계산)
   const fx = makeFixture(cfg.pythonBin);
   const cacheDir = join(fx.root, "cache");
-  const deps = makePipelineDeps(cfg, { dataDir: fx.dataDir, ingestRoot: fx.ingestRoot, cacheDir });
+  // 시험용 주입: --history <json>(가족 결과) / --reask <json>(다시 답변). 합성 자료만 쓴다.
+  const historyPath = opt(args, "--history");
+  const reaskPath = opt(args, "--reask");
+  const history = historyPath ? parseHistory(readFileSync(historyPath, "utf8")) : null;
+  const reask = reaskPath ? parseReask(readFileSync(reaskPath, "utf8"))("dry-run") : undefined;
+  const deps = makePipelineDeps(
+    cfg,
+    { dataDir: fx.dataDir, ingestRoot: fx.ingestRoot, cacheDir },
+    history ? () => Promise.resolve(history) : undefined,
+  );
   console.log("dry-run: 합성 질문 + 합성 픽스처 (네트워크·claim 없음)");
   let res;
   try {
     res = await answerQuestion(
       deps,
-      { body: SYNTHETIC_QUESTION, askedBy: "테스트", redFlag: false },
+      { body: SYNTHETIC_QUESTION, askedBy: "테스트", redFlag: false, reask },
       {
         onStage: (s, ms) => {
           console.log(`  stage ${s}: ${ms}ms`);
@@ -165,10 +181,22 @@ export async function main(args: string[]): Promise<number> {
   process.on("SIGTERM", stop);
   process.on("SIGBREAK", stop);
   try {
-    const pipe = makePipelineDeps(cfg, { dataDir: cfg.dataDir, cacheDir: join(home, "cache") });
+    const client = createClient({ origin: cfg.origin, token: cfg.token });
+    // 가족 의견은 claim 직후 받아 60초 캐시한다. 가져오기에 실패해도 가족 결과 없이 답한다.
+    const history = createHistoryCache(() => client.history(60));
+    const pipe = makePipelineDeps(
+      cfg,
+      { dataDir: cfg.dataDir, cacheDir: join(home, "cache") },
+      () => history.get(),
+    );
     const loopDeps: LoopDeps = {
-      client: createClient({ origin: cfg.origin, token: cfg.token }),
+      client,
       process: (q, hooks, signal) => answerQuestion(pipe, q, hooks, signal),
+      // 처리 뒤 로컬 의견 요약 파일 갱신(본문 없음: 개수·질문 번호만)
+      afterProcess: async () => {
+        const items = await history.get(true);
+        writeDigest(join(home, DIGEST_FILE), buildDigest(items, Date.now()));
+      },
       log,
       sleep: abortableSleep,
       pollMs: cfg.pollMs,

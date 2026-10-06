@@ -18,6 +18,8 @@ export interface LoopDeps {
   log: Logger;
   sleep: (ms: number, signal: AbortSignal) => Promise<void>;
   pollMs: number;
+  /** 한 건 처리가 끝난 뒤(성공·실패 모두) 부르는 후처리(의견 요약 파일 갱신 등). 실패해도 루프는 계속한다. */
+  afterProcess?: () => Promise<void>;
   heartbeatMs?: number; // 처리 중 리스 연장 간격(0 이면 끔)
   backoffBaseMs?: number;
   backoffMaxMs?: number;
@@ -148,6 +150,13 @@ export async function handleOne(
     }
   } finally {
     if (hb) clearInterval(hb);
+  }
+  if (deps.afterProcess) {
+    try {
+      await deps.afterProcess();
+    } catch {
+      log("after_process_error", { id: q.id });
+    }
   }
   return { claimed: true, netError };
 }

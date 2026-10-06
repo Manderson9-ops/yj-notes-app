@@ -408,11 +408,21 @@ describe("민감 정보", () => {
   });
 });
 
-async function finishQuestion(body: string, askedBy = "엄마", level = 5, over = {}): Promise<number> {
+async function finishQuestion(
+  body: string,
+  askedBy = "엄마",
+  level = 5,
+  over = {},
+): Promise<number> {
   const id = await ask(body, askedBy);
   const got = await claimed();
   expect(got?.id).toBe(id);
-  const res = await workerCall(h, "POST", `/api/worker/ask/${String(id)}/answer`, workerAnswerBody(level, over));
+  const res = await workerCall(
+    h,
+    "POST",
+    `/api/worker/ask/${String(id)}/answer`,
+    workerAnswerBody(level, over),
+  );
   expect(res.status).toBe(200);
   return id;
 }
@@ -430,35 +440,64 @@ describe("claim: 다시 답변(reask) 덩어리", () => {
     const res = await workerCall(h, "POST", "/api/worker/ask/claim");
     const j = await res.json<{
       question: { id: number };
-      reask?: { count: number; reason: string; by: string; previousAnswer: { summary: string } | null };
+      reask?: {
+        count: number;
+        reason: string;
+        by: string;
+        previousAnswer: { summary: string } | null;
+      };
     }>();
     expect(j.question.id).toBe(id);
-    expect(j.reask).toMatchObject({ count: 1, reason: "우리 상황과 달라요 · 합성 사정이 있어요", by: "아빠" });
+    expect(j.reask).toMatchObject({
+      count: 1,
+      reason: "우리 상황과 달라요 · 합성 사정이 있어요",
+      by: "아빠",
+    });
     expect(j.reask?.previousAnswer?.summary).toContain("합성 상황");
   });
 
   it("처음 답변 claim 응답에는 reask 키가 없다", async () => {
     await ask("합성 질문");
-    const j = await (await workerCall(h, "POST", "/api/worker/ask/claim")).json<Record<string, unknown>>();
+    const j = await (
+      await workerCall(h, "POST", "/api/worker/ask/claim")
+    ).json<Record<string, unknown>>();
     expect(Object.keys(j)).toEqual(["question"]);
   });
 });
 
 describe("GET /api/worker/ask/history", () => {
   const history = (qs = "") => workerCall(h, "GET", `/api/worker/ask/history${qs}`);
-  type Hist = {
+  interface Hist {
     items: {
-      id: number; body: string; askedBy: string; level: number; tryNowActions: string[];
-      votes: { by: string; helpful: boolean; reason: string | null }[];
+      id: number;
+      body: string;
+      askedBy: string;
+      level: number;
+      tryNowActions: string[];
+      votes: { by: string; helpful: boolean; reason: string | null; updatedAt: string }[];
       notes: { by: string; note: string }[];
     }[];
-  };
+  }
 
   it("토큰 없음·틀린 토큰 401, 세션 쿠키만으로도 401", async () => {
-    expect((await workerCall(h, "GET", "/api/worker/ask/history", undefined, null)).status).toBe(401);
-    expect((await workerCall(h, "GET", "/api/worker/ask/history", undefined, "wrong-token-0123456789abcdef")).status).toBe(401);
+    expect((await workerCall(h, "GET", "/api/worker/ask/history", undefined, null)).status).toBe(
+      401,
+    );
+    expect(
+      (
+        await workerCall(
+          h,
+          "GET",
+          "/api/worker/ask/history",
+          undefined,
+          "wrong-token-0123456789abcdef",
+        )
+      ).status,
+    ).toBe(401);
     const viaCookie = await h.handle(
-      new Request("https://app.example.test/api/worker/ask/history", { headers: { Cookie: cookie } }),
+      new Request("https://app.example.test/api/worker/ask/history", {
+        headers: { Cookie: cookie },
+      }),
     );
     expect(viaCookie.status).toBe(401);
   });
@@ -472,9 +511,19 @@ describe("GET /api/worker/ask/history", () => {
     const a = await finishQuestion("합성 질문 첫째");
     const b = await finishQuestion("합성 질문 둘째", "아빠", 4);
     await ask("아직 대기 중 질문");
-    await sessionCall(h, cookie, "PUT", `/api/ask/${String(a)}/vote`, { by: "엄마", helpful: true });
-    await sessionCall(h, cookie, "PUT", `/api/ask/${String(a)}/vote`, { by: "할머니", helpful: false, reason: "안 됐어요" });
-    await sessionCall(h, cookie, "POST", `/api/ask/${String(a)}/feedback`, { by: "엄마", note: "먼저 안아 줬어요" });
+    await sessionCall(h, cookie, "PUT", `/api/ask/${String(a)}/vote`, {
+      by: "엄마",
+      helpful: true,
+    });
+    await sessionCall(h, cookie, "PUT", `/api/ask/${String(a)}/vote`, {
+      by: "할머니",
+      helpful: false,
+      reason: "안 됐어요",
+    });
+    await sessionCall(h, cookie, "POST", `/api/ask/${String(a)}/feedback`, {
+      by: "엄마",
+      note: "먼저 안아 줬어요",
+    });
     const res = await history();
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toContain("no-store");
@@ -483,8 +532,13 @@ describe("GET /api/worker/ask/history", () => {
     expect(j.items[0]).toMatchObject({ body: "합성 질문 둘째", askedBy: "아빠", level: 4 });
     expect(j.items[1]?.tryNowActions).toEqual(["먼저 안아 주기", "잠시 쉬기"]);
     expect(j.items[1]?.votes).toEqual([
-      { by: "엄마", helpful: true, reason: null },
-      { by: "할머니", helpful: false, reason: "안 됐어요" },
+      { by: "엄마", helpful: true, reason: null, updatedAt: expect.any(String) as string },
+      {
+        by: "할머니",
+        helpful: false,
+        reason: "안 됐어요",
+        updatedAt: expect.any(String) as string,
+      },
     ]);
     expect(j.items[1]?.notes[0]).toMatchObject({ by: "엄마", note: "먼저 안아 줬어요" });
   });
@@ -495,11 +549,22 @@ describe("GET /api/worker/ask/history", () => {
     await workerCall(h, "POST", `/api/worker/ask/${String(nb)}/answer`, {
       level: 1,
       answer: {
-        kind: "not_behavior", level: 1, levelTitle: "", levelReason: "도울 수 있는 일을 안내해요",
-        summary: "행동 질문이 아니에요", fromRecords: [], evidence: [], tryNow: [], avoid: [],
-        upIf: [], downIf: [], forAsker: "엄마께: 행동을 물어봐 주세요",
+        kind: "not_behavior",
+        level: 1,
+        levelTitle: "",
+        levelReason: "도울 수 있는 일을 안내해요",
+        summary: "행동 질문이 아니에요",
+        fromRecords: [],
+        evidence: [],
+        tryNow: [],
+        avoid: [],
+        upIf: [],
+        downIf: [],
+        forAsker: "엄마께: 행동을 물어봐 주세요",
       },
-      reviewScore: 9.6, model: "m", workMs: 1,
+      reviewScore: 9.6,
+      model: "m",
+      workMs: 1,
     });
     const gone = await finishQuestion("합성 삭제될 질문");
     await sessionCall(h, cookie, "DELETE", `/api/ask/${String(gone)}`);
@@ -519,14 +584,20 @@ describe("GET /api/worker/ask/history", () => {
     const big = "가".repeat(480);
     for (let i = 0; i < 100; i++) {
       h.fake.sqlite
-        .prepare("INSERT INTO ask_question (asked_by, body, status, created_at, updated_at) VALUES ('엄마', ?, 'done', '2030-01-01T00:00:00.000Z', '2030-01-01T00:00:00.000Z')")
+        .prepare(
+          "INSERT INTO ask_question (asked_by, body, status, created_at, updated_at) VALUES ('엄마', ?, 'done', '2030-01-01T00:00:00.000Z', '2030-01-01T00:00:00.000Z')",
+        )
         .run(`${big}${String(i)}`);
       h.fake.sqlite
-        .prepare("INSERT INTO ask_answer (question_id, level, answer_json, created_at) VALUES (?, 5, ?, '2030-01-01T00:00:00.000Z')")
+        .prepare(
+          "INSERT INTO ask_answer (question_id, level, answer_json, created_at) VALUES (?, 5, ?, '2030-01-01T00:00:00.000Z')",
+        )
         .run(i + 1, JSON.stringify(syntheticAnswer(5)));
       for (let k = 0; k < 10; k++) {
         h.fake.sqlite
-          .prepare("INSERT INTO ask_feedback (question_id, by, note, created_at) VALUES (?, '엄마', ?, '2030-01-01T00:00:00.000Z')")
+          .prepare(
+            "INSERT INTO ask_feedback (question_id, by, note, created_at) VALUES (?, '엄마', ?, '2030-01-01T00:00:00.000Z')",
+          )
           .run(i + 1, "나".repeat(300));
       }
     }

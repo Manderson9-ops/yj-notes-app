@@ -95,3 +95,67 @@ describe("client", () => {
     await expect(c.ping()).rejects.toBeInstanceOf(NetworkError);
   });
 });
+
+describe("client: 다시 답변·history (T-Q3)", () => {
+  const claimBody = {
+    question: {
+      id: 7,
+      body: "합성 질문",
+      askedBy: "테스트",
+      createdAt: "2020-03-01T00:00:00Z",
+      redFlag: false,
+    },
+    reask: { count: 1, reason: "이미 해 봤어요", by: "아빠", previousAnswer: goodAnswer() },
+  };
+  it("claim: reask 덩어리를 질문에 붙여 돌려준다(없으면 키 없음)", async () => {
+    const f = fakeFetch([
+      new Response(JSON.stringify(claimBody), { status: 200 }),
+      new Response(JSON.stringify({ question: claimBody.question }), { status: 200 }),
+    ]);
+    const c = createClient({ ...opts, fetchFn: f.fn });
+    const q = await c.claim();
+    expect(q?.reask).toMatchObject({ count: 1, reason: "이미 해 봤어요", by: "아빠" });
+    expect(q?.reask?.previousAnswer?.level).toBe(4);
+    expect((await c.claim())?.reask).toBeUndefined();
+  });
+  it("claim: reask 모양이 틀리면 502", async () => {
+    const bad = { ...claimBody, reask: { count: 0, reason: "x", by: "a", previousAnswer: null } };
+    const c = createClient({ ...opts, fetchFn: fakeFetch([new Response(JSON.stringify(bad))]).fn });
+    await expect(c.claim()).rejects.toMatchObject({ status: 502 });
+  });
+  it("history: GET, limit 은 1~100 으로 맞추고 항목을 파싱한다", async () => {
+    const item = {
+      id: 3,
+      body: "합성",
+      askedBy: "엄마",
+      createdAt: "2020-03-01T00:00:00Z",
+      level: 4,
+      tryNowActions: ["a"],
+      votes: [],
+      notes: [],
+    };
+    const f = fakeFetch([
+      new Response(JSON.stringify({ items: [item] })),
+      new Response(JSON.stringify({ items: [] })),
+    ]);
+    const c = createClient({ ...opts, fetchFn: f.fn });
+    expect(await c.history(60)).toEqual([item]);
+    expect(f.calls[0]?.url).toBe("https://app.example.test/api/worker/ask/history?limit=60");
+    expect(f.calls[0]?.init.method).toBe("GET");
+    await c.history(5000);
+    expect(f.calls[1]?.url).toContain("limit=100");
+  });
+  it("history: 401 은 ApiError, 모양 오류·너무 큰 응답은 502", async () => {
+    const mk = (r: Response) => createClient({ ...opts, fetchFn: fakeFetch([r]).fn });
+    await expect(mk(new Response("", { status: 401 })).history()).rejects.toMatchObject({
+      status: 401,
+    });
+    await expect(
+      mk(new Response(JSON.stringify({ items: [{ id: 1 }] }))).history(),
+    ).rejects.toMatchObject({ status: 502 });
+    await expect(mk(new Response("x".repeat(400_001))).history()).rejects.toMatchObject({
+      status: 502,
+    });
+    await expect(mk(new Response("not json")).history()).rejects.toMatchObject({ status: 502 });
+  });
+});

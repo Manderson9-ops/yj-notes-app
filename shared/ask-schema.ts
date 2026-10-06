@@ -187,7 +187,13 @@ export const HistoryItemSchema = z.object({
   level: z.number().int().min(1).max(10),
   tryNowActions: z.array(z.string()),
   votes: z.array(
-    z.object({ by: z.string(), helpful: z.boolean(), reason: z.string().nullable() }),
+    z.object({
+      by: z.string(),
+      helpful: z.boolean(),
+      reason: z.string().nullable(),
+      /** 표를 남기거나 바꾼 시각(ISO). 워커의 최근 30일 요약에 쓴다. */
+      updatedAt: z.string(),
+    }),
   ),
   notes: z.array(z.object({ by: z.string(), note: z.string(), createdAt: z.string() })),
 });

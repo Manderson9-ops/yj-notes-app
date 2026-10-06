@@ -15,6 +15,7 @@ import { levelProblem, type LevelSuggestion } from "./level-suggest.ts";
 import { levelTitle } from "./levels.ts";
 import type { SearchSummary } from "./pack.ts";
 import { refDomain, textMatchesDomain } from "./topics.ts";
+import { FAMILY_REF_PREFIX, sameMethod, type FamilyInfo, type ReaskInfo } from "./family.ts";
 
 export interface PackInfo {
   pack: string;
@@ -33,6 +34,10 @@ export interface PackInfo {
   askedBy?: string | undefined;
   /** 질문에서 계산한 권장 단계(위급이면 없음). 모델 단계가 ±1 밖이면 근거를 대야 한다. */
   suggested?: LevelSuggestion | undefined;
+  /** 가족 결과 구역에 실린 FAMILY-Q ref 와 잘 안 됐다고 한 방법(없으면 관련 검사를 건너뛴다). */
+  family?: FamilyInfo | undefined;
+  /** 다시 답변이면 이유 선택지와 이전 답의 해 볼 것. */
+  reask?: ReaskInfo | undefined;
 }
 
 export interface Severity {
@@ -103,7 +108,10 @@ const UNRELATED =
   /직접\s*관련(?:은|이)?\s*없|관련\s*없|관련이\s*적|관련은\s*적|상관\s*없|지금과(?:는)?\s*(?:많이\s*)?달라/;
 /** 가족에게 보이는 글에 쓰면 안 되는 내부 표지·파일·ID(refs 는 evidence.ref·tryNow.basis 에만). */
 export const INTERNAL_LABEL =
-  /권장\s*보다|권장\s*단계|[(（]\s*장소\s*모름\s*[)）]|장소\s*모름|[(（]\s*반\s*친구일\s*수\s*있음\s*[)）]|records\/|가이드\s*§|guide:|묶음|전수|INT-|NORM-|EMERG-/;
+  /권장\s*보다|권장\s*단계|[(（]\s*장소\s*모름\s*[)）]|장소\s*모름|[(（]\s*반\s*친구일\s*수\s*있음\s*[)）]|records\/|가이드\s*§|guide:|묶음|전수|INT-|NORM-|EMERG-|FAMILY-/;
+/** 「이번엔 바꿔서」처럼 다시 권하는 이유(바뀐 점)를 밝히는 말. */
+const CHANGE_WORDS =
+  /이번엔|이번에는|바꿔|바꾼|바꿨|달리|다르게|대신|조금\s*다|방법을\s*바|변경|보완/;
 /** 판단을 기다리라는 말 / 기다리지 말라는 말(한 답 안에서 함께 나오면 모순). */
 const WAIT_WORDS = /다음\s*(?:진료|검진|방문)\s*때|며칠\s*(?:더\s*)?지켜|더\s*지켜보|두고\s*보/;
 const NO_WAIT_WORDS = /기다리지\s*말|미루지\s*말|지금\s*바로|바로\s*(?:상담|연락|진료|예약)/;
@@ -230,6 +238,33 @@ export function claimRefuted(sentence: string, s: SearchSummary): string | null 
 
 // ── 본 검사 ───────────────────────────────────────────────
 
+/** evidence.ref·tryNow.basis 가 묶음에 실재하는가(HARD). FAMILY-Q ref 는 이번 묶음의 가족 결과에 있어야 한다. */
+function checkRefs(
+  answer: Answer,
+  refs: ReadonlySet<string>,
+  hard: (category: CheckCategory, text: string) => void,
+): void {
+  const famMissing = (r: string): boolean => r.startsWith(FAMILY_REF_PREFIX) && !refs.has(r);
+  for (const e of answer.evidence) {
+    const r = e.ref.trim();
+    if (famMissing(r))
+      hard("factual", `FAMILY-Q ref 가 이번 가족 결과에 없어요: ${r.slice(0, 40)}`);
+    else if (!refs.has(r))
+      hard("factual", `evidence.ref 가 근거 묶음에 없어요: ${e.ref.slice(0, 40)}`);
+  }
+  for (const t of answer.tryNow) {
+    const b = t.basis.trim();
+    if (famMissing(b))
+      hard("factual", `FAMILY-Q ref 가 이번 가족 결과에 없어요: ${b.slice(0, 40)}`);
+    else if (b !== GENERAL_BASIS && !refs.has(b)) {
+      hard(
+        "factual",
+        `tryNow.basis 는 묶음의 ref 이거나 정확히 「${GENERAL_BASIS}」 여야 해요: ${b.slice(0, 40)}`,
+      );
+    }
+  }
+}
+
 export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): CheckResult {
   const items: CheckIssue[] = [];
   const hard = (category: CheckCategory, text: string) =>
@@ -306,19 +341,7 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
       soft("safety", "위급 처치의 basis 는 묶음의 EMERG-… ref 로 써요");
     }
     for (const m of checkSpecialist(answer.level, answer.upIf)) soft("safety", m);
-    for (const e of answer.evidence) {
-      if (!refs.has(e.ref.trim()))
-        hard("factual", `evidence.ref 가 근거 묶음에 없어요: ${e.ref.slice(0, 40)}`);
-    }
-    for (const t of answer.tryNow) {
-      const b = t.basis.trim();
-      if (b !== GENERAL_BASIS && !refs.has(b)) {
-        hard(
-          "factual",
-          `tryNow.basis 는 묶음의 ref 이거나 정확히 「${GENERAL_BASIS}」 여야 해요: ${b.slice(0, 40)}`,
-        );
-      }
-    }
+    checkRefs(answer, refs, hard);
     return done(answer);
   }
 
@@ -355,19 +378,7 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
   }
   for (const m of checkSpecialist(answer.level, answer.upIf)) soft("safety", m);
 
-  for (const e of answer.evidence) {
-    if (!refs.has(e.ref.trim()))
-      hard("factual", `evidence.ref 가 근거 묶음에 없어요: ${e.ref.slice(0, 40)}`);
-  }
-  for (const t of answer.tryNow) {
-    const b = t.basis.trim();
-    if (b !== GENERAL_BASIS && !refs.has(b)) {
-      hard(
-        "factual",
-        `tryNow.basis 는 묶음의 ref 이거나 정확히 「${GENERAL_BASIS}」 여야 해요: ${b.slice(0, 40)}`,
-      );
-    }
-  }
+  checkRefs(answer, refs, hard);
   const dates = packDates(info.pack);
   const meta = packMeta(info.pack);
   for (const r of answer.fromRecords) {
@@ -498,6 +509,31 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
         "over_interpretation",
         `[over_interpretation] tryNow.basis ${t.basis.slice(0, 40)} 는 ${d} 주제 근거인데 이 행동·질문과 맞지 않아요 — 직접 뒷받침하는 행동에만 쓰고 아니면 「${GENERAL_BASIS}」`,
       );
+    }
+  }
+
+  // 가족 결과: 잘 안 됐다고 한 방법을 바꾼 점 없이 그대로 다시 권하면 안 된다
+  if (info.family && info.family.failed.length > 0) {
+    const why = [answer.levelReason, answer.forAsker].join(" ");
+    for (const t of answer.tryNow) {
+      const hit = info.family.failed.find((f) => sameMethod(t.action, f.action));
+      if (hit && !CHANGE_WORDS.test(`${t.action} ${t.say ?? ""} ${why}`)) {
+        soft(
+          "ungrounded",
+          `tryNow 「${t.action.slice(0, 40)}」는 가족이 해 봤는데 잘 안 됐다고 한 방법과 같아요(질문 ${String(hit.id)}) — 그대로 다시 권하지 말고 바꾼 점을 분명히 써요(「이번엔 ○○를 바꿔서」) 또는 다른 방법으로 바꿔요`,
+        );
+      }
+    }
+  }
+  // 다시 답변 「이미 해 봤어요」: 이전 해 볼 것과 같은 방법을 또 권하면 안 된다
+  if (info.reask?.choice === "이미 해 봤어요" && info.reask.previousActions.length > 0) {
+    for (const t of answer.tryNow) {
+      if (info.reask.previousActions.some((p) => sameMethod(t.action, p))) {
+        soft(
+          "template",
+          `다시 답변 이유가 「이미 해 봤어요」인데 tryNow 「${t.action.slice(0, 40)}」는 이전 답과 같은 방법이에요 — 다른 방법으로 바꿔요`,
+        );
+      }
     }
   }
 

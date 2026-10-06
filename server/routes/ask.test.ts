@@ -7,13 +7,7 @@ import {
   workerCall,
 } from "../test-utils/ask";
 import { ASK_REASK_MAX, ASK_VOTERS_MAX } from "../../shared/ask-schema";
-import {
-  ORIGIN,
-  TEST_PIN,
-  cookieFrom,
-  createHarness,
-  type Harness,
-} from "../test-utils/harness";
+import { ORIGIN, TEST_PIN, cookieFrom, createHarness, type Harness } from "../test-utils/harness";
 import { ASK_RATE } from "./ask";
 
 let h: Harness;
@@ -253,18 +247,23 @@ async function doneQuestion(body = "합성 질문", askedBy = "엄마"): Promise
   const id = (await (await ask(body, askedBy)).json<{ id: number }>()).id;
   const claim = await workerCall(h, "POST", "/api/worker/ask/claim");
   expect(claim.status).toBe(200);
-  const res = await workerCall(h, "POST", `/api/worker/ask/${String(id)}/answer`, workerAnswerBody(5));
+  const res = await workerCall(
+    h,
+    "POST",
+    `/api/worker/ask/${String(id)}/answer`,
+    workerAnswerBody(5),
+  );
   expect(res.status).toBe(200);
   return id;
 }
-type Detail = {
+interface Detail {
   status: string;
   feedback: { by: string; note: string }[];
   votes: { by: string; helpful: boolean; reason: string | null }[];
   history: { version: number; level: number | null; answer: { summary: string } }[];
   reask: { count: number; reason: string | null; by: string | null };
   answer?: { level: number };
-};
+}
 const detail = async (id: number): Promise<Detail> =>
   (await call("GET", `/api/ask/${String(id)}`)).json<Detail>();
 
@@ -275,7 +274,9 @@ describe("POST /api/ask/:id/feedback (메모만)", () => {
     expect((await call("POST", p, { by: "할머니", note: "해 봤어요" })).status).toBe(201);
     expect((await call("POST", p, { by: "아빠", helpful: true })).status).toBe(422);
     expect((await call("POST", p, { by: "아빠", note: "x", helpful: true })).status).toBe(422);
-    expect((await detail(id)).feedback.map((f) => [f.by, f.note])).toEqual([["할머니", "해 봤어요"]]);
+    expect((await detail(id)).feedback.map((f) => [f.by, f.note])).toEqual([
+      ["할머니", "해 봤어요"],
+    ]);
   });
 
   it("검증: 메모 없음·501자·없는 질문", async () => {
@@ -283,7 +284,9 @@ describe("POST /api/ask/:id/feedback (메모만)", () => {
     const p = `/api/ask/${String(id)}/feedback`;
     expect((await call("POST", p, { by: "아빠" })).status).toBe(422);
     expect((await call("POST", p, { by: "아빠", note: "가".repeat(501) })).status).toBe(422);
-    expect((await call("POST", "/api/ask/999/feedback", { by: "아빠", note: "x" })).status).toBe(404);
+    expect((await call("POST", "/api/ask/999/feedback", { by: "아빠", note: "x" })).status).toBe(
+      404,
+    );
   });
 });
 
@@ -292,7 +295,9 @@ describe("PUT /api/ask/:id/vote", () => {
     const id = await doneQuestion();
     const p = `/api/ask/${String(id)}/vote`;
     expect((await call("PUT", p, { by: "아빠", helpful: true })).status).toBe(200);
-    let r = await (await call("PUT", p, { by: "할머니", helpful: false, reason: "너무 어려워요" })).json<{
+    let r = await (
+      await call("PUT", p, { by: "할머니", helpful: false, reason: "너무 어려워요" })
+    ).json<{
       votes: { by: string; helpful: boolean; reason: string | null }[];
     }>();
     expect(r.votes.map((v) => [v.by, v.helpful, v.reason])).toEqual([
@@ -318,12 +323,18 @@ describe("PUT /api/ask/:id/vote", () => {
     const id = await doneQuestion();
     const p = `/api/ask/${String(id)}/vote`;
     expect((await call("PUT", p, { by: "아빠", helpful: true, reason: "x" })).status).toBe(422);
-    expect((await call("PUT", p, { by: "아빠", helpful: false, reason: "가".repeat(201) })).status).toBe(422);
+    expect(
+      (await call("PUT", p, { by: "아빠", helpful: false, reason: "가".repeat(201) })).status,
+    ).toBe(422);
     expect((await call("PUT", p, { by: "아빠", helpful: "yes" })).status).toBe(422);
     expect((await call("PUT", p, { by: "아빠", helpful: true, extra: 1 })).status).toBe(422);
     expect((await call("PUT", p, { by: "", helpful: true })).status).toBe(422);
-    expect((await call("PUT", "/api/ask/999/vote", { by: "아빠", helpful: true })).status).toBe(404);
-    expect((await call("PUT", "/api/ask/abc/vote", { by: "아빠", helpful: true })).status).toBe(404);
+    expect((await call("PUT", "/api/ask/999/vote", { by: "아빠", helpful: true })).status).toBe(
+      404,
+    );
+    expect((await call("PUT", "/api/ask/abc/vote", { by: "아빠", helpful: true })).status).toBe(
+      404,
+    );
     const pending = (await (await ask("대기 중 질문")).json<{ id: number }>()).id;
     expect(
       (await call("PUT", `/api/ask/${String(pending)}/vote`, { by: "아빠", helpful: true })).status,
@@ -357,7 +368,9 @@ describe("PUT /api/ask/:id/vote", () => {
     await call("PUT", `/api/ask/${String(id)}/vote`, { by: "아빠", helpful: true });
     await call("PUT", `/api/ask/${String(id)}/vote`, { by: "엄마", helpful: true });
     await call("PUT", `/api/ask/${String(id)}/vote`, { by: "할머니", helpful: false });
-    const list = await (await call("GET", "/api/ask")).json<{
+    const list = await (
+      await call("GET", "/api/ask")
+    ).json<{
       items: { id: number; votes: { up: number; down: number } }[];
     }>();
     expect(list.items[0]?.votes).toEqual({ up: 2, down: 1 });
@@ -365,14 +378,17 @@ describe("PUT /api/ask/:id/vote", () => {
 });
 
 describe("POST /api/ask/:id/reask", () => {
-  const reask = (id: number, json: unknown) =>
-    call("POST", `/api/ask/${String(id)}/reask`, json);
+  const reask = (id: number, json: unknown) => call("POST", `/api/ask/${String(id)}/reask`, json);
 
   it("done 만: 현재 답을 이력 1 로 옮기고 대기로 돌린다", async () => {
     const id = await doneQuestion();
     const before = await detail(id);
     expect(before.answer?.level).toBe(5);
-    const res = await reask(id, { by: "아빠", choice: "이미 해 봤어요", text: "안아 주기는 했어요" });
+    const res = await reask(id, {
+      by: "아빠",
+      choice: "이미 해 봤어요",
+      text: "안아 주기는 했어요",
+    });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: "pending", reaskCount: 1 });
     const d = await detail(id);
@@ -380,7 +396,11 @@ describe("POST /api/ask/:id/reask", () => {
     expect(d.answer).toBeUndefined();
     expect(d.history).toHaveLength(1);
     expect(d.history[0]).toMatchObject({ version: 1, level: 5 });
-    expect(d.reask).toEqual({ count: 1, reason: "이미 해 봤어요 · 안아 주기는 했어요", by: "아빠" });
+    expect(d.reask).toEqual({
+      count: 1,
+      reason: "이미 해 봤어요 · 안아 주기는 했어요",
+      by: "아빠",
+    });
     const [qrow] = rows<{ attempts: number; status: string }>(
       h,
       `SELECT attempts, status FROM ask_question WHERE id = ${String(id)}`,
@@ -397,7 +417,9 @@ describe("POST /api/ask/:id/reask", () => {
       const claim = await workerCall(h, "POST", "/api/worker/ask/claim");
       expect(claim.status).toBe(200);
       const body = workerAnswerBody(5, { summary: `합성 답변 ${String(n + 1)}번째예요` });
-      expect((await workerCall(h, "POST", `/api/worker/ask/${String(id)}/answer`, body)).status).toBe(200);
+      expect(
+        (await workerCall(h, "POST", `/api/worker/ask/${String(id)}/answer`, body)).status,
+      ).toBe(200);
     }
     const d = await detail(id);
     expect(d.history.map((x) => x.version)).toEqual([1, 2, 3]);
@@ -413,7 +435,9 @@ describe("POST /api/ask/:id/reask", () => {
     expect((await reask(pending, { by: "엄마", choice: "너무 일반적이에요" })).status).toBe(409);
     expect((await reask(id, { by: "엄마", choice: "아무 이유" })).status).toBe(422);
     expect((await reask(id, { by: "엄마" })).status).toBe(422);
-    expect((await reask(id, { by: "엄마", choice: "이미 해 봤어요", text: "가".repeat(281) })).status).toBe(422);
+    expect(
+      (await reask(id, { by: "엄마", choice: "이미 해 봤어요", text: "가".repeat(281) })).status,
+    ).toBe(422);
     expect((await reask(id, { by: "엄마", choice: "이미 해 봤어요", more: 1 })).status).toBe(422);
     expect((await reask(999, { by: "엄마", choice: "이미 해 봤어요" })).status).toBe(404);
     expect((await detail(id)).status).toBe("done"); // 검증 실패는 아무것도 바꾸지 않는다
@@ -433,7 +457,10 @@ describe("POST /api/ask/:id/reask", () => {
     await workerCall(h, "POST", "/api/worker/ask/claim");
     h.clock.t += 40_000;
     await workerCall(h, "POST", `/api/worker/ask/${String(id)}/answer`, workerAnswerBody(5));
-    const [a] = rows<{ total_ms: number; wait_ms: number }>(h, "SELECT total_ms, wait_ms FROM ask_answer");
+    const [a] = rows<{ total_ms: number; wait_ms: number }>(
+      h,
+      "SELECT total_ms, wait_ms FROM ask_answer",
+    );
     expect(a?.total_ms).toBe(60_000);
     expect(a?.wait_ms).toBe(20_000);
   });

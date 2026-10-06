@@ -2,6 +2,10 @@
 // golden.jsonl 한 줄: {"id":"g01","question":"...","askedBy":"..."?,"redFlag":false?}
 // 저장소 안 경로는 거부한다. 결과(JSON + markdown)에는 질문·답변 본문을 쓰지 않는다(id·점수·시간·감점 범주만).
 // 질문마다 결과 파일을 통째로 다시 쓴다(중간에 멈춰도 그때까지의 결과가 남는다).
+// --history <json>: 합성 가족 결과(이전 질문·표·메모)를 주입한다. 형식: HistoryItem[] 또는 {"items": HistoryItem[]} (GET /api/worker/ask/history 응답과 같다).
+// --reask <json>: 다시 답변 상황을 주입한다. 형식: {"reason","by","count"?,"previousAnswer"} 이면 모든 문항에, {"<골든 id>": {…}} 이면 그 문항에만.
+//   reason 은 「선택지」 또는 「선택지 · 자유 글」(선택지: 너무 일반적이에요 / 이미 해 봤어요 / 우리 상황과 달라요 / 더 자세히 알고 싶어요).
+// 두 파일 모두 저장소 밖 경로만 허용한다(결과에는 본문을 쓰지 않는다).
 // --save-answers: 독립 검토용으로 답변 본문과 검토 지적(범주·위치·수정안)을 answers-<시각>.json 에 저장한다(S1, 저장소 밖).
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,6 +14,7 @@ import { z } from "zod";
 import type { ReviewIssue } from "./answer-schema.ts";
 import { assertOutsideRepo, loadConfig } from "./config.ts";
 import { renderMarkdown, summarize, type EvalItem } from "./eval-stats.ts";
+import { parseHistory, parseReask } from "./inject.ts";
 import { answerQuestion } from "./pipeline.ts";
 import { makePipelineDeps } from "./worker.ts";
 
@@ -53,12 +58,18 @@ export async function main(args: string[]): Promise<number> {
   const outDir = opt(args, "--out");
   if (!setPath || !outDir) {
     console.error(
-      "사용: ask-worker:eval -- --set <golden.jsonl> --out <결과 폴더> [--runs 2] [--limit N] [--save-answers]",
+      "사용: ask-worker:eval -- --set <golden.jsonl> --out <결과 폴더> [--runs 2] [--limit N] [--save-answers] [--history <json>] [--reask <json>]",
     );
     return 1;
   }
   assertOutsideRepo(setPath);
   assertOutsideRepo(outDir);
+  const historyPath = opt(args, "--history");
+  const reaskPath = opt(args, "--reask");
+  if (historyPath) assertOutsideRepo(historyPath);
+  if (reaskPath) assertOutsideRepo(reaskPath);
+  const history = historyPath ? parseHistory(readFileSync(historyPath, "utf8")) : null;
+  const reaskOf = reaskPath ? parseReask(readFileSync(reaskPath, "utf8")) : () => undefined;
   const cfg = loadConfig({ requireToken: false });
   if (!cfg.dataDir) throw new Error("DATA_DIR 가 필요해요");
   const runs = Math.max(1, Math.min(3, Number(opt(args, "--runs") ?? 2)));
@@ -66,7 +77,11 @@ export async function main(args: string[]): Promise<number> {
   const saveAnswers = args.includes("--save-answers");
   const saved: SavedAnswer[] = [];
   const golden = parseGolden(readFileSync(setPath, "utf8")).slice(0, limit);
-  const deps = makePipelineDeps(cfg, { dataDir: cfg.dataDir, cacheDir: join(cfg.home, "cache") });
+  const deps = makePipelineDeps(
+    cfg,
+    { dataDir: cfg.dataDir, cacheDir: join(cfg.home, "cache") },
+    history ? () => Promise.resolve(history) : undefined,
+  );
   const items: EvalItem[] = [];
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   mkdirSync(outDir, { recursive: true });
@@ -88,6 +103,7 @@ export async function main(args: string[]): Promise<number> {
           body: g.question,
           askedBy: g.askedBy ?? "가족",
           redFlag: g.redFlag ?? false,
+          reask: reaskOf(g.id),
         });
         item.runs.push({
           level: r.level,

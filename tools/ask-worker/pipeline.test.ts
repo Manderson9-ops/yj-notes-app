@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ClaudeRequest, ClaudeRunner } from "./claude.ts";
 import { checkAnswer } from "./checks.ts";
+import type { ExpandResult } from "./expand.ts";
 import { goodAnswer, PACK, review } from "./fixtures.ts";
+import { hist } from "./hist-fixture.ts";
 import { answerQuestion, PipelineError, type PipelineDeps } from "./pipeline.ts";
 
 // 권장 단계 4(남을 때림 → 최소 4)가 되도록 한 질문: 합성 답(4단계)과 단계가 같아야 한다
@@ -344,5 +346,130 @@ describe("교정 라운드: 파이프라인", () => {
     expect(ra.deductions.record_link).toBe(0.3);
     const b = setup([old, review()]);
     expect((await answerQuestion(b.deps, q)).deductions.record_link).toBe(0);
+  });
+});
+
+describe("가족 의견·다시 답변 (T-Q3)", () => {
+  const famItem = hist({
+    id: 12,
+    notes: [
+      {
+        by: "엄마",
+        note: "식사 시간을 정해 뒀는데 효과 없었어요",
+        createdAt: "2020-03-02T00:00:00Z",
+      },
+    ],
+    votes: [
+      { by: "할머니", helpful: false, reason: "안 됐어요", updatedAt: "2020-03-02T00:00:00Z" },
+    ],
+  });
+  const expandOk = (): Promise<ExpandResult> =>
+    Promise.resolve({
+      ok: true,
+      expansion: {
+        keywords: ["식사", "밥"],
+        synonyms: [],
+        domains: ["feeding"],
+        topic: "식사",
+        isBehaviorQuestion: true,
+        frequency: null,
+        duration: null,
+        impact: null,
+        aggression: null,
+      },
+      ms: 1,
+      model: "m",
+    } as ExpandResult);
+
+  it("관련 가족 결과가 있으면 묶음에 구역이 붙고, FAMILY-Q basis 를 쓸 수 있다", async () => {
+    const answer = goodAnswer({
+      tryNow: [
+        { action: "간식 간격을 넉넉히 두어요", basis: "FAMILY-Q12" },
+        { action: "식탁에서 영상은 끄고 함께 앉아요", basis: "일반 권고" },
+      ],
+    });
+    const { deps, reqs } = setup([answer, review()]);
+    deps.getHistory = () => Promise.resolve([famItem]);
+    deps.today = () => "2020-03-06";
+    deps.expand = expandOk;
+    const r = await answerQuestion(deps, { ...q, id: 99 });
+    expect(r.reviewScore).toBe(10);
+    expect(reqs[0]?.prompt).toContain("## 가족이 전에 물어본 것과 해 본 결과");
+    expect(reqs[0]?.prompt).toContain("[ref: FAMILY-Q12]");
+    expect(reqs[1]?.prompt).toContain("FAMILY-Q12"); // 검토 호출에도 같은 묶음
+  });
+
+  it("자기 자신 질문은 가족 결과에서 빠지고, 가져오기 실패·빈 목록이면 구역이 없다", async () => {
+    const { deps, reqs } = setup([goodAnswer(), review()]);
+    deps.getHistory = () => Promise.resolve([famItem]);
+    deps.today = () => "2020-03-06";
+    deps.expand = expandOk;
+    await answerQuestion(deps, { ...q, id: 12 });
+    expect(reqs[0]?.prompt).not.toContain("가족이 전에 물어본 것");
+    const f = setup([goodAnswer(), review()]);
+    f.deps.getHistory = () => Promise.reject(new Error("net"));
+    f.deps.expand = expandOk;
+    const r = await answerQuestion(f.deps, q);
+    expect(r.reviewScore).toBe(10);
+    expect(f.reqs[0]?.prompt).not.toContain("가족이 전에 물어본 것");
+  });
+
+  it("위급 질문에는 가족 결과 구역을 붙이지 않는다", async () => {
+    const { deps, reqs } = setup([
+      goodAnswer({
+        level: 10,
+        upIf: ["119"],
+        tryNow: [{ action: "119에 바로 연락해요", basis: "일반 권고" }],
+      }),
+      review(),
+    ]);
+    deps.getHistory = () => Promise.resolve([famItem]);
+    deps.expand = expandOk;
+    await answerQuestion(deps, { ...q, redFlag: true }).catch(() => undefined);
+    expect(reqs[0]?.prompt ?? "").not.toContain("가족이 전에 물어본 것");
+  });
+
+  it("잘 안 됐다는 방법을 그대로 다시 권한 첫 답은 지적으로 재작성되고 최종은 바뀐 답", async () => {
+    const same = goodAnswer(); // 식사 시간을 정해 두어요 (실패한 방법)
+    const changed = goodAnswer({
+      tryNow: [
+        { action: "이번엔 식사 시간을 정해 두되 간식을 줄여요", basis: "SYN-IV-01" },
+        { action: "간식 간격을 넉넉히 두어요", basis: "일반 권고" },
+      ],
+    });
+    // SOFT 지적 0.5 만으로는 9.5(목표)라 재작성이 안 되므로, 검토의 다른 지적과 합쳐 목표 아래가 되게 한다
+    const { deps, reqs } = setup([same, review([{ category: "record_link" }]), changed, review()]);
+    deps.getHistory = () => Promise.resolve([famItem]);
+    deps.today = () => "2020-03-06";
+    deps.expand = expandOk;
+    const r = await answerQuestion(deps, { ...q, id: 99 });
+    expect(r.rewritten).toBe(true);
+    expect(reqs[2]?.prompt).toContain("잘 안 됐다고 한 방법과 같아요");
+    expect(r.answer.tryNow[0]?.action).toContain("이번엔");
+  });
+
+  it("다시 답변: 이전 답·이유가 묶음에 들어가고 생성 지시가 붙는다. 「이미 해 봤어요」에 같은 방법이면 재작성", async () => {
+    const prev = goodAnswer();
+    const reask = { count: 1, reason: "이미 해 봤어요", by: "아빠", previousAnswer: prev };
+    const diff = goodAnswer({
+      tryNow: [
+        { action: "식탁에 앉는 순서를 아이가 고르게 해요", basis: "일반 권고" },
+        { action: "간식 간격을 넉넉히 두어요", basis: "일반 권고" },
+      ],
+    });
+    const { deps, reqs } = setup([prev, review(), diff, review()]);
+    const r = await answerQuestion(deps, { ...q, reask });
+    expect(reqs[0]?.prompt).toContain("## 다시 답변 요청");
+    expect(reqs[0]?.prompt).toContain("이번은 다시 답변이에요");
+    expect(reqs[0]?.prompt).toContain("이전 해 볼 것 1: 식사 시간을 정해 두어요");
+    expect(r.rewritten).toBe(true);
+    expect(reqs[2]?.prompt).toContain("이전 답과 같은 방법이에요");
+  });
+
+  it("처음 질문(가족 결과·다시 답변 없음)은 기존과 같다: 단계 시간에 history 가 없다", async () => {
+    const { deps } = setup([goodAnswer(), review()]);
+    const stages: string[] = [];
+    await answerQuestion(deps, q, { onStage: (s) => stages.push(s) });
+    expect(stages).toEqual(["pack", "generate", "review"]);
   });
 });

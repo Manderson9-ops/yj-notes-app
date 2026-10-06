@@ -28,16 +28,40 @@ describe("migration 0009 데이터 이동", () => {
     for (const f of files.filter((n) => n >= "0009")) db.exec(sql(f));
 
     const votes = db
-      .prepare("SELECT question_id, by, helpful, reason, updated_at FROM ask_vote ORDER BY question_id, by")
+      .prepare(
+        "SELECT question_id, by, helpful, reason, updated_at FROM ask_vote ORDER BY question_id, by",
+      )
       .all();
     expect(votes).toEqual([
-      { question_id: 1, by: "아빠", helpful: 0, reason: null, updated_at: "2020-01-03T00:00:00.000Z" },
-      { question_id: 1, by: "할머니", helpful: 1, reason: null, updated_at: "2020-01-04T00:00:00.000Z" },
-      { question_id: 2, by: "아빠", helpful: 1, reason: null, updated_at: "2020-01-05T00:00:00.000Z" },
+      {
+        question_id: 1,
+        by: "아빠",
+        helpful: 0,
+        reason: null,
+        updated_at: "2020-01-03T00:00:00.000Z",
+      },
+      {
+        question_id: 1,
+        by: "할머니",
+        helpful: 1,
+        reason: null,
+        updated_at: "2020-01-04T00:00:00.000Z",
+      },
+      {
+        question_id: 2,
+        by: "아빠",
+        helpful: 1,
+        reason: null,
+        updated_at: "2020-01-05T00:00:00.000Z",
+      },
     ]);
     expect(db.prepare("SELECT COUNT(*) AS n FROM ask_feedback").get()).toEqual({ n: 5 });
     expect(
-      db.prepare("SELECT reask_count, reask_reason, reask_by, reask_at FROM ask_question WHERE id = 1").get(),
+      db
+        .prepare(
+          "SELECT reask_count, reask_reason, reask_by, reask_at FROM ask_question WHERE id = 1",
+        )
+        .get(),
     ).toEqual({ reask_count: 0, reask_reason: null, reask_by: null, reask_at: null });
   });
 
