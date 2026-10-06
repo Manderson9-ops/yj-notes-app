@@ -220,7 +220,10 @@ describe("AskDetailPage (진행·답변·의견)", () => {
     expect(await screen.findByText("합성 질문 본문")).toBeInTheDocument();
     const steps = screen.getByRole("list", { name: "진행 단계" });
     expect(steps.querySelector("[aria-current='step']")?.textContent).toContain("접수");
-    expect(screen.getByRole("status")).toHaveTextContent("질문을 받았어요");
+    expect(screen.getByText("질문을 받았어요. 집 PC가 곧 집어요.")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
     expect(await screen.findByText("합성 알림장 발췌")).toBeInTheDocument();
     expect(screen.getByText("합성 자료 제목")).toBeInTheDocument();
     expect(screen.queryByText("답변")).toBeNull();

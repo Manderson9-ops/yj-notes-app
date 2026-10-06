@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ClaudeError, withExitRetry, type ClaudeRunner } from "./claude.ts";
 
 describe("withExitRetry", () => {
-  const ok = { output: { a: 1 }, model: "m" };
+  const ok = { output: { a: 1 }, model: "m", ms: 1 };
   it("claude_exit 는 한 번만 다시 시도해요", async () => {
     let n = 0;
     const run: ClaudeRunner = () =>

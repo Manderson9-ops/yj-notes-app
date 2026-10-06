@@ -101,7 +101,7 @@ test("보내기 → 접수 → 작성 중 → 검토 중 → 답변, 의견 남�
   await expect(page.getByRole("heading", { level: 1, name: "질문" })).toBeVisible();
   const now = page.locator("ol[aria-label='진행 단계'] [aria-current='step']");
   await expect(now).toContainText("접수");
-  await expect(page.getByRole("status")).toContainText("질문을 받았어요");
+  await expect(page.locator(".ask-status-line")).toContainText("질문을 받았어요");
   await expect(now).toContainText("작성 중", { timeout: 20_000 });
   await expect(now).toContainText("검토 중", { timeout: 20_000 });
   await expect(page.getByRole("article", { name: "답변" })).toBeVisible({ timeout: 20_000 });

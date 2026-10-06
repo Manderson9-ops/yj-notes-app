@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Answer } from "../../../shared/ask-schema";
-import { buildShareText, shareTitle, shareUrl, SHARE_MAX } from "./share";
+import {
+  buildShareText,
+  clip,
+  monthDay,
+  shareTitle,
+  shareUrl,
+  SHARE_MAX,
+  stripUrgency,
+} from "./share";
 
 // 합성 답(테스트아이). 실제 자료 없음.
 const answer: Answer = {
@@ -46,7 +54,7 @@ describe("shareUrl · shareTitle", () => {
     expect(shareUrl("https://app.example.test", 3)).toBe("https://app.example.test/ask/3");
   });
   it("제목은 한국 날짜", () => {
-    expect(shareTitle({ createdAt: "2020-03-05T20:00:00.000Z" })).toBe("물어보기 2020-03-06");
+    expect(shareTitle({ createdAt: "2020-03-05T20:00:00.000Z" })).toBe("물어보기 3월 6일");
   });
 });
 
@@ -54,19 +62,19 @@ describe("buildShareText 요약형", () => {
   const t = buildShareText(base);
   it("머리: 날짜(한국 시간)·질문자, 구분선, 질문, 단계", () => {
     const lines = t.split("\n");
-    expect(lines[0]).toBe("📝 아이 물어보기 (2020-03-05 · 질문: 아빠)");
+    expect(lines[0]).toBe("📝 아이 물어보기 (3월 5일 · 질문: 아빠)");
     expect(lines[1]).toBe("━━━━━━━━━━");
     expect(lines.slice(2, 5)).toEqual(["💬 질문", "점심에 밥을 자꾸 남겨요", "━━━━━━━━━━"]);
-    expect(t).toContain("📊 단계 5 · 방법 바꾸며 1주 기록\n30개월이고");
+    expect(t).toContain("📊 단계 5/10 · 방법 바꾸며 1주 기록\n30개월이고");
   });
   it("해 볼 것은 번호·할 말(👉 「…」), 피할 것은 - 줄, 지켜볼 것, 상담", () => {
     expect(t).toContain(
-      "✅ 지금 해 볼 것\n1. 식사 시간을 정해 두어요\n   👉 「밥 먹고 놀자」\n2. 간식 간격을 넉넉히 두어요",
+      "\n\n✅ 지금 해 볼 것\n1. 식사 시간을 정해 두어요\n   👉 「밥 먹고 놀자」\n2. 간식 간격을 넉넉히 두어요",
     );
     expect(t).toContain("❌ 피할 것\n- 억지로 먹이지 않아요\n- 식탁에서 영상 보여 주기");
     expect(t).toContain("👀 지켜볼 것: 먹은 양 (1주)");
     // 연락처가 있는 것만
-    expect(t).toContain("⬆️ 이럴 땐 상담: 체중이 줄면 소아과에 물어봐요");
+    expect(t).toContain("⬆️ 이럴 땐 상담\n- 체중이 줄면 소아과에 물어봐요");
     expect(t).not.toContain("하루 5번 이상으로 늘어요");
   });
   it("끝: 앱 링크와 PIN 안내, 요약형에는 기록·근거·한계 없음", () => {
@@ -89,7 +97,7 @@ describe("buildShareText 전체", () => {
   it("상황 요약·기록·근거·질문하신 분께·한계가 더해진다", () => {
     expect(t).toContain("📌 상황 요약\n테스트아이가 점심을");
     expect(t).toContain(
-      "📖 기록에서 본 것\n- 2020-03-02 점심을 반만 먹었어요 (밥 먹는 양과 이어져요)",
+      "📖 기록에서 본 것\n- 3월 2일 점심을 반만 먹었어요 (밥 먹는 양과 이어져요)",
     );
     expect(t).toContain("🔎 근거\n- 식사 시간을 일정하게 하면 도움이 돼요");
     expect(t).toContain("🙋 질문하신 분께\n엄마께:");
@@ -133,12 +141,13 @@ describe("옵션 칸·특수 경우", () => {
     };
     const x = buildShareText({ ...base, answer: nb, level: null, mode: "full" });
     expect(x).toContain("💬 질문\n점심에 밥을 자꾸 남겨요");
-    expect(x).toContain("행동 질문이 아니에요\n아이 행동 걱정을 묻는 곳이에요");
-    for (const s of ["📊", "✅", "❌", "👀", "⬆️", "🔎"]) expect(x).not.toContain(s);
+    expect(x).toContain("ℹ️ 안내\n행동 질문이 아니에요\n아이 행동 걱정을 묻는 곳이에요");
+    expect(x).not.toMatch(/단계/);
+    for (const m of ["📊", "✅", "❌", "👀", "⬆️", "🔎"]) expect(x).not.toContain(m);
     expect(x).toContain("앱에서 보기:");
   });
 
-  it("redFlag: 맨 위에 「🚨 위급: 지금 바로 …」 줄", () => {
+  it("redFlag: 맨 위에 「🚨 위급 신호: …」 (앞의 지금/바로는 뗀다)", () => {
     const red = buildShareText({
       ...base,
       redFlag: true,
@@ -146,12 +155,67 @@ describe("옵션 칸·특수 경우", () => {
       answer: {
         ...answer,
         level: 10,
-        tryNow: [{ action: "119에 바로 전화해요", basis: "일반 권고" }],
+        tryNow: [{ action: "지금 바로 119에 전화해요", basis: "일반 권고" }],
       },
     });
-    expect(red.split("\n")[0]).toBe("🚨 위급: 지금 바로 119에 바로 전화해요");
-    expect(red.split("\n")[2]).toBe("📝 아이 물어보기 (2020-03-05 · 질문: 아빠)");
+    expect(red.split("\n")[0]).toBe("🚨 위급 신호: 119에 전화해요");
+    expect(red.split("\n")[1]).toBe("");
+    expect(red.split("\n")[2]).toBe("📝 아이 물어보기 (3월 5일 · 질문: 아빠)");
     expect(buildShareText(base)).not.toContain("🚨");
+    expect(stripUrgency("바로 지금 119 신고")).toBe("119 신고");
+    expect(stripUrgency("119에 지금 전화")).toBe("119에 지금 전화");
+  });
+
+  it("redFlag 인데 행동 질문이 아닌 글: 고정 문구(처치 내용 없음)", () => {
+    const nb: Answer = {
+      kind: "not_behavior",
+      level: 1,
+      levelTitle: "",
+      levelReason: "안내예요",
+      summary: "요약이에요",
+      fromRecords: [],
+      evidence: [],
+      tryNow: [],
+      avoid: [],
+      upIf: [],
+      downIf: [],
+      forAsker: "엄마께: 한 줄",
+    };
+    const x = buildShareText({ ...base, redFlag: true, answer: nb, level: null });
+    expect(x.split("\n")[0]).toBe("🚨 위급 신호예요. 앱에서 안내를 확인해요.");
+    expect(x).not.toContain("단계");
+  });
+
+  it("각 이모지 머리 앞에는 빈 줄이 있다(구분선 바로 뒤는 제외)", () => {
+    const lines = buildShareText({ ...base, mode: "full" }).split("\n");
+    const headers = ["📊", "📌", "✅", "❌", "👀", "⬆️", "📖", "🔎", "🙋", "ℹ️"];
+    for (const [i, l] of lines.entries()) {
+      if (!headers.some((h) => l.startsWith(h))) continue;
+      const prev = lines[i - 1];
+      expect(prev === "" || prev === "━━━━━━━━━━", l).toBe(true);
+    }
+    // 연락처는 - 줄
+    expect(lines).toContain("- 체중이 줄면 소아과에 물어봐요");
+  });
+
+  it("clip: 이모지·합자가 반으로 잘리지 않는다", () => {
+    const fam = "👨‍👩‍👧‍👦";
+    const out = clip(fam.repeat(10), 20);
+    expect(out.endsWith("…")).toBe(true);
+    expect(out.length).toBeLessThanOrEqual(20);
+    const body = out.slice(0, -1);
+    expect(body.length % fam.length).toBe(0);
+    expect(body === fam.repeat(body.length / fam.length)).toBe(true);
+    expect(clip("짧아요", 10)).toBe("짧아요");
+    expect(monthDay("2020-03-05")).toBe("3월 5일");
+  });
+
+  it("아주 긴 구역을 자르더라도 끝의 구분선과 링크 줄은 남는다", () => {
+    const x = buildShareText({ ...base, answer: { ...answer, levelReason: "가".repeat(3500) } });
+    expect(x.length).toBeLessThanOrEqual(SHARE_MAX);
+    const lines = x.split("\n");
+    expect(lines.at(-2)).toBe("━━━━━━━━━━");
+    expect(lines.at(-1)).toBe("앱에서 보기: https://app.example.test/ask/12 (가족 PIN 필요)");
   });
 
   it("길이 상한 3,000자: 긴 답도 넘지 않고 링크 줄은 남는다", () => {

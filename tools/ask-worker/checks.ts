@@ -15,7 +15,13 @@ import { levelProblem, type LevelSuggestion } from "./level-suggest.ts";
 import { levelTitle } from "./levels.ts";
 import type { SearchSummary } from "./pack.ts";
 import { refDomain, textMatchesDomain } from "./topics.ts";
-import { FAMILY_REF_PREFIX, sameMethod, type FamilyInfo, type ReaskInfo } from "./family.ts";
+import {
+  FAMILY_REF_PREFIX,
+  sameMethod,
+  statesNewSeverity,
+  type FamilyInfo,
+  type ReaskInfo,
+} from "./family.ts";
 
 export interface PackInfo {
   pack: string;
@@ -535,6 +541,19 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
         );
       }
     }
+  }
+
+  // 다시 답변의 단계는 이전과 같게: 가족이 새 빈도·지속·영향을 적었을 때만 바꾼다
+  const rk = info.reask;
+  if (
+    rk?.previousLevel !== undefined &&
+    answer.level !== rk.previousLevel &&
+    !statesNewSeverity(rk.freeText ?? "")
+  ) {
+    soft(
+      "template",
+      `다시 답변인데 단계가 이전(${String(rk.previousLevel)}단계)과 달라요(${String(answer.level)}단계): 가족이 새 빈도·지속·영향을 적지 않았으면 단계는 그대로 두고 방법만 바꿔요`,
+    );
   }
 
   // 식사: 가이드 05 §3-1 의 기존 2주 저녁 기록을 쓰게 안내한다(새 기록을 시작하지 않는다)

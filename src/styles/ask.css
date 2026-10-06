@@ -214,3 +214,69 @@
   font-weight: 700;
   cursor: pointer;
 }
+
+/* 표 · 다시 답변 UI 다듬기 (T-Q3 2차) */
+.ask-vote-live:empty,
+.ask-share-live:empty {
+  display: none;
+}
+
+.ask-reask .ask-field-label,
+.ask-field-label {
+  margin-top: var(--space-3);
+}
+
+.ask-linkbtn {
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ask-help {
+  margin: var(--space-2) 0 0;
+  color: var(--c-muted);
+}
+
+.ask-copybox {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.ask-reask-by {
+  margin: var(--space-2) 0;
+  font-weight: 600;
+}
+
+.ask-mine {
+  font-weight: 700;
+}
+
+/* 이전 답변 펼침: 마커 대신 쐐기(▸ 닫힘 / ▾ 열림) */
+.ask-old > summary {
+  list-style: none;
+}
+
+.ask-old > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ask-old > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: var(--space-5);
+  text-align: center;
+}
+
+.ask-old[open] > summary::before {
+  content: "▾";
+}
+
+/* 장식 글꼴에 없는 글자가 든 버튼은 글 전체를 본문 글꼴로(글꼴이 한 버튼 안에서 섞이지 않게) */
+:root:root .btn.ask-bodyfont {
+  font-family: var(--font-body);
+}

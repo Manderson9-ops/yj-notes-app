@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnswerCard } from "../components/ask/AnswerCard";
 import { ShareBar } from "../components/ask/ShareBar";
@@ -16,10 +16,19 @@ import {
   type AskDetail,
 } from "../lib/ask/api";
 import { COPY } from "../lib/ask/copy";
+import { LABELS } from "../lib/ask/labels";
 import type { ShareMode } from "../lib/ask/share";
-import { STATUS_LINE, STEPS, stepIndex, whenKo } from "../lib/ask/format";
+import {
+  oldAnswerLine,
+  reaskByLine,
+  STATUS_LINE,
+  STEPS,
+  stepIndex,
+  whenKo,
+} from "../lib/ask/format";
 import { formatShortKo } from "../lib/dateFormat";
 import { getDefaultRecorder } from "../lib/logs/ids";
+import { splitReaskReason } from "../../shared/ask-schema";
 import { useOverview } from "../lib/notesApi";
 import "../styles/notes.css";
 import "../styles/ask.css";
@@ -103,13 +112,13 @@ function Memo({ detail }: { detail: AskDetail }) {
   const [note, setNote] = useState("");
   return (
     <section aria-labelledby="ask-feedback">
-      <h2 id="ask-feedback">{COPY.noteLabel}</h2>
+      <h2 id="ask-feedback">{LABELS.noteTitle}</h2>
       <p className="meta" id="ask-note-guide">
         {COPY.noteGuide}
       </p>
       <div className="field-row">
         <label htmlFor="ask-note" className="sr-only">
-          {COPY.noteLabel}
+          {LABELS.noteTitle}
         </label>
         <textarea
           id="ask-note"
@@ -170,12 +179,10 @@ function OldAnswers({ detail }: { detail: AskDetail }) {
   if (detail.history.length === 0) return null;
   return (
     <section aria-labelledby="ask-old">
-      <h2 id="ask-old">{COPY.oldAnswers}</h2>
+      <h2 id="ask-old">{LABELS.oldTitle}</h2>
       {[...detail.history].reverse().map((h) => (
         <details key={h.version} className="ask-old">
-          <summary>
-            {COPY.oldAnswerN} {h.version} · {whenKo(h.createdAt)}
-          </summary>
+          <summary>{oldAnswerLine(h.version, h.createdAt)}</summary>
           <AnswerCard level={h.level ?? h.answer.level} answer={h.answer} />
         </details>
       ))}
@@ -261,8 +268,24 @@ function Body({
   const waiting = status === "pending" || status === "claimed";
   const reasking = detail.reask.count > 0 && status !== "done" && status !== "failed";
   const [mode, setMode] = useState<ShareMode>("summary");
+  // 다시 답변을 요청하면 포커스를 진행 상황으로 옮기고 알린다(알림 칸은 늘 떠 있어야 읽힌다).
+  const [announce, setAnnounce] = useState("");
+  const progressRef = useRef<HTMLHeadingElement>(null);
+  const focusPending = useRef(false);
+  useEffect(() => {
+    if (focusPending.current && status !== "done") {
+      focusPending.current = false;
+      progressRef.current?.focus();
+    }
+  }, [status]);
+  const reaskChoice = detail.reask.reason
+    ? (splitReaskReason(detail.reask.reason).choice ?? detail.reask.reason)
+    : "";
   return (
     <>
+      <p role="status" aria-live="polite" className="sr-only" data-testid="ask-announce">
+        {announce}
+      </p>
       {detail.redFlag && <RedFlagCard />}
       <section aria-labelledby="ask-q">
         <h2 id="ask-q">질문</h2>
@@ -276,8 +299,15 @@ function Body({
 
       {status !== "done" && (
         <section aria-labelledby="ask-progress">
-          <h2 id="ask-progress">진행 상황</h2>
+          <h2 id="ask-progress" ref={progressRef} tabIndex={-1}>
+            진행 상황
+          </h2>
           <Progress status={status} reasking={reasking} />
+          {reasking && (
+            <p className="ask-reask-by" data-testid="ask-reask-by">
+              {reaskByLine(detail.reask.by ?? "", reaskChoice)}
+            </p>
+          )}
           {waiting && workerOffline && (
             <Notice tone="info">
               <span>{COPY.offWait}</span>
@@ -309,9 +339,8 @@ function Body({
                 level={detail.answer.level ?? detail.answer.answer.level}
                 answer={detail.answer.answer}
                 reviewScore={detail.answer.reviewScore}
-                afterSummary={<ShareBar detail={detail} mode={mode} onMode={setMode} where="top" />}
               />
-              <ShareBar detail={detail} mode={mode} onMode={setMode} where="bottom" />
+              <ShareBar detail={detail} mode={mode} onMode={setMode} />
             </>
           ) : (
             <Notice tone="warn">{COPY.noAnswer}</Notice>
@@ -319,7 +348,15 @@ function Body({
         </section>
       )}
 
-      {status === "done" && <VoteBar detail={detail} />}
+      {status === "done" && (
+        <VoteBar
+          detail={detail}
+          onReasked={() => {
+            focusPending.current = true;
+            setAnnounce(COPY.reaskSent);
+          }}
+        />
+      )}
       {status === "done" && <Memo detail={detail} />}
       <OldAnswers detail={detail} />
 

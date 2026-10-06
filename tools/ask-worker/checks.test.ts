@@ -244,3 +244,44 @@ describe("가족 결과·다시 답변 검사(T-Q3)", () => {
     ).toBe(false);
   });
 });
+
+describe("다시 답변 단계 안정(T-Q3 2차)", () => {
+  const rk = (freeText: string, previousLevel = 4) => ({
+    choice: "너무 일반적이에요" as const,
+    previousActions: [],
+    previousLevel,
+    freeText,
+  });
+  it("이전 단계와 같으면 통과", () => {
+    const r = checkAnswer(goodAnswer({ level: 4 }), { ...PACK, reask: rk("") }, false);
+    expect(r.soft.some((i) => i.text.includes("단계가 이전"))).toBe(false);
+  });
+  it("단계가 달라지고 새 심각도 말이 없으면 SOFT template", () => {
+    const r = checkAnswer(
+      goodAnswer({ level: 5 }),
+      { ...PACK, reask: rk("더 알고 싶어요") },
+      false,
+    );
+    expect(r.hard).toEqual([]);
+    expect(
+      r.soft.some((i) => i.category === "template" && i.text.includes("단계가 이전(4단계)")),
+    ).toBe(true);
+  });
+  it("가족이 새 빈도·지속·영향·공격성을 적었으면 단계를 바꿔도 된다", () => {
+    for (const t of ["요즘은 매일 그래요", "벌써 3주째예요", "밥을 못 먹어요", "친구를 때려요"]) {
+      const r = checkAnswer(goodAnswer({ level: 5 }), { ...PACK, reask: rk(t) }, false);
+      expect(
+        r.soft.some((i) => i.text.includes("단계가 이전")),
+        t,
+      ).toBe(false);
+    }
+  });
+  it("이전 답이 없으면(previousLevel 없음) 검사하지 않는다", () => {
+    const r = checkAnswer(
+      goodAnswer({ level: 5 }),
+      { ...PACK, reask: { choice: null, previousActions: [], freeText: "" } },
+      false,
+    );
+    expect(r.soft.some((i) => i.text.includes("단계가 이전"))).toBe(false);
+  });
+});

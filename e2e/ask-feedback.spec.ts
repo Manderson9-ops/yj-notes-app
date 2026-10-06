@@ -61,14 +61,14 @@ for (const mode of ["normal", "high"] as const) {
           const up = page.getByRole("button", { name: "도움이 됐어요", exact: true });
           await expect(up).toHaveAttribute("aria-pressed", "true");
           await expect(page.getByTestId("ask-vote-summary")).toContainText("엄마");
-          await expect(page.getByRole("button", { name: "공유하기" })).toHaveCount(2);
+          await expect(page.getByRole("button", { name: "공유하기" })).toHaveCount(1);
           await check();
           await shot("voted");
 
           // 👎 → 이유 고르기 시트
           await page.goto("/ask/2");
           await page.getByRole("button", { name: "도움이 안 됐어요", exact: true }).click();
-          await page.getByRole("button", { name: "이미 해 봤어요", exact: true }).click();
+          await page.getByRole("radio", { name: "이미 해 봤어요", exact: true }).click();
           await expect(page.getByTestId("ask-reask-panel")).toBeVisible();
           await check();
           await shot("reask-sheet");
@@ -76,7 +76,7 @@ for (const mode of ["normal", "high"] as const) {
           // 다시 작성 중
           await page.goto("/ask/6");
           await expect(page.getByText("다시 작성 중이에요.")).toBeVisible();
-          await expect(page.getByText(/이전 답변 1/)).toBeVisible();
+          await expect(page.getByText("1번째 답 · 1월 15일")).toBeVisible();
           await check();
           await shot("reasking");
         });
@@ -111,12 +111,12 @@ test("다시 답변 받기: 이유 → 다시 작성 중 → 새 답 + 이전 �
   await login(page);
   await page.goto("/ask/2");
   await page.getByRole("button", { name: "도움이 안 됐어요", exact: true }).click();
-  await page.getByRole("button", { name: "더 자세히 알고 싶어요", exact: true }).click();
+  await page.getByRole("radio", { name: "더 자세히 알고 싶어요", exact: true }).click();
   await page.getByLabel("더 알려 주고 싶은 점(선택)").fill("할 말 예시가 더 있으면 좋아요");
   await page.getByRole("button", { name: "다시 답변 받기" }).click();
   await expect(page.getByText(/다시 작성/).first()).toBeVisible();
   await expect(page.getByRole("article", { name: "답변" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/이전 답변 1/)).toBeVisible();
+  await expect(page.getByText("1번째 답 · 1월 15일")).toBeVisible();
   // 이전 답의 표는 새 답에는 세지 않는다
   await expect(page.getByRole("button", { name: "도움이 안 됐어요", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -134,12 +134,13 @@ test("공유하기: navigator.share 가 있으면 시트, 없으면 복사 + 안
     navigator.share = (d) => { window.__shared = d; return Promise.resolve(); };
   })()`);
   await page.getByRole("button", { name: "공유하기" }).first().click();
-  const shared = await page.evaluate<{ title: string; text: string; url: string }>(
+  const shared = await page.evaluate<{ title: string; text: string; url?: string }>(
     "window.__shared",
   );
   expect(shared.text).toContain("📝 아이 물어보기");
   expect(shared.text).toContain("✅ 지금 해 볼 것");
-  expect(shared.url).toMatch(/\/ask\/1$/);
+  expect(shared.url).toBeUndefined();
+  expect(shared.text).toContain("/ask/1 (가족 PIN 필요)");
   expect(shared.text.length).toBeLessThanOrEqual(3000);
   // share 가 없는 브라우저: 클립보드 복사
   await page.evaluate(

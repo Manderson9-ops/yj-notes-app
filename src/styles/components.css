@@ -102,7 +102,7 @@ mark {
 }
 
 /* 고른 칩: 바깥 링을 겹치지 않고 테두리 자체를 강조색·3px 로(+체크 아이콘·굵은 글씨·중간 톤 면). 너비가 변하지 않게 안쪽 여백을 줄인다 */
-.chip[aria-pressed="true"] {
+.chip:is([aria-pressed="true"], [aria-checked="true"]) {
   padding: 0 calc(var(--space-4) - (3px - var(--bw)));
   border: 3px solid var(--c-accent);
   background: var(--c-accent-soft);
@@ -110,11 +110,11 @@ mark {
   font-weight: 700;
 }
 
-.chip[data-size="lg"][aria-pressed="true"] {
+.chip[data-size="lg"]:is([aria-pressed="true"], [aria-checked="true"]) {
   padding: 0 calc(var(--space-5) - (3px - var(--bw)));
 }
 
-.chip[aria-pressed="true"] .chip-check {
+.chip:is([aria-pressed="true"], [aria-checked="true"]) .chip-check {
   display: inline-block;
 }
 

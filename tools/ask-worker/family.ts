@@ -34,7 +34,25 @@ export interface FamilyInfo {
 export interface ReaskInfo {
   choice: ReaskChoice | null;
   previousActions: string[];
+  /** 이전 답의 단계(행동 질문이 아니었으면 undefined). */
+  previousLevel?: number | undefined;
+  /** 가족이 적은 자유 글(없으면 빈 문자열). */
+  freeText?: string | undefined;
 }
+
+/**
+ * 가족이 이유·자유 글에 새 빈도·지속·영향·공격성(질문 확장이 뽑는 네 축과 같은 말)을 적었는가.
+ * 적었을 때만 다시 답변의 단계를 바꿀 수 있다.
+ */
+const NEW_SEVERITY = new RegExp(
+  [
+    "매일|하루\\s*\\d+\\s*번|\\d+\\s*번씩|더\\s*자주|자주\\s*(?:울|그|해)|늘었|많아졌|반복", // 빈도
+    "일주일|\\d+\\s*주|몇\\s*주|한\\s*달|몇\\s*달|\\d+\\s*일째|오래", // 지속
+    "못\\s*(?:먹|자|놀)|지장|힘들어|심해|심각|다쳤|체중|살이\\s*빠", // 영향
+    "때려|때리|물어|물었|밀어|밀었|던져|깨물", // 공격성
+  ].join("|"),
+);
+export const statesNewSeverity = (text: string): boolean => NEW_SEVERITY.test(text);
 
 // ── 글 → 낱말 ─────────────────────────────────────────────
 
@@ -286,7 +304,7 @@ export function buildReaskSection(r: ClaimReask | undefined): string {
           `  이전 해 볼 것 ${String(i + 1)}: ${clean(t.action, 120)}${t.say ? ` (말: ${clean(t.say, 60)})` : ""}`,
       ),
       ...prev.avoid.map((a, i) => `  이전 피할 것 ${String(i + 1)}: ${clean(a, 100)}`),
-      `- 단계는 근거 없이 바꾸지 않아요(이전 ${String(prev.level)}단계). 바꾸면 levelReason 에 새 근거(기록·가족 결과)를 적어요.`,
+      `- 단계는 이전 ${String(prev.level)}단계 그대로 써요. 가족의 이유·자유 글에 새 빈도·지속·영향(더 자주·몇 주째·못 먹어요 등)이 적혔을 때만 바꾸고, 그때는 levelReason 에 그 새 내용을 적어요.`,
     );
   } else {
     lines.push("- 이전 답을 불러오지 못했어요: 이유에 맞춰 새로 써요.");
@@ -296,9 +314,13 @@ export function buildReaskSection(r: ClaimReask | undefined): string {
 
 export function reaskInfo(r: ClaimReask | undefined): ReaskInfo | undefined {
   if (!r) return undefined;
+  const { choice, text } = splitReaskReason(r.reason);
+  const prev = r.previousAnswer;
   return {
-    choice: splitReaskReason(r.reason).choice,
-    previousActions: r.previousAnswer?.tryNow.map((t) => t.action) ?? [],
+    choice,
+    previousActions: prev?.tryNow.map((t) => t.action) ?? [],
+    previousLevel: prev?.kind === "behavior" ? prev.level : undefined,
+    freeText: text,
   };
 }
 

@@ -197,7 +197,7 @@ describe("다시 답변 구역", () => {
     expect(t).toContain("이유: 이미 해 봤어요 / 가족이 쓴 글: 간식도 줄여 봤어요");
     expect(t).toContain("겹치지 않는 다른 방법");
     expect(t).toContain("이전 해 볼 것 1: 식사 시간을 정해 두어요");
-    expect(t).toContain("단계는 근거 없이 바꾸지 않아요(이전 4단계)");
+    expect(t).toContain("단계는 이전 4단계 그대로 써요");
     expect(buildReaskSection(undefined)).toBe("");
   });
   it("이유 4종마다 방향 문구, 이전 답이 없으면 새로 쓰기", () => {
@@ -216,6 +216,8 @@ describe("다시 답변 구역", () => {
     expect(reaskInfo(r)).toEqual({
       choice: "이미 해 봤어요",
       previousActions: prev.tryNow.map((t) => t.action),
+      previousLevel: 4,
+      freeText: "간식도 줄여 봤어요",
     });
     expect(reaskInfo(undefined)).toBeUndefined();
   });
