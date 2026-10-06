@@ -281,3 +281,10 @@
     transition: none;
   }
 }
+
+/* 크레용 장식 글꼴 부분 집합에 없는 글자(공·유·복)가 섞이지 않게, 공유·복사 버튼은 글 전체를 본문 글꼴로 쓴다.
+   굵기는 다른 크레용 버튼과 맞춘다. 지우면 ask-bodyfont.test.ts 가 실패한다. */
+:root:root .btn.ask-bodyfont {
+  font-family: var(--font-body);
+  font-weight: 700;
+}

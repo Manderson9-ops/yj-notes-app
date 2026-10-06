@@ -42,7 +42,7 @@ describe("주 버튼 면·글자색", () => {
   it("선명하게 보기: 모든 테마에서 .btn-primary(꺼지지 않은) 가 강조색 면 + on-accent 글자", () => {
     const b = bodies(
       read("./contrast-high.css"),
-      ':root[data-contrast="high"][data-theme] .btn-primary:not(:disabled)',
+      ':root[data-contrast="high"] .btn-primary:not(:disabled)',
     ).join(";");
     expect(b).toMatch(/background-color:\s*var\(--c-accent\)/);
     expect(b).toMatch(/color:\s*var\(--c-on-accent\)/);
