@@ -229,12 +229,12 @@
 }
 
 /* 고른 칩: 강조색 손그림 선 + 눌려 들어간 모양(그림자 없음). 바깥 링은 없다 */
-:root[data-theme="crayon"] .chip[aria-pressed="true"] {
+:root[data-theme="crayon"] .chip:is([aria-pressed="true"], [aria-checked="true"]) {
   padding: 0 var(--space-4);
   box-shadow: none;
 }
 
-:root[data-theme="crayon"] .chip[data-size="lg"][aria-pressed="true"] {
+:root[data-theme="crayon"] .chip[data-size="lg"]:is([aria-pressed="true"], [aria-checked="true"]) {
   padding: 0 var(--space-5);
 }
 
@@ -397,7 +397,7 @@
   --face: var(--c-accent);
 }
 
-:root[data-theme="crayon"] .chip[aria-pressed="true"],
+:root[data-theme="crayon"] .chip:is([aria-pressed="true"], [aria-checked="true"]),
 :root[data-theme="crayon"] .theme-option:has(input:checked) {
   --face: var(--c-accent-soft);
   --edge: var(--c-accent);
@@ -517,7 +517,7 @@
   border-image-source: var(--bi-rect-accent);
 }
 
-:root[data-theme="crayon"] .chip[aria-pressed="true"] {
+:root[data-theme="crayon"] .chip:is([aria-pressed="true"], [aria-checked="true"]) {
   border-image-source: var(--bi-pill-accent);
 }
 

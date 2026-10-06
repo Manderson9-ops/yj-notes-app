@@ -91,6 +91,7 @@ function make(opts: {
       rec.calls.push(`fail:${id}:${code}`);
       return Promise.resolve();
     },
+    history: () => Promise.resolve([]),
     ping: () => Promise.resolve(),
   };
   const sleeps: number[] = [];
@@ -271,5 +272,39 @@ describe("check_issues 로그: 범주 이름만", () => {
     expect(dump).not.toContain("손톱");
     expect(dump).not.toContain("비밀 질문 본문");
     expect(dump).not.toContain("428");
+  });
+});
+
+describe("afterProcess 후처리 (T-Q3)", () => {
+  it("한 건 처리(성공·실패) 뒤에 부르고, 던져도 루프는 계속한다", async () => {
+    const calls: string[] = [];
+    const ok = make({ claims: [Q] });
+    ok.deps.afterProcess = () => {
+      calls.push("ok");
+      return Promise.resolve();
+    };
+    await handleOne(ok.deps, ok.ac.signal);
+    const bad = make({
+      claims: [Q],
+      processor: () => Promise.reject(new ClaudeError("claude_exit")),
+    });
+    bad.deps.afterProcess = () => {
+      calls.push("bad");
+      return Promise.reject(new Error("디스크 오류"));
+    };
+    const r = await handleOne(bad.deps, bad.ac.signal);
+    expect(r.claimed).toBe(true);
+    expect(calls).toEqual(["ok", "bad"]);
+    expect(bad.rec.logs.map((l) => l.event)).toContain("after_process_error");
+  });
+  it("질문이 없으면 부르지 않는다", async () => {
+    const m = make({ claims: [null] });
+    let n = 0;
+    m.deps.afterProcess = () => {
+      n++;
+      return Promise.resolve();
+    };
+    await handleOne(m.deps, m.ac.signal);
+    expect(n).toBe(0);
   });
 });

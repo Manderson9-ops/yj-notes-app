@@ -1,7 +1,8 @@
 /* 물어보기 (S50) 화면. 색·모양은 토큰만 쓴다(공용 상태색 토큰 재사용: 새 색 없음). 테마 분기 없음. */
 
 .ask-field-label {
-  margin: var(--space-4) 0 var(--space-2);
+  display: block;
+  margin: var(--space-3) 0 var(--space-2);
   font-weight: 700;
 }
 
@@ -171,5 +172,119 @@
   border-radius: var(--radius);
   background: var(--c-accent-soft);
   color: var(--c-on-accent-soft);
+  font-weight: 700;
+}
+
+/* 표 · 다시 답변 · 공유 (T-Q3). 선택 모양은 공용 .chip[aria-pressed] 규칙을 그대로 쓴다. */
+.ask-vote-live,
+.ask-share-live {
+  min-height: var(--space-5);
+  margin: var(--space-2) 0;
+  font-weight: 600;
+}
+
+.ask-vote-summary {
+  margin: var(--space-2) 0;
+  overflow-wrap: anywhere;
+}
+
+.ask-reask {
+  margin-top: var(--space-3);
+}
+
+.ask-reask .actions,
+.ask-share .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.ask-share {
+  margin: var(--space-3) 0;
+}
+
+.ask-old {
+  margin: var(--space-2) 0;
+}
+
+.ask-old > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 표 · 다시 답변 UI 다듬기 (T-Q3 2차) */
+/* 비어 있어도 접근성 트리에 남는다(display:none 이면 스크린리더가 나중에 채워진 글을 읽지 못한다): 자리만 접는다 */
+.ask-vote-live:empty,
+.ask-share-live:empty {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.ask-linkbtn {
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ask-help {
+  margin: var(--space-2) 0 0;
+  color: var(--c-muted);
+}
+
+.ask-copybox {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.ask-reask-by {
+  margin: var(--space-2) 0;
+  font-weight: 600;
+}
+
+.ask-mine {
+  font-weight: 700;
+}
+
+/* 이전 답변 펼침: 쐐기 아이콘(aria-hidden, 20px) — 열리면 아래로 돌린다. 모션 줄이기에서는 돌리기만 하고 전환은 없다 */
+.ask-old > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+.ask-old > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ask-old .chevron {
+  flex: none;
+  transition: transform var(--dur) var(--ease);
+}
+
+.ask-old[open] .chevron {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-old .chevron {
+    transition: none;
+  }
+}
+
+/* 크레용 장식 글꼴 부분 집합에 없는 글자(공·유·복)가 섞이지 않게, 공유·복사 버튼은 글 전체를 본문 글꼴로 쓴다.
+   굵기는 다른 크레용 버튼과 맞춘다. 지우면 ask-bodyfont.test.ts 가 실패한다. */
+:root:root .btn.ask-bodyfont {
+  font-family: var(--font-body);
   font-weight: 700;
 }

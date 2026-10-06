@@ -24,10 +24,14 @@ INSERT INTO app_setting VALUES ('ask_worker_locked_until', '2030-01-01T00:15:00.
 CREATE TABLE ask_question (id INTEGER PRIMARY KEY, body TEXT);
 CREATE TABLE ask_answer (question_id INTEGER PRIMARY KEY REFERENCES ask_question(id), answer_json TEXT);
 CREATE TABLE ask_feedback (id INTEGER PRIMARY KEY, question_id INTEGER, note TEXT);
+CREATE TABLE ask_vote (question_id INTEGER, by TEXT, helpful INTEGER, reason TEXT, updated_at TEXT, PRIMARY KEY (question_id, by));
+CREATE TABLE ask_answer_history (question_id INTEGER, version INTEGER, answer_json TEXT, PRIMARY KEY (question_id, version));
 CREATE TABLE worker_auth_fail (at TEXT);
 INSERT INTO ask_question VALUES (1, 'synthetic q');
 INSERT INTO ask_answer VALUES (1, '{}');
 INSERT INTO ask_feedback VALUES (1, 1, 'ok');
+INSERT INTO ask_vote VALUES (1, 'a', 0, 'synthetic reason', '2030-01-01T00:00:00.000Z');
+INSERT INTO ask_answer_history VALUES (1, 1, '{}');
 INSERT INTO worker_auth_fail VALUES ('2030-01-01T00:00:00.000Z');
 """
 
@@ -54,9 +58,12 @@ def test_skips_session_epoch_and_last_lock(tmp_path, capsys):
 
 def test_includes_ask_tables_but_not_worker_auth_fail(tmp_path, capsys):
     _, sql, printed = run(tmp_path, capsys)
-    for t in ("ask_question", "ask_answer", "ask_feedback"):
+    for t in ("ask_question", "ask_answer", "ask_feedback", "ask_vote", "ask_answer_history"):
         assert f"INSERT OR REPLACE INTO {t} " in sql
     assert sql.index("INTO ask_question") < sql.index("INTO ask_answer")
+    # 외래키: 표·이력은 질문 뒤
+    assert sql.index("INTO ask_question") < sql.index("INTO ask_vote")
+    assert sql.index("INTO ask_question") < sql.index("INTO ask_answer_history")
     assert "worker_auth_fail" not in sql and "worker_auth_fail" not in printed
 
 

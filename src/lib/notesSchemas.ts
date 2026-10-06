@@ -99,6 +99,10 @@ export const overviewSchema = z.object({
     pending: z.number().int(),
     worker: z.object({ online: z.boolean(), seenAt: z.string().nullable() }),
     medianTotalMs7d: z.number().int().nullable(),
+    /** 최근 7일 가족 의견 수(표 · 메모). */
+    feedback7d: z
+      .object({ up: z.number().int(), down: z.number().int(), notes: z.number().int() })
+      .optional(),
   }),
   milestones: z.object({ observed: z.number().int(), unobserved: z.number().int() }),
   recentNotes: z.array(

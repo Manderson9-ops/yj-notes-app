@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ASK_LEVELS, levelTemplateText } from "../../shared/ask-levels.ts";
 import { issueLine, type ReviewIssue } from "./answer-schema.ts";
+import type { ClaimReask } from "../../shared/ask-schema.ts";
 import type { LevelSuggestion } from "./level-suggest.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,10 @@ export interface PromptQuestion {
   topic?: string | undefined;
   /** 질문 글에서 결정적으로 계산한 권장 단계(위급이면 없음). */
   suggested?: LevelSuggestion | undefined;
+  /** 질문 번호(가족 결과에서 자기 자신을 빼는 데 쓴다). */
+  id?: number | undefined;
+  /** 다시 답변 요청(이전 답·이유). */
+  reask?: ClaimReask | undefined;
 }
 
 export function sanitizeQuestion(s: string): string {
@@ -70,6 +75,11 @@ export function generatePrompt(pack: string, q: PromptQuestion): string {
     questionBlock(q),
     "",
     "위 근거 묶음만 근거로 삼아 답변 JSON 하나를 작성해요.",
+    ...(q.reask
+      ? [
+          "이번은 다시 답변이에요: 묶음의 「다시 답변 요청」 이유에 맞춰 이전 답과 달라진 답을 써요. 단계는 근거 없이 바꾸지 않아요.",
+        ]
+      : []),
   ].join("\n");
 }
 

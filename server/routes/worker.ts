@@ -8,6 +8,12 @@ import { errorResponse, jsonResponse } from "../http/errors";
 import { hasForbiddenWord } from "../../shared/ask-forbidden";
 import {
   ASK_ANSWER_MAX_BYTES,
+  ASK_HISTORY_DEFAULT_LIMIT,
+  ASK_HISTORY_MAX_BYTES,
+  ASK_HISTORY_MAX_LIMIT,
+  AnswerSchema,
+  HistoryItemSchema,
+  type HistoryItem,
   WorkerAnswerSchema,
   WorkerFailSchema,
   WorkerProgressSchema,
@@ -79,11 +85,46 @@ workerRoutes.post("/api/worker/ask/claim", async (c) => {
            AND (status = 'pending' OR (status IN ${ACTIVE} AND lease_until < ?1))
            AND attempts < ?3
          ORDER BY red_flag DESC, created_at, id LIMIT 1)
-       RETURNING id, body, asked_by, created_at, red_flag`,
+       RETURNING id, body, asked_by, created_at, red_flag, reask_count, reask_reason, reask_by`,
     )
     .bind(now, iso(nowMs + LEASE_MS), MAX_ATTEMPTS)
-    .first<{ id: number; body: string; asked_by: string; created_at: string; red_flag: number }>();
+    .first<{
+      id: number;
+      body: string;
+      asked_by: string;
+      created_at: string;
+      red_flag: number;
+      reask_count: number;
+      reask_reason: string | null;
+      reask_by: string | null;
+    }>();
   if (!claimed) return new Response(null, { status: 204 });
+
+  // 다시 답변이면 직전 답(가장 최근 이력)과 이유를 함께 준다.
+  let reask: { count: number; reason: string; by: string; previousAnswer: unknown } | undefined;
+  if (claimed.reask_count > 0) {
+    const prev = await db
+      .prepare(
+        "SELECT answer_json FROM ask_answer_history WHERE question_id = ?1 ORDER BY version DESC LIMIT 1",
+      )
+      .bind(claimed.id)
+      .first<{ answer_json: string }>();
+    let previousAnswer: unknown = null;
+    if (prev) {
+      try {
+        const p = AnswerSchema.safeParse(JSON.parse(prev.answer_json));
+        if (p.success) previousAnswer = p.data;
+      } catch {
+        previousAnswer = null;
+      }
+    }
+    reask = {
+      count: claimed.reask_count,
+      reason: claimed.reask_reason ?? "",
+      by: claimed.reask_by ?? "",
+      previousAnswer,
+    };
+  }
   return jsonResponse(200, {
     question: {
       id: claimed.id,
@@ -92,7 +133,103 @@ workerRoutes.post("/api/worker/ask/claim", async (c) => {
       createdAt: claimed.created_at,
       redFlag: claimed.red_flag === 1,
     },
+    ...(reask ? { reask } : {}),
   });
+});
+
+// 워커 전용: 최근 끝난 질문과 가족 의견(표·메모). 본문이 들어 있으므로 Bearer 만(위 미들웨어), 로그에 내용을 쓰지 않는다. 크기 상한 200KB.
+workerRoutes.get("/api/worker/ask/history", async (c) => {
+  const raw = c.req.query("limit");
+  let limit = ASK_HISTORY_DEFAULT_LIMIT;
+  if (raw !== undefined) {
+    if (!/^[0-9]{1,3}$/.test(raw)) return errorResponse(400, "bad_request", "잘못된 요청이에요.");
+    limit = Number(raw);
+    if (limit < 1 || limit > ASK_HISTORY_MAX_LIMIT) {
+      return errorResponse(400, "bad_request", "잘못된 요청이에요.");
+    }
+  }
+  const db = c.env.DB;
+  const base = `SELECT q.id FROM ask_question q JOIN ask_answer a ON a.question_id = q.id
+    WHERE q.deleted_at IS NULL AND q.status = 'done'
+      AND json_valid(a.answer_json) AND json_extract(a.answer_json, '$.kind') = 'behavior'
+    ORDER BY q.id DESC LIMIT ?1`;
+  const qs = await db
+    .prepare(
+      `SELECT q.id, q.body, q.asked_by, q.created_at, a.level, a.answer_json
+       FROM ask_question q JOIN ask_answer a ON a.question_id = q.id
+       WHERE q.id IN (${base})
+       ORDER BY q.id DESC`,
+    )
+    .bind(limit)
+    .all<{
+      id: number;
+      body: string;
+      asked_by: string;
+      created_at: string;
+      level: number;
+      answer_json: string;
+    }>();
+  const votes = await db
+    .prepare(
+      `SELECT question_id, by, helpful, reason, updated_at FROM ask_vote WHERE question_id IN (${base}) ORDER BY updated_at`,
+    )
+    .bind(limit)
+    .all<{
+      question_id: number;
+      by: string;
+      helpful: number;
+      reason: string | null;
+      updated_at: string;
+    }>();
+  const notes = await db
+    .prepare(
+      `SELECT question_id, by, note, created_at FROM ask_feedback
+       WHERE note IS NOT NULL AND question_id IN (${base}) ORDER BY id`,
+    )
+    .bind(limit)
+    .all<{ question_id: number; by: string; note: string; created_at: string }>();
+
+  const items: HistoryItem[] = [];
+  for (const r of qs.results) {
+    let parsed: ReturnType<typeof AnswerSchema.safeParse> | null;
+    try {
+      parsed = AnswerSchema.safeParse(JSON.parse(r.answer_json));
+    } catch {
+      parsed = null;
+    }
+    if (!parsed?.success) continue;
+    const item: HistoryItem = {
+      id: r.id,
+      body: r.body,
+      askedBy: r.asked_by,
+      createdAt: r.created_at,
+      level: r.level,
+      tryNowActions: parsed.data.tryNow.map((t) => t.action),
+      votes: votes.results
+        .filter((v) => v.question_id === r.id)
+        .slice(0, 12)
+        .map((v) => ({
+          by: v.by,
+          helpful: v.helpful === 1,
+          reason: v.reason,
+          updatedAt: v.updated_at,
+        })),
+      notes: notes.results
+        .filter((n) => n.question_id === r.id)
+        .slice(-10)
+        .map((n) => ({ by: n.by, note: n.note, createdAt: n.created_at })),
+    };
+    items.push(HistoryItemSchema.parse(item));
+  }
+  // 크기 상한: 오래된 항목부터 버린다(목록은 최신순).
+  const enc = new TextEncoder();
+  while (
+    items.length > 0 &&
+    enc.encode(JSON.stringify({ items })).byteLength > ASK_HISTORY_MAX_BYTES
+  ) {
+    items.pop();
+  }
+  return jsonResponse(200, { items });
 });
 
 function idOf(raw: string): number | null {
@@ -141,11 +278,16 @@ workerRoutes.post("/api/worker/ask/:id/answer", async (c) => {
   const db = c.env.DB;
   const q = await db
     .prepare(
-      `SELECT red_flag, created_at, claimed_at FROM ask_question
+      `SELECT red_flag, created_at, claimed_at, reask_at FROM ask_question
        WHERE id = ?1 AND deleted_at IS NULL AND status IN ${ACTIVE}`,
     )
     .bind(id)
-    .first<{ red_flag: number; created_at: string; claimed_at: string | null }>();
+    .first<{
+      red_flag: number;
+      created_at: string;
+      claimed_at: string | null;
+      reask_at: string | null;
+    }>();
   if (!q) return conflict();
   if (q.red_flag === 1 && level !== 10) {
     return errorResponse(422, "validation_error", "입력을 확인해 주세요.", {
@@ -154,7 +296,8 @@ workerRoutes.post("/api/worker/ask/:id/answer", async (c) => {
   }
 
   const nowMs = c.get("deps").now();
-  const created = Date.parse(q.created_at);
+  // 다시 답변이면 다시 요청한 시각부터 센다.
+  const created = Date.parse(q.reask_at ?? q.created_at);
   const claimedAt = q.claimed_at === null ? created : Date.parse(q.claimed_at);
   const waitMs = Math.max(0, claimedAt - created);
   const totalMs = Math.max(0, nowMs - created);

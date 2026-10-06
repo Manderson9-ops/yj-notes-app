@@ -6,14 +6,25 @@ import type { MockContext, MockModule } from "./index.ts";
 /**
  * FAKE 물어보기 API (`npm run dev:mock` / e2e 전용, 합성 자료만: 테스트아이 · 2020-01-15).
  * 질문마다 상태는 세션별 저장소에 둔다(병렬 e2e 가 서로 보지 않게). 시작 자료:
- *   1 완료(단계 5) · 2 완료(단계 1) · 3 완료(위급, 단계 10) · 4 대기 · 5 작성 중.
+ *   1 완료(단계 5, 가족 표·메모 있음) · 2 완료(단계 1) · 3 완료(위급, 단계 10) · 4 대기 · 5 작성 중 · 6 다시 작성 중(이전 답 1개).
+ * 표(PUT /vote)·다시 답변(POST /reask)·이력(history)은 세션별 저장소에서 실제처럼 동작한다(합성 자료).
  * 새 질문은 조회할 때마다 접수 → 작성 중 → 검토 중 → 완료(위급이면 단계 10, 아니면 5)로 넘어간다.
  */
 interface Fb {
   id: number;
   by: string;
-  helpful: boolean | null;
-  note: string | null;
+  note: string;
+  createdAt: string;
+}
+interface Vote {
+  by: string;
+  helpful: boolean;
+  reason: string | null;
+  updatedAt: string;
+}
+interface Old {
+  version: number;
+  level: number;
   createdAt: string;
 }
 interface Q {
@@ -26,6 +37,11 @@ interface Q {
   level: number | null;
   polls: number;
   feedback: Fb[];
+  votes: Vote[];
+  history: Old[];
+  reask: { count: number; reason: string | null; by: string | null };
+  /** 지금 답이 게시된 시각(다시 답변이면 이전 답보다 늦다). */
+  answerAt: string;
   deleted: boolean;
 }
 
@@ -93,14 +109,40 @@ function seed(): Q[] {
     level,
     polls: 99,
     feedback: [],
+    votes: [],
+    history: [],
+    reask: { count: 0, reason: null, by: null },
+    answerAt: `2020-01-15T0${String(id)}:10:00.000Z`,
     deleted: false,
   });
+  const first = mk(1, "밥 먹을 때 자꾸 숟가락을 던져요", "done", 5);
+  first.votes = [
+    { by: "엄마", helpful: true, reason: null, updatedAt: "2020-01-15T05:00:00.000Z" },
+    {
+      by: "할머니",
+      helpful: false,
+      reason: "너무 일반적이에요",
+      updatedAt: "2020-01-15T05:30:00.000Z",
+    },
+  ];
+  first.feedback = [
+    {
+      id: 1,
+      by: "엄마",
+      note: "안아 주니 금방 그쳤어요 (합성)",
+      createdAt: "2020-01-15T06:00:00.000Z",
+    },
+  ];
+  const redo = mk(6, "양치할 때 칫솔을 물고 안 놔요", "answering", null);
+  redo.reask = { count: 1, reason: "이미 해 봤어요 · 노래를 불러 줬어요", by: "엄마" };
+  redo.history = [{ version: 1, level: 5, createdAt: "2020-01-15T06:10:00.000Z" }];
   return [
-    mk(1, "밥 먹을 때 자꾸 숟가락을 던져요", "done", 5),
+    first,
     mk(2, "낮잠 자기 전에 인형을 꼭 안고 있어요", "done", 1),
     mk(3, "자다가 경련을 했어요 (합성 예시)", "done", 10, true),
     mk(4, "친구A 가 오면 숨어요", "pending", null),
     mk(5, "양치를 싫어해요", "answering", null),
+    redo,
   ];
 }
 
@@ -160,6 +202,10 @@ async function handle(req: IncomingMessage, ctx: MockContext): Promise<void> {
         level: null,
         polls: 0,
         feedback: [],
+        votes: [],
+        history: [],
+        reask: { count: 0, reason: null, by: null },
+        answerAt: "2020-01-15T05:10:00.000Z",
         deleted: false,
       });
       ctx.send(201, { id, status: "pending", redFlag: red, instant: INSTANT }, h);
@@ -176,6 +222,10 @@ async function handle(req: IncomingMessage, ctx: MockContext): Promise<void> {
           redFlag: q.redFlag,
           ...(q.level === null ? {} : { level: q.level }),
           createdAt: q.createdAt,
+          votes: {
+            up: q.votes.filter((v) => v.helpful).length,
+            down: q.votes.filter((v) => !v.helpful).length,
+          },
         }));
       ctx.send(200, { items, nextBefore: null }, h);
       return;
@@ -199,12 +249,20 @@ async function handle(req: IncomingMessage, ctx: MockContext): Promise<void> {
                 answer: {
                   level: q.level,
                   answer: answerFor(q.level, q.askedBy),
-                  createdAt: q.createdAt,
+                  createdAt: q.answerAt,
                   totalMs: 150_000,
                 },
               }
             : {}),
           feedback: q.feedback,
+          votes: q.votes,
+          history: q.history.map((o) => ({
+            version: o.version,
+            level: o.level,
+            createdAt: o.createdAt,
+            answer: answerFor(o.level, q.askedBy),
+          })),
+          reask: q.reask,
         },
         h,
       );
@@ -215,17 +273,64 @@ async function handle(req: IncomingMessage, ctx: MockContext): Promise<void> {
       return;
     }
     if (action === "feedback" && method === "POST") {
-      const b = (await ctx.readJson()) as
-        { by?: string; helpful?: boolean | null; note?: string } | undefined;
+      const b = (await ctx.readJson()) as { by?: string; note?: string } | undefined;
+      if (typeof b?.note !== "string" || b.note.trim() === "") {
+        ctx.send(422, { error: "validation_error", message: "입력을 확인해 주세요." }, h);
+        return;
+      }
       const id = Math.max(0, ...q.feedback.map((f) => f.id)) + 1;
       q.feedback.push({
         id,
-        by: b?.by ?? "가족",
-        helpful: b?.helpful ?? null,
-        note: b?.note ?? null,
+        by: b.by ?? "가족",
+        note: b.note.trim(),
         createdAt: "2020-01-15T06:00:00.000Z",
       });
       ctx.send(201, { id }, h);
+      return;
+    }
+    if (action === "vote" && method === "PUT") {
+      const b = (await ctx.readJson()) as
+        { by?: string; helpful?: boolean | null; reason?: string } | undefined;
+      if (typeof b?.by !== "string" || b.helpful === undefined || q.status !== "done") {
+        ctx.send(422, { error: "validation_error", message: "입력을 확인해 주세요." }, h);
+        return;
+      }
+      q.votes = q.votes.filter((v) => v.by !== b.by);
+      if (b.helpful !== null) {
+        q.votes.push({
+          by: b.by,
+          helpful: b.helpful,
+          reason: b.helpful ? null : (b.reason ?? null),
+          // 다시 답변 전의 표는 12시, 다시 답변(18시 게시) 뒤의 표는 23시
+          updatedAt:
+            q.history.length === 0 ? "2020-01-15T12:00:00.000Z" : "2020-01-15T23:00:00.000Z",
+        });
+      }
+      ctx.send(200, { votes: q.votes }, h);
+      return;
+    }
+    if (action === "reask" && method === "POST") {
+      const b = (await ctx.readJson()) as
+        { by?: string; choice?: string; text?: string } | undefined;
+      if (q.status !== "done" || q.level === null || typeof b?.choice !== "string") {
+        ctx.send(409, { error: "conflict", message: "지금 상태에서는 할 수 없어요." }, h);
+        return;
+      }
+      if (q.reask.count >= 3) {
+        ctx.send(429, { error: "too_many", message: "다시 답변은 세 번까지 받을 수 있어요." }, h);
+        return;
+      }
+      q.history.push({ version: q.history.length + 1, level: q.level, createdAt: q.answerAt });
+      q.reask = {
+        count: q.reask.count + 1,
+        reason: b.text ? `${b.choice} · ${b.text}` : b.choice,
+        by: b.by ?? "가족",
+      };
+      q.status = "pending";
+      q.level = null;
+      q.polls = 0;
+      q.answerAt = "2020-01-15T18:00:00.000Z";
+      ctx.send(200, { status: "pending", reaskCount: q.reask.count }, h);
       return;
     }
     if (action === undefined && method === "DELETE") {

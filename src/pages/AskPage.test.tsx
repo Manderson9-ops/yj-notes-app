@@ -220,7 +220,10 @@ describe("AskDetailPage (진행·답변·의견)", () => {
     expect(await screen.findByText("합성 질문 본문")).toBeInTheDocument();
     const steps = screen.getByRole("list", { name: "진행 단계" });
     expect(steps.querySelector("[aria-current='step']")?.textContent).toContain("접수");
-    expect(screen.getByRole("status")).toHaveTextContent("질문을 받았어요");
+    expect(screen.getByText("질문을 받았어요. 집 PC가 곧 집어요.")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
     expect(await screen.findByText("합성 알림장 발췌")).toBeInTheDocument();
     expect(screen.getByText("합성 자료 제목")).toBeInTheDocument();
     expect(screen.queryByText("답변")).toBeNull();
@@ -347,7 +350,7 @@ describe("AskDetailPage (진행·답변·의견)", () => {
     expect(screen.getByRole("link", { name: "새로 질문하기" })).toBeInTheDocument();
   });
 
-  it("의견: 도움이 됐어요 / 메모를 보낸다", async () => {
+  it("메모를 보낸다(도움 여부는 표로 따로)", async () => {
     routes["GET /ask/7"] = () =>
       json(
         200,
@@ -356,14 +359,13 @@ describe("AskDetailPage (진행·답변·의견)", () => {
     routes["POST /ask/7/feedback"] = () => json(201, { id: 1 });
     localStorage.setItem("yj.recorder", "아빠");
     renderAt("/ask/7");
-    await userEvent.click(await screen.findByRole("button", { name: "도움이 됐어요" }));
-    await userEvent.type(screen.getByLabelText("해 봤어요 메모"), "안아 주니 그쳤어요");
+    await userEvent.type(
+      await screen.findByRole("textbox", { name: "해 봤어요 메모" }),
+      "안아 주니 그쳤어요",
+    );
     await userEvent.click(screen.getByRole("button", { name: "메모 남기기" }));
     const posts = calls.filter((c) => c.method === "POST").map((c) => c.body);
-    expect(posts).toEqual([
-      { by: "아빠", helpful: true },
-      { by: "아빠", note: "안아 주니 그쳤어요" },
-    ]);
+    expect(posts).toEqual([{ by: "아빠", note: "안아 주니 그쳤어요" }]);
   });
 
   it("지우기는 확인을 거친다", async () => {

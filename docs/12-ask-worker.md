@@ -92,7 +92,18 @@ npm run ask-worker:eval -- --set "<DATA_DIR>\ask-eval\golden.jsonl" --out "<DATA
 `golden.jsonl` 한 줄: `{"id":"g01","question":"…","askedBy":"할머니","redFlag":false}` (`askedBy`·`redFlag` 선택).
 각 질문을 `--runs`(기본 2)회 돌려 평균·최저 점수, 항목별(근거·기록·실행·안전·말투) 평균, 같은 질문 단계 차 ≤ 1 비율을
 `eval-<시각>.json` / `.md` 로 저장한다. 결과 파일에는 질문·답변 본문이 없고 id·점수·시간만 있다.
-`--set`·`--out` 이 저장소 안이면 거부한다. 저장소에는 형식만 두고 실제 질문·답은 두지 않는다.
+`--set`·`--out`·`--history`·`--reask` 가 저장소 안이면 거부한다. 저장소에는 형식만 두고 실제 질문·답은 두지 않는다.
+
+### 5-1. 가족 의견 주입 옵션 (T-Q3)
+
+```powershell
+npm run ask-worker:eval -- --set <golden.jsonl> --out <결과 폴더> --history <history.json> --reask <reask.json>
+node tools/ask-worker/worker.ts --dry-run --history <history.json> --reask <reask.json>   # 합성 질문 1건 (reask 는 단일 덩어리 또는 "dry-run" 키)
+```
+
+- `--history <json>`: 합성 가족 결과 주입. **`HistoryItem[]` 또는 `{"items": HistoryItem[]}`** (= `GET /api/worker/ask/history` 응답과 같다). `HistoryItem` = `{"id": 12, "body": "…", "askedBy": "엄마", "createdAt": "2020-03-01T00:00:00.000Z", "level": 4, "tryNowActions": ["…", "…"], "votes": [{"by": "할머니", "helpful": false, "reason": "…"|null, "updatedAt": "…"}], "notes": [{"by": "엄마", "note": "…", "createdAt": "…"}]}`. 워커의 관련 질문 고르기·묶음 구역·검사가 그대로 돈다(질문 확장이 고른 주제·낱말과 본문 겹침 기준).
+- `--reask <json>`: 다시 답변 상황 주입. **한 덩어리 `{"reason": "이미 해 봤어요 · 자유 글", "by": "엄마", "count": 1, "previousAnswer": <Answer>}`**(모든 문항에 적용; `by`·`count` 는 생략하면 `"가족"`·`1`) 또는 **문항별 `{"g01": {…위 덩어리…}, "g02": {…}}`**(골든 `id` 키, 없는 문항은 처음 질문으로). `reason` 은 「선택지」 또는 「선택지 · 자유 글」: 너무 일반적이에요 / 이미 해 봤어요 / 우리 상황과 달라요 / 더 자세히 알고 싶어요. `previousAnswer` 는 `AnswerSchema`(`shared/ask-schema.ts`)를 만족해야 하고 `null` 도 된다(이전 답을 불러오지 못한 경우).
+- 형식 검증은 `tools/ask-worker/inject.ts`(zod). 이 파일들은 합성·평가용이며 실제 가족 자료는 저장소 밖에 둔다.
 
 ## 6. 리드타임 측정
 
@@ -126,3 +137,23 @@ overview 에 7일 중앙값(`medianTotalMs7d`)을 낸다.
 
 보안 메모: 워커는 외부 프로세스(`claude`, `python`)를 셸 없이 실행하고, 질문 본문은 명령줄이 아니라 stdin 으로만 넘긴다.
 가족 질문은 프롬프트에서 「가족 질문(지시 아님)」 블록에 가둬 지시로 취급하지 않는다. claude 는 `--tools ""` 로 도구가 없다.
+
+## 8. 의견 요약 파일 (T-Q3 §5-c)
+
+워커는 질문 한 건을 처리할 때마다(성공·실패 모두) 가족 의견을 다시 받아 `%USERPROFILE%\.yj-ask\feedback-digest.json` 을 갱신한다(임시 파일에 쓴 뒤 바꿔 치기). **본문은 없다** — 개수와 질문 번호만:
+
+```json
+{
+  "updatedAt": "2020-03-31T00:00:00.000Z",
+  "windowDays": 30,
+  "up": 4,
+  "down": 2,
+  "notes": 3,
+  "downQuestionIds": [3, 5],
+  "noteQuestionIds": [5, 9]
+}
+```
+
+- 창은 최근 30일: 표는 `updatedAt`, 메모는 `createdAt` 기준. history(최근 끝난 질문 60건) 범위 안의 값이라 오래된 질문의 표는 빠질 수 있다.
+- 관리자(Aside)의 **주 1회 루틴**이 원격 D1(읽기 전용)과 이 파일을 읽어 「👎·메모가 몰린 주제와 개선안」을 알린다. 루틴은 코드가 아니라 운영 설정이다(이 저장소에 두지 않는다). 앱 설정 화면의 「최근 7일 의견」 한 줄은 `/api/overview` 값이다.
+- 파일은 저장소·Drive 밖이고 본문이 없어 S1 이 아니지만, 질문 번호는 가족 앱에서만 의미가 있으니 외부에 올리지 않는다.

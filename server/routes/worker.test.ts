@@ -407,3 +407,214 @@ describe("민감 정보", () => {
     expect(all).not.toContain("XYZ");
   });
 });
+
+async function finishQuestion(
+  body: string,
+  askedBy = "엄마",
+  level = 5,
+  over = {},
+): Promise<number> {
+  const id = await ask(body, askedBy);
+  const got = await claimed();
+  expect(got?.id).toBe(id);
+  const res = await workerCall(
+    h,
+    "POST",
+    `/api/worker/ask/${String(id)}/answer`,
+    workerAnswerBody(level, over),
+  );
+  expect(res.status).toBe(200);
+  return id;
+}
+
+describe("claim: 다시 답변(reask) 덩어리", () => {
+  it("처음 질문에는 reask 가 없고, 다시 답변 요청 뒤에는 이전 답·이유·횟수가 온다", async () => {
+    const id = await finishQuestion("합성 질문");
+    const first = await workerCall(h, "POST", "/api/worker/ask/claim");
+    expect(first.status).toBe(204);
+    await sessionCall(h, cookie, "POST", `/api/ask/${String(id)}/reask`, {
+      by: "아빠",
+      choice: "우리 상황과 달라요",
+      text: "합성 사정이 있어요",
+    });
+    const res = await workerCall(h, "POST", "/api/worker/ask/claim");
+    const j = await res.json<{
+      question: { id: number };
+      reask?: {
+        count: number;
+        reason: string;
+        by: string;
+        previousAnswer: { summary: string } | null;
+      };
+    }>();
+    expect(j.question.id).toBe(id);
+    expect(j.reask).toMatchObject({
+      count: 1,
+      reason: "우리 상황과 달라요 · 합성 사정이 있어요",
+      by: "아빠",
+    });
+    expect(j.reask?.previousAnswer?.summary).toContain("합성 상황");
+  });
+
+  it("처음 답변 claim 응답에는 reask 키가 없다", async () => {
+    await ask("합성 질문");
+    const j = await (
+      await workerCall(h, "POST", "/api/worker/ask/claim")
+    ).json<Record<string, unknown>>();
+    expect(Object.keys(j)).toEqual(["question"]);
+  });
+});
+
+describe("GET /api/worker/ask/history", () => {
+  const history = (qs = "") => workerCall(h, "GET", `/api/worker/ask/history${qs}`);
+  interface Hist {
+    items: {
+      id: number;
+      body: string;
+      askedBy: string;
+      level: number;
+      tryNowActions: string[];
+      votes: { by: string; helpful: boolean; reason: string | null; updatedAt: string }[];
+      notes: { by: string; note: string }[];
+    }[];
+  }
+
+  it("토큰 없음·틀린 토큰 401, 세션 쿠키만으로도 401", async () => {
+    expect((await workerCall(h, "GET", "/api/worker/ask/history", undefined, null)).status).toBe(
+      401,
+    );
+    expect(
+      (
+        await workerCall(
+          h,
+          "GET",
+          "/api/worker/ask/history",
+          undefined,
+          "wrong-token-0123456789abcdef",
+        )
+      ).status,
+    ).toBe(401);
+    const viaCookie = await h.handle(
+      new Request("https://app.example.test/api/worker/ask/history", {
+        headers: { Cookie: cookie },
+      }),
+    );
+    expect(viaCookie.status).toBe(401);
+  });
+
+  it("세션 API 경로로는 Bearer 가 통하지 않는다(영역 분리)", async () => {
+    const res = await workerCall(h, "GET", "/api/ask");
+    expect(res.status).toBe(401);
+  });
+
+  it("끝난 행동 질문만 최신순: 본문·단계·권한 방법·표·메모", async () => {
+    const a = await finishQuestion("합성 질문 첫째");
+    const b = await finishQuestion("합성 질문 둘째", "아빠", 4);
+    await ask("아직 대기 중 질문");
+    await sessionCall(h, cookie, "PUT", `/api/ask/${String(a)}/vote`, {
+      by: "엄마",
+      helpful: true,
+    });
+    await sessionCall(h, cookie, "PUT", `/api/ask/${String(a)}/vote`, {
+      by: "할머니",
+      helpful: false,
+      reason: "안 됐어요",
+    });
+    await sessionCall(h, cookie, "POST", `/api/ask/${String(a)}/feedback`, {
+      by: "엄마",
+      note: "먼저 안아 줬어요",
+    });
+    const res = await history();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toContain("no-store");
+    const j = await res.json<Hist>();
+    expect(j.items.map((i) => i.id)).toEqual([b, a]);
+    expect(j.items[0]).toMatchObject({ body: "합성 질문 둘째", askedBy: "아빠", level: 4 });
+    expect(j.items[1]?.tryNowActions).toEqual(["먼저 안아 주기", "잠시 쉬기"]);
+    expect(j.items[1]?.votes).toEqual([
+      { by: "엄마", helpful: true, reason: null, updatedAt: expect.any(String) as string },
+      {
+        by: "할머니",
+        helpful: false,
+        reason: "안 됐어요",
+        updatedAt: expect.any(String) as string,
+      },
+    ]);
+    expect(j.items[1]?.notes[0]).toMatchObject({ by: "엄마", note: "먼저 안아 줬어요" });
+  });
+
+  it("not_behavior·삭제된 질문은 빠진다", async () => {
+    const nb = await ask("상관없는 글");
+    await claimed();
+    await workerCall(h, "POST", `/api/worker/ask/${String(nb)}/answer`, {
+      level: 1,
+      answer: {
+        kind: "not_behavior",
+        level: 1,
+        levelTitle: "",
+        levelReason: "도울 수 있는 일을 안내해요",
+        summary: "행동 질문이 아니에요",
+        fromRecords: [],
+        evidence: [],
+        tryNow: [],
+        avoid: [],
+        upIf: [],
+        downIf: [],
+        forAsker: "엄마께: 행동을 물어봐 주세요",
+      },
+      reviewScore: 9.6,
+      model: "m",
+      workMs: 1,
+    });
+    const gone = await finishQuestion("합성 삭제될 질문");
+    await sessionCall(h, cookie, "DELETE", `/api/ask/${String(gone)}`);
+    expect((await (await history()).json<Hist>()).items).toEqual([]);
+  });
+
+  it("limit: 기본 60, 범위 밖·숫자 아님 400, 작게 주면 그만큼", async () => {
+    await finishQuestion("합성 하나");
+    await finishQuestion("합성 둘");
+    expect((await (await history("?limit=1")).json<Hist>()).items).toHaveLength(1);
+    for (const bad of ["?limit=0", "?limit=101", "?limit=abc", "?limit=-1", "?limit=1.5"]) {
+      expect((await history(bad)).status).toBe(400);
+    }
+  });
+
+  it("응답 크기 200KB 상한: 오래된 것부터 버린다", async () => {
+    const big = "가".repeat(480);
+    for (let i = 0; i < 100; i++) {
+      h.fake.sqlite
+        .prepare(
+          "INSERT INTO ask_question (asked_by, body, status, created_at, updated_at) VALUES ('엄마', ?, 'done', '2030-01-01T00:00:00.000Z', '2030-01-01T00:00:00.000Z')",
+        )
+        .run(`${big}${String(i)}`);
+      h.fake.sqlite
+        .prepare(
+          "INSERT INTO ask_answer (question_id, level, answer_json, created_at) VALUES (?, 5, ?, '2030-01-01T00:00:00.000Z')",
+        )
+        .run(i + 1, JSON.stringify(syntheticAnswer(5)));
+      for (let k = 0; k < 10; k++) {
+        h.fake.sqlite
+          .prepare(
+            "INSERT INTO ask_feedback (question_id, by, note, created_at) VALUES (?, '엄마', ?, '2030-01-01T00:00:00.000Z')",
+          )
+          .run(i + 1, "나".repeat(300));
+      }
+    }
+    const res = await history("?limit=100");
+    const text = await res.text();
+    expect(new TextEncoder().encode(text).byteLength).toBeLessThanOrEqual(200 * 1024);
+    const j = JSON.parse(text) as Hist;
+    expect(j.items.length).toBeGreaterThan(0);
+    expect(j.items.length).toBeLessThan(100);
+    expect(j.items[0]?.id).toBe(100); // 최신부터 남는다
+  });
+
+  it("로그에 본문을 남기지 않는다", async () => {
+    const spy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await finishQuestion("합성 비밀 본문");
+    await history();
+    const logged = JSON.stringify([...spy.mock.calls, ...vi.mocked(console.error).mock.calls]);
+    expect(logged).not.toContain("합성 비밀 본문");
+  });
+});

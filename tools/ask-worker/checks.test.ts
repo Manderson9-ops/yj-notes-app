@@ -144,3 +144,144 @@ describe("단계별 틀 검사(코드가 정확한 문장으로 알린다)", () 
     }
   });
 });
+
+describe("가족 결과·다시 답변 검사(T-Q3)", () => {
+  const famPack = { ...PACK, refs: [...PACK.refs, "FAMILY-Q12"] };
+  const family = { refs: ["FAMILY-Q12"], failed: [{ id: 12, action: "식사 시간을 정해 두어요" }] };
+  const base = goodAnswer(); // 해 볼 것 1: 「식사 시간을 정해 두어요」
+
+  it("FAMILY-Q ref 는 묶음에 실려 있어야 한다(HARD): 있으면 통과, 없으면 막는다", () => {
+    const ok = goodAnswer({
+      tryNow: [
+        { action: "간식 간격을 넉넉히 두어요", basis: "FAMILY-Q12" },
+        { action: "식탁에서 영상은 끄고 함께 앉아요", basis: "일반 권고" },
+      ],
+    });
+    expect(checkAnswer(ok, famPack, false).hard).toEqual([]);
+    const missing = checkAnswer(ok, PACK, false); // 묶음에 FAMILY-Q12 가 없다
+    expect(missing.hard.map((i) => i.text).join()).toContain(
+      "FAMILY-Q ref 가 이번 가족 결과에 없어요",
+    );
+    const evi = goodAnswer({ evidence: [{ ref: "FAMILY-Q99", point: "합성" }] });
+    expect(checkAnswer(evi, famPack, false).hard.some((i) => i.category === "factual")).toBe(true);
+  });
+
+  it("위급 질문에서도 없는 FAMILY-Q ref 는 막는다", () => {
+    const a = goodAnswer({
+      level: 10,
+      tryNow: [{ action: "119에 바로 연락해요", basis: "FAMILY-Q5" }],
+    });
+    expect(
+      checkAnswer(a, PACK, true)
+        .hard.map((i) => i.text)
+        .join(),
+    ).toContain("FAMILY-Q ref");
+  });
+
+  it("가족에게 보이는 글에 FAMILY- 표지를 쓰면 막는다(HARD leak)", () => {
+    const a = goodAnswer({ summary: "FAMILY-Q12 에서 해 보셨어요." });
+    expect(checkAnswer(a, famPack, false).hard.some((i) => i.category === "leak")).toBe(true);
+  });
+
+  it("실패했다는 방법을 바꾼 점 없이 그대로 다시 권하면 SOFT ungrounded", () => {
+    const r = checkAnswer(base, { ...famPack, family }, false);
+    expect(r.hard).toEqual([]);
+    expect(r.soft.some((i) => i.category === "ungrounded" && i.text.includes("잘 안 됐다고"))).toBe(
+      true,
+    );
+  });
+
+  it("바꾼 점을 밝히면(이번엔 …) 통과, 다른 방법이면 통과", () => {
+    const changed = goodAnswer({
+      tryNow: [
+        { action: "이번엔 식사 시간을 정해 두되 간식을 줄여요", basis: "SYN-IV-01" },
+        { action: "간식 간격을 넉넉히 두어요", basis: "일반 권고" },
+      ],
+    });
+    expect(
+      checkAnswer(changed, { ...famPack, family }, false).soft.map((i) => i.category),
+    ).not.toContain("ungrounded");
+    const other = goodAnswer({
+      tryNow: [
+        { action: "식탁에 앉는 순서를 아이가 고르게 해요", basis: "일반 권고" },
+        { action: "간식 간격을 넉넉히 두어요", basis: "일반 권고" },
+      ],
+    });
+    expect(
+      checkAnswer(other, { ...famPack, family }, false).soft.map((i) => i.category),
+    ).not.toContain("ungrounded");
+  });
+
+  it("다시 답변 「이미 해 봤어요」: 이전 해 볼 것과 같은 방법이면 SOFT template, 다른 방법이면 통과", () => {
+    const reask = {
+      choice: "이미 해 봤어요" as const,
+      previousActions: ["식사 시간을 정해 두어요"],
+    };
+    const same = checkAnswer(base, { ...PACK, reask }, false);
+    expect(
+      same.soft.some((i) => i.category === "template" && i.text.includes("이미 해 봤어요")),
+    ).toBe(true);
+    const diff = goodAnswer({
+      tryNow: [
+        { action: "식탁에 앉는 순서를 아이가 고르게 해요", basis: "일반 권고" },
+        { action: "간식 간격을 넉넉히 두어요", basis: "일반 권고" },
+      ],
+    });
+    expect(
+      checkAnswer(
+        diff,
+        { ...PACK, reask: { ...reask, previousActions: ["식사 시간을 정해 두어요"] } },
+        false,
+      ).soft.some((i) => i.text.includes("이미 해 봤어요")),
+    ).toBe(false);
+    // 다른 이유 선택지에서는 이 검사를 하지 않는다
+    expect(
+      checkAnswer(
+        base,
+        { ...PACK, reask: { ...reask, choice: "더 자세히 알고 싶어요" } },
+        false,
+      ).soft.some((i) => i.text.includes("이미 해 봤어요")),
+    ).toBe(false);
+  });
+});
+
+describe("다시 답변 단계 안정(T-Q3 2차)", () => {
+  const rk = (freeText: string, previousLevel = 4) => ({
+    choice: "너무 일반적이에요" as const,
+    previousActions: [],
+    previousLevel,
+    freeText,
+  });
+  it("이전 단계와 같으면 통과", () => {
+    const r = checkAnswer(goodAnswer({ level: 4 }), { ...PACK, reask: rk("") }, false);
+    expect(r.soft.some((i) => i.text.includes("단계가 이전"))).toBe(false);
+  });
+  it("단계가 달라지고 새 심각도 말이 없으면 SOFT template", () => {
+    const r = checkAnswer(
+      goodAnswer({ level: 5 }),
+      { ...PACK, reask: rk("더 알고 싶어요") },
+      false,
+    );
+    expect(r.hard).toEqual([]);
+    expect(
+      r.soft.some((i) => i.category === "template" && i.text.includes("단계가 이전(4단계)")),
+    ).toBe(true);
+  });
+  it("가족이 새 빈도·지속·영향·공격성을 적었으면 단계를 바꿔도 된다", () => {
+    for (const t of ["요즘은 매일 그래요", "벌써 3주째예요", "밥을 못 먹어요", "친구를 때려요"]) {
+      const r = checkAnswer(goodAnswer({ level: 5 }), { ...PACK, reask: rk(t) }, false);
+      expect(
+        r.soft.some((i) => i.text.includes("단계가 이전")),
+        t,
+      ).toBe(false);
+    }
+  });
+  it("이전 답이 없으면(previousLevel 없음) 검사하지 않는다", () => {
+    const r = checkAnswer(
+      goodAnswer({ level: 5 }),
+      { ...PACK, reask: { choice: null, previousActions: [], freeText: "" } },
+      false,
+    );
+    expect(r.soft.some((i) => i.text.includes("단계가 이전"))).toBe(false);
+  });
+});

@@ -172,3 +172,19 @@ export function createClaudeRunner(o: RunnerOptions): ClaudeRunner {
     });
   };
 }
+
+/**
+ * claude 가 드물게 비정상 종료(claude_exit)하는 일이 실제 평가에서 2회 있었다(재실행하면 통과).
+ * 한 번만 2초 뒤 다시 시도한다. 시간 초과·취소·다른 오류는 그대로 올린다.
+ */
+export function withExitRetry(run: ClaudeRunner, delayMs = 2000): ClaudeRunner {
+  return async (req, signal) => {
+    try {
+      return await run(req, signal);
+    } catch (e) {
+      if (!(e instanceof ClaudeError) || e.message !== "claude_exit" || signal?.aborted) throw e;
+      await new Promise((r) => setTimeout(r, delayMs));
+      return run(req, signal);
+    }
+  };
+}

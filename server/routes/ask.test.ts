@@ -6,7 +6,8 @@ import {
   workerAnswerBody,
   workerCall,
 } from "../test-utils/ask";
-import { TEST_PIN, cookieFrom, createHarness, type Harness } from "../test-utils/harness";
+import { ASK_REASK_MAX, ASK_VOTERS_MAX } from "../../shared/ask-schema";
+import { ORIGIN, TEST_PIN, cookieFrom, createHarness, type Harness } from "../test-utils/harness";
 import { ASK_RATE } from "./ask";
 
 let h: Harness;
@@ -240,32 +241,228 @@ describe("GET /api/ask · /api/ask/:id", () => {
   });
 });
 
-describe("POST /api/ask/:id/feedback", () => {
-  it("도움 여부·메모를 저장하고 상세에 보인다", async () => {
+/** 질문 하나를 끝까지(접수 -> 워커가 집음 -> 답 게시) 만든다. */
+async function doneQuestion(body = "합성 질문", askedBy = "엄마"): Promise<number> {
+  h.clock.t += 1000;
+  const id = (await (await ask(body, askedBy)).json<{ id: number }>()).id;
+  const claim = await workerCall(h, "POST", "/api/worker/ask/claim");
+  expect(claim.status).toBe(200);
+  const res = await workerCall(
+    h,
+    "POST",
+    `/api/worker/ask/${String(id)}/answer`,
+    workerAnswerBody(5),
+  );
+  expect(res.status).toBe(200);
+  return id;
+}
+interface Detail {
+  status: string;
+  feedback: { by: string; note: string }[];
+  votes: { by: string; helpful: boolean; reason: string | null }[];
+  history: { version: number; level: number | null; answer: { summary: string } }[];
+  reask: { count: number; reason: string | null; by: string | null };
+  answer?: { level: number };
+}
+const detail = async (id: number): Promise<Detail> =>
+  (await call("GET", `/api/ask/${String(id)}`)).json<Detail>();
+
+describe("POST /api/ask/:id/feedback (메모만)", () => {
+  it("메모를 저장하고 상세에 보인다. helpful 은 거부", async () => {
     const id = (await (await ask("합성 질문")).json<{ id: number }>()).id;
     const p = `/api/ask/${String(id)}/feedback`;
-    expect((await call("POST", p, { by: "아빠", helpful: true })).status).toBe(201);
     expect((await call("POST", p, { by: "할머니", note: "해 봤어요" })).status).toBe(201);
-    const detail = await (
-      await call("GET", `/api/ask/${String(id)}`)
-    ).json<{
-      feedback: { by: string; helpful: boolean | null; note: string | null }[];
-    }>();
-    expect(detail.feedback.map((f) => [f.by, f.helpful, f.note])).toEqual([
-      ["아빠", true, null],
-      ["할머니", null, "해 봤어요"],
+    expect((await call("POST", p, { by: "아빠", helpful: true })).status).toBe(422);
+    expect((await call("POST", p, { by: "아빠", note: "x", helpful: true })).status).toBe(422);
+    expect((await detail(id)).feedback.map((f) => [f.by, f.note])).toEqual([
+      ["할머니", "해 봤어요"],
     ]);
   });
 
-  it("검증: 둘 다 없음·메모 501자·없는 질문", async () => {
+  it("검증: 메모 없음·501자·없는 질문", async () => {
     const id = (await (await ask("합성 질문")).json<{ id: number }>()).id;
     const p = `/api/ask/${String(id)}/feedback`;
     expect((await call("POST", p, { by: "아빠" })).status).toBe(422);
     expect((await call("POST", p, { by: "아빠", note: "가".repeat(501) })).status).toBe(422);
-    expect((await call("POST", p, { by: "아빠", helpful: false })).status).toBe(201);
+    expect((await call("POST", "/api/ask/999/feedback", { by: "아빠", note: "x" })).status).toBe(
+      404,
+    );
+  });
+});
+
+describe("PUT /api/ask/:id/vote", () => {
+  it("upsert: 처음 -> 바꾸기 -> 취소(null)", async () => {
+    const id = await doneQuestion();
+    const p = `/api/ask/${String(id)}/vote`;
+    expect((await call("PUT", p, { by: "아빠", helpful: true })).status).toBe(200);
+    let r = await (
+      await call("PUT", p, { by: "할머니", helpful: false, reason: "너무 어려워요" })
+    ).json<{
+      votes: { by: string; helpful: boolean; reason: string | null }[];
+    }>();
+    expect(r.votes.map((v) => [v.by, v.helpful, v.reason])).toEqual([
+      ["아빠", true, null],
+      ["할머니", false, "너무 어려워요"],
+    ]);
+    // 바꾸기: 같은 사람의 표는 한 줄만
+    r = await (await call("PUT", p, { by: "아빠", helpful: false })).json();
+    expect(r.votes).toHaveLength(2);
+    expect(r.votes.find((v) => v.by === "아빠")).toMatchObject({ helpful: false, reason: null });
+    // 👍 로 바꾸면 이유는 지워진다
+    r = await (await call("PUT", p, { by: "할머니", helpful: true })).json();
+    expect(r.votes.find((v) => v.by === "할머니")).toMatchObject({ helpful: true, reason: null });
+    // 취소
+    r = await (await call("PUT", p, { by: "아빠", helpful: null })).json();
+    expect(r.votes.map((v) => v.by)).toEqual(["할머니"]);
+    expect((await call("PUT", p, { by: "아빠", helpful: null })).status).toBe(200); // 없는 표 취소도 안전
+    expect((await detail(id)).votes).toHaveLength(1);
+    expect(rows(h, "SELECT 1 FROM ask_vote")).toHaveLength(1);
+  });
+
+  it("검증: 이유는 👎 만·200자·모르는 필드·없는 질문·끝나기 전 질문", async () => {
+    const id = await doneQuestion();
+    const p = `/api/ask/${String(id)}/vote`;
+    expect((await call("PUT", p, { by: "아빠", helpful: true, reason: "x" })).status).toBe(422);
     expect(
-      (await call("POST", "/api/ask/999/feedback", { by: "아빠", helpful: true })).status,
-    ).toBe(404);
+      (await call("PUT", p, { by: "아빠", helpful: false, reason: "가".repeat(201) })).status,
+    ).toBe(422);
+    expect((await call("PUT", p, { by: "아빠", helpful: "yes" })).status).toBe(422);
+    expect((await call("PUT", p, { by: "아빠", helpful: true, extra: 1 })).status).toBe(422);
+    expect((await call("PUT", p, { by: "", helpful: true })).status).toBe(422);
+    expect((await call("PUT", "/api/ask/999/vote", { by: "아빠", helpful: true })).status).toBe(
+      404,
+    );
+    expect((await call("PUT", "/api/ask/abc/vote", { by: "아빠", helpful: true })).status).toBe(
+      404,
+    );
+    const pending = (await (await ask("대기 중 질문")).json<{ id: number }>()).id;
+    expect(
+      (await call("PUT", `/api/ask/${String(pending)}/vote`, { by: "아빠", helpful: true })).status,
+    ).toBe(409);
+  });
+
+  it("서로 다른 사람 수 상한(12명)을 넘으면 429, 기존 사람은 바꿀 수 있다", async () => {
+    const id = await doneQuestion();
+    const p = `/api/ask/${String(id)}/vote`;
+    for (let i = 0; i < ASK_VOTERS_MAX; i++) {
+      expect((await call("PUT", p, { by: `사람${String(i)}`, helpful: true })).status).toBe(200);
+    }
+    expect((await call("PUT", p, { by: "새사람", helpful: true })).status).toBe(429);
+    expect((await call("PUT", p, { by: "사람0", helpful: false })).status).toBe(200);
+  });
+
+  it("세션 없이·Origin 없이는 거절", async () => {
+    const id = await doneQuestion();
+    const res = await h.handle(
+      new Request(`${ORIGIN}/api/ask/${String(id)}/vote`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Origin: ORIGIN },
+        body: JSON.stringify({ by: "아빠", helpful: true }),
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("목록에 👍/👎 수", async () => {
+    const id = await doneQuestion();
+    await call("PUT", `/api/ask/${String(id)}/vote`, { by: "아빠", helpful: true });
+    await call("PUT", `/api/ask/${String(id)}/vote`, { by: "엄마", helpful: true });
+    await call("PUT", `/api/ask/${String(id)}/vote`, { by: "할머니", helpful: false });
+    const list = await (
+      await call("GET", "/api/ask")
+    ).json<{
+      items: { id: number; votes: { up: number; down: number } }[];
+    }>();
+    expect(list.items[0]?.votes).toEqual({ up: 2, down: 1 });
+  });
+});
+
+describe("POST /api/ask/:id/reask", () => {
+  const reask = (id: number, json: unknown) => call("POST", `/api/ask/${String(id)}/reask`, json);
+
+  it("done 만: 현재 답을 이력 1 로 옮기고 대기로 돌린다", async () => {
+    const id = await doneQuestion();
+    const before = await detail(id);
+    expect(before.answer?.level).toBe(5);
+    const res = await reask(id, {
+      by: "아빠",
+      choice: "이미 해 봤어요",
+      text: "안아 주기는 했어요",
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "pending", reaskCount: 1 });
+    const d = await detail(id);
+    expect(d.status).toBe("pending");
+    expect(d.answer).toBeUndefined();
+    expect(d.history).toHaveLength(1);
+    expect(d.history[0]).toMatchObject({ version: 1, level: 5 });
+    expect(d.reask).toEqual({
+      count: 1,
+      reason: "이미 해 봤어요 · 안아 주기는 했어요",
+      by: "아빠",
+    });
+    const [qrow] = rows<{ attempts: number; status: string }>(
+      h,
+      `SELECT attempts, status FROM ask_question WHERE id = ${String(id)}`,
+    );
+    expect(qrow).toEqual({ attempts: 0, status: "pending" });
+    expect(rows(h, "SELECT 1 FROM ask_answer")).toHaveLength(0);
+  });
+
+  it("이력 버전이 쌓이고(1,2,3) 4번째는 429", async () => {
+    const id = await doneQuestion();
+    for (let n = 1; n <= ASK_REASK_MAX; n++) {
+      h.clock.t += 1000;
+      expect((await reask(id, { by: "엄마", choice: "너무 일반적이에요" })).status).toBe(200);
+      const claim = await workerCall(h, "POST", "/api/worker/ask/claim");
+      expect(claim.status).toBe(200);
+      const body = workerAnswerBody(5, { summary: `합성 답변 ${String(n + 1)}번째예요` });
+      expect(
+        (await workerCall(h, "POST", `/api/worker/ask/${String(id)}/answer`, body)).status,
+      ).toBe(200);
+    }
+    const d = await detail(id);
+    expect(d.history.map((x) => x.version)).toEqual([1, 2, 3]);
+    expect(d.history[2]?.answer.summary).toBe("합성 답변 3번째예요");
+    expect(d.reask.count).toBe(3);
+    expect((await reask(id, { by: "엄마", choice: "너무 일반적이에요" })).status).toBe(429);
+    expect((await detail(id)).status).toBe("done");
+  });
+
+  it("답이 끝나기 전·실패·삭제된 질문은 409/404, 검증 오류는 422", async () => {
+    const id = await doneQuestion();
+    const pending = (await (await ask("대기 중")).json<{ id: number }>()).id;
+    expect((await reask(pending, { by: "엄마", choice: "너무 일반적이에요" })).status).toBe(409);
+    expect((await reask(id, { by: "엄마", choice: "아무 이유" })).status).toBe(422);
+    expect((await reask(id, { by: "엄마" })).status).toBe(422);
+    expect(
+      (await reask(id, { by: "엄마", choice: "이미 해 봤어요", text: "가".repeat(281) })).status,
+    ).toBe(422);
+    expect((await reask(id, { by: "엄마", choice: "이미 해 봤어요", more: 1 })).status).toBe(422);
+    expect((await reask(999, { by: "엄마", choice: "이미 해 봤어요" })).status).toBe(404);
+    expect((await detail(id)).status).toBe("done"); // 검증 실패는 아무것도 바꾸지 않는다
+    expect((await reask(id, { by: "엄마", choice: "이미 해 봤어요" })).status).toBe(200);
+    // 이미 대기로 돌아간 질문에 또 누르면 409(중복 요청은 한 번만 먹는다)
+    expect((await reask(id, { by: "아빠", choice: "이미 해 봤어요" })).status).toBe(409);
+    expect((await detail(id)).reask.count).toBe(1);
+    await call("DELETE", `/api/ask/${String(id)}`);
+    expect((await reask(id, { by: "엄마", choice: "이미 해 봤어요" })).status).toBe(404);
+  });
+
+  it("다시 답변 뒤 소요 시간은 요청 시각부터 센다", async () => {
+    const id = await doneQuestion();
+    h.clock.t += 3 * 24 * 3600_000; // 사흘 뒤
+    await reask(id, { by: "엄마", choice: "더 자세히 알고 싶어요" });
+    h.clock.t += 20_000;
+    await workerCall(h, "POST", "/api/worker/ask/claim");
+    h.clock.t += 40_000;
+    await workerCall(h, "POST", `/api/worker/ask/${String(id)}/answer`, workerAnswerBody(5));
+    const [a] = rows<{ total_ms: number; wait_ms: number }>(
+      h,
+      "SELECT total_ms, wait_ms FROM ask_answer",
+    );
+    expect(a?.total_ms).toBe(60_000);
+    expect(a?.wait_ms).toBe(20_000);
   });
 });
 
@@ -278,12 +475,14 @@ describe("GET /api/overview ask", () => {
         pending: number;
         worker: { online: boolean; seenAt: string | null };
         medianTotalMs7d: number | null;
+        feedback7d: { up: number; down: number; notes: number };
       };
     }>();
     expect(empty.ask).toEqual({
       pending: 0,
       worker: { online: false, seenAt: null },
       medianTotalMs7d: null,
+      feedback7d: { up: 0, down: 0, notes: 0 },
     });
 
     await ask("질문 하나");
