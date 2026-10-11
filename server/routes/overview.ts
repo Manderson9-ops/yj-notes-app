@@ -85,6 +85,7 @@ overviewRoutes.get("/api/overview", async (c) => {
     state: s.state,
     lastOkAt: s.lastOkAt,
     lastAttemptAt: s.lastAttemptAt,
+    lastAttemptReceivedAt: s.lastAttemptReceivedAt,
     newReports: s.newReports,
     lastNoteDate: s.lastNoteDate,
     code: s.code,

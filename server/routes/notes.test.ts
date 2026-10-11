@@ -201,6 +201,7 @@ describe("empty database", () => {
         state: "none",
         lastOkAt: null,
         lastAttemptAt: null,
+        lastAttemptReceivedAt: null,
         newReports: 0,
         lastNoteDate: null,
         code: null,

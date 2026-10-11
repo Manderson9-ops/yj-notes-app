@@ -26,7 +26,7 @@
   range: {from,to} | null,                       // 알림장 날짜 범위
   lastIngest: {at, status:'ok', commit} | null,  // 마지막 성공 적재(finished_at, 없으면 started_at)
   ingestState: 'idle'|'running'|'failed',        // R1-6: 가장 최근 ingest_run 상태(running 6시간 초과는 failed 로 본다)
-  sync: {state:'none'|'ok'|'running'|'failed'|'missed'|'stuck', lastOkAt, lastAttemptAt, newReports, lastNoteDate, code},  // T-S1: 알림장 자동 업데이트 상태(서버 판정, `09` §5-2). 날짜·시각은 null 가능, 본문 없음
+  sync: {state:'none'|'ok'|'running'|'failed'|'missed'|'stuck', lastOkAt, lastAttemptAt, lastAttemptReceivedAt, newReports, lastNoteDate, code},  // T-S1: 알림장 자동 업데이트 상태(서버 판정, `09` §5-2). 날짜·시각은 null 가능, 본문 없음
   security: {lastGlobalLockAt: string | null},   // R1-3: 마지막 전체 잠금(ISO UTC)
   ask: {pending, worker:{online, seenAt}, medianTotalMs7d},   // T-Q1: 답 기다리는 질문 수·워커 상태·7일 답 시간 중앙값(ms, 없으면 null)
   milestones: {observed, unobserved},            // observation 에 나온 이정표 수 / 나머지

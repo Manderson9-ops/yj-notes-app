@@ -791,10 +791,12 @@ a.card::after {
 
 /* ---- 자동 업데이트 안내(T-S1): 첫 줄만 굵게, 날짜는 줄 중간에서 끊지 않는다 ---- */
 .sync-notice .notice > p {
+  font-size: var(--fs-sm);
   font-weight: 400;
 }
 
 .sync-notice .notice strong {
+  font-size: var(--fs-base);
   font-weight: 700;
 }
 

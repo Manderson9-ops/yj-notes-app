@@ -48,6 +48,7 @@ async function setOverview(
 const base = {
   lastOkAt: "2020-05-01T11:10:00.000Z", // 5월 1일 저녁 8시 10분
   lastAttemptAt: "2020-05-02T11:00:05.000Z",
+  lastAttemptReceivedAt: "2020-05-02T11:00:06.000Z",
   newReports: 3,
   lastNoteDate: "2020-05-01",
 };
@@ -57,6 +58,15 @@ async function noHorizontalOverflow(page: Page) {
     "document.documentElement.scrollWidth - document.documentElement.clientWidth",
   );
   expect(over).toBeLessThanOrEqual(0);
+}
+
+/** 경고 상자 글줄 수: 글자 사각형의 세로 위치를 줄 단위로 묶어 센다(첫 줄만 굵고 크므로 높이 나눗셈은 맞지 않는다). */
+async function noticeLines(page: Page): Promise<number> {
+  return Number(
+    await page.evaluate(
+      "(() => { const p = document.querySelector('[data-testid=sync-notice] .notice > p'); const r = document.createRange(); r.selectNodeContents(p); const ys = [...r.getClientRects()].filter((q) => q.width > 1).map((q) => q.top + q.height / 2).sort((a, b) => a - b); let n = 0, last = -99; for (const y of ys) { if (y - last > 6) n++; last = y; } return n; })()",
+    ),
+  );
 }
 
 const COMBOS = [
@@ -104,9 +114,10 @@ for (const { theme, scheme, high, large } of COMBOS) {
         "오늘 저녁 알림장 자동 업데이트가 안 됐어요.",
       );
       await expect(box).toContainText("키즈노트 로그인이 풀렸어요.");
-      await expect(box).toContainText("마지막으로 반영된 알림장: 5월 1일");
-      await expect(box).toContainText("가족은 하실 일이 없어요. 관리자가 확인해요.");
+      await expect(box).toContainText("마지막 알림장: 5월 1일");
+      await expect(box).toContainText("관리자가 확인해요(가족은 하실 일 없어요).");
       await expect(box).toContainText("내일 저녁 8시에 다시 해요.");
+      if (!large) expect(await noticeLines(page), "보통 글씨 360px 줄 수").toBeLessThanOrEqual(7);
       await check(page);
       if (info.project.name === "mobile-chromium") {
         await stableElementShot(page, box, name("home-failed"));
@@ -119,11 +130,13 @@ for (const { theme, scheme, high, large } of COMBOS) {
         state: "missed",
         code: "missed",
         lastAttemptAt: "2020-05-01T11:00:05.000Z",
+        lastAttemptReceivedAt: "2020-05-01T11:00:06.000Z",
       });
       await login(page);
       const box = page.getByTestId("sync-notice");
       await expect(box).toContainText("집 PC가 꺼져 있었던 것 같아요.");
-      await expect(box).toContainText("관리자가 집 PC를 확인해요.");
+      await expect(box).toContainText("관리자가 집 PC를 확인해요(가족은 하실 일 없어요).");
+      if (!large) expect(await noticeLines(page), "보통 글씨 360px 줄 수").toBeLessThanOrEqual(7);
       await check(page);
       if (info.project.name === "mobile-chromium") {
         await stableElementShot(page, box, name("home-missed"));

@@ -47,6 +47,7 @@ describe("deriveSyncSummary", () => {
       state: "none",
       lastOkAt: null,
       lastAttemptAt: null,
+      lastAttemptReceivedAt: null,
       newReports: 0,
       lastNoteDate: null,
       code: null,
@@ -196,5 +197,18 @@ describe("deriveSyncSummary", () => {
     });
     expect(derive(r, "2030-03-10T14:29:00.000Z").state).toBe("running");
     expect(derive(r, "2030-03-10T14:31:00.000Z").state).toBe("stuck");
+  });
+
+  it("서버가 받은 시각(lastAttemptReceivedAt)을 따로 내보낸다(PC 시계와 무관)", () => {
+    const r = run({
+      started_at: "2030-03-10T10:20:00.000Z", // PC 시계 40분 늦음
+      created_at: "2030-03-10T11:00:30.000Z",
+      finished_at: "2030-03-10T11:10:00.000Z",
+    });
+    const s = derive(r, "2030-03-10T13:00:00.000Z");
+    expect(s.lastAttemptAt).toBe("2030-03-10T10:20:00.000Z");
+    expect(s.lastAttemptReceivedAt).toBe("2030-03-10T11:00:30.000Z");
+    expect(s.state).toBe("ok");
+    expect(derive(null, "2030-03-10T13:00:00.000Z").lastAttemptReceivedAt).toBeNull();
   });
 });

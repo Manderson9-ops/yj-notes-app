@@ -29,6 +29,9 @@ const sync = (over: Partial<SyncInfo>): SyncInfo => ({
   lastNoteDate: "2030-03-07",
   code: null,
   ...over,
+  // 서버가 받은 시각은 따로 주지 않으면 보고된 시작 시각과 같다고 본다
+  lastAttemptReceivedAt:
+    over.lastAttemptReceivedAt ?? over.lastAttemptAt ?? "2030-03-10T11:00:06.000Z",
 });
 
 const overview = (
@@ -81,7 +84,7 @@ describe("홈: 자동 업데이트 배너", () => {
   it.each([
     ["kidsnote_login", "키즈노트 로그인이 풀렸어요."],
     ["kidsnote_api", "키즈노트 응답이 없어요."],
-    ["changed_existing", "예전 알림장이 바뀌었어요(관리자 확인 중)."],
+    ["changed_existing", "예전 알림장이 바뀌었어요."],
     ["media", "사진 받기가 끝나지 않았어요."],
     ["verify", "자료 검사에서 멈췄어요."],
     ["ingest", "앱에 올리는 중 멈췄어요."],
@@ -96,9 +99,9 @@ describe("홈: 자동 업데이트 배너", () => {
       "오늘 저녁 알림장 자동 업데이트가 안 됐어요.",
     );
     expect(within(box).getByTestId("sync-reason")).toHaveTextContent(reason);
-    expect(within(box).getByText("가족은 하실 일이 없어요. 관리자가 확인해요.")).toBeVisible();
+    expect(within(box).getByText("관리자가 확인해요(가족은 하실 일 없어요).")).toBeVisible();
     expect(within(box).getByText("내일 저녁 8시에 다시 해요.")).toBeVisible();
-    expect(box).toHaveTextContent("마지막으로 반영된 알림장: 3월 7일");
+    expect(box).toHaveTextContent("마지막 알림장: 3월 7일");
   });
 
   it("의미 구조: role=status, 보이지 않는 「주의:」, 첫 줄만 strong, 날짜는 줄바꿈 없는 span", async () => {
@@ -123,7 +126,7 @@ describe("홈: 자동 업데이트 배너", () => {
     expect(await screen.findByTestId("sync-reason")).toHaveTextContent(
       "집 PC가 꺼져 있었던 것 같아요.",
     );
-    expect(screen.getByText("관리자가 집 PC를 확인해요.")).toBeVisible();
+    expect(screen.getByText("관리자가 집 PC를 확인해요(가족은 하실 일 없어요).")).toBeVisible();
     expect(screen.getByTestId("sync-head")).toHaveTextContent("오늘 저녁");
   });
 
@@ -152,7 +155,7 @@ describe("홈: 자동 업데이트 배너", () => {
     stub(overview(sync({ state: "failed", code: "media", lastNoteDate: null })));
     renderPage(<HomePage />);
     const box = await screen.findByTestId("sync-notice");
-    expect(within(box).queryByText(/마지막으로 반영된 알림장/)).toBeNull();
+    expect(within(box).queryByText(/마지막 알림장/)).toBeNull();
   });
 
   it.each(["ok", "running", "none"] as const)("%s: 배너 없음", async (state) => {
@@ -216,13 +219,14 @@ describe("설정: 자동 업데이트 한 줄", () => {
     expect(await screen.findByTestId("sync-line")).toHaveTextContent("· 새 알림장 없음");
   });
 
-  it("실패 상태면 「· 오늘은 안 됐어요」를 덧붙이고 마지막 성공은 그대로", async () => {
+  it("실패 상태면 「· 오늘은 안 됐어요」를 줄바꿈 없는 덩어리로 덧붙인다", async () => {
     stub(overview(sync({ state: "failed", code: "media" })));
     renderPage(<SettingsPage />);
     const line = await screen.findByTestId("sync-line");
     expect(line).toHaveTextContent(
       "마지막 성공 3월 9일 저녁 8시 10분 · 새 알림장 3건 · 오늘은 안 됐어요",
     );
+    expect(within(line).getByText("· 오늘은 안 됐어요")).toHaveClass("nowrap");
   });
 
   it("저녁 8시 전 실패는 「어제는」", async () => {
@@ -288,9 +292,23 @@ describe("syncText: 시각에 따른 문구", () => {
     expect(syncHead(missed, now)).toContain("오늘 저녁");
   });
 
+  it("집 PC 시계가 40분 늦어도 서버가 받은 시각으로 오늘 저녁을 판단한다", () => {
+    const now = at("2030-03-10T12:31:00.000Z"); // 21:31 KST
+    const slow = failed("2030-03-10T10:25:00.000Z"); // PC 시계는 19:25 KST 로 보고
+    slow.lastAttemptReceivedAt = "2030-03-10T11:05:00.000Z"; // 서버는 20:05 에 받음
+    expect(syncHead(slow, now)).toContain("오늘 저녁");
+    expect(syncNextLine(slow, now)).toBe("내일 저녁 8시에 다시 해요.");
+    // 반대로 PC 시계가 빠르게(예정 뒤) 보고했어도 서버가 어제 받았으면 어제
+    const fast = failed("2030-03-10T11:30:00.000Z");
+    fast.lastAttemptReceivedAt = "2030-03-09T11:05:00.000Z";
+    expect(syncHead(fast, now)).toContain("어제 저녁");
+  });
+
   it("누가 하는지·사유 보조 함수", () => {
-    expect(syncWhoLine(yesterday)).toBe("가족은 하실 일이 없어요. 관리자가 확인해요.");
-    expect(syncWhoLine(sync({ state: "missed" }))).toBe("관리자가 집 PC를 확인해요.");
+    expect(syncWhoLine(yesterday)).toBe("관리자가 확인해요(가족은 하실 일 없어요).");
+    expect(syncWhoLine(sync({ state: "missed" }))).toBe(
+      "관리자가 집 PC를 확인해요(가족은 하실 일 없어요).",
+    );
     expect(syncReason(sync({ state: "missed", code: "media" }))).toBe(
       "집 PC가 꺼져 있었던 것 같아요",
     );

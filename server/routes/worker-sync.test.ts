@@ -273,6 +273,7 @@ describe("overview.sync", () => {
       state: "none",
       lastOkAt: null,
       lastAttemptAt: null,
+      lastAttemptReceivedAt: null,
       newReports: 0,
       lastNoteDate: null,
       code: null,
@@ -316,10 +317,19 @@ describe("overview.sync", () => {
     expect(await sync()).toMatchObject({ state: "stuck", code: "stuck" });
   });
 
-  it("응답에는 필드 6개뿐(본문·이름 없음)", async () => {
+  it("집 PC 시계가 40분 늦어도 overview 에는 서버가 받은 시각이 실린다", async () => {
+    const res = await start(new Date(h.clock.t - 40 * 60_000).toISOString());
+    expect(res.status).toBe(200);
+    const s = await sync();
+    expect(s.lastAttemptAt).toBe(new Date(h.clock.t - 40 * 60_000).toISOString());
+    expect(s.lastAttemptReceivedAt).toBe(nowIso());
+  });
+
+  it("응답에는 필드 7개뿐(본문·이름 없음)", async () => {
     expect(Object.keys(await sync()).sort()).toEqual([
       "code",
       "lastAttemptAt",
+      "lastAttemptReceivedAt",
       "lastNoteDate",
       "lastOkAt",
       "newReports",

@@ -1,5 +1,14 @@
 // 알림장 자동 업데이트(sync_run) 상태 판정 — 순수 함수 (docs/09 「자동 업데이트」).
 // 기준은 한국 표준시(KST, UTC+9, 서머타임 없음). 매일 20:00 KST 가 「예정 시각」이다.
+import {
+  EARLY_GRACE_MS,
+  KST_OFFSET_MS,
+  MISSED_AFTER_MS,
+  SCHEDULE_HOUR_KST,
+  STUCK_AFTER_MS,
+  SYNC_RETENTION_MS,
+} from "../../shared/sync-schedule";
+
 export type SyncState = "none" | "ok" | "running" | "failed" | "missed" | "stuck";
 
 export interface SyncRunRow {
@@ -21,6 +30,8 @@ export interface SyncSummary {
   lastOkAt: string | null;
   /** 가장 최근 실행을 시작한 시각(ISO). 없으면 null. */
   lastAttemptAt: string | null;
+  /** 가장 최근 실행의 시작 보고를 서버가 받은 시각(ISO). 집 PC 시계와 무관해 화면의 「오늘/어제」 판단에 쓴다. */
+  lastAttemptReceivedAt: string | null;
   /** 마지막 성공 실행이 새로 가져온 알림장 수. */
   newReports: number;
   /** 마지막으로 반영된 알림장 날짜(YYYY-MM-DD). 모르면 null. */
@@ -29,24 +40,15 @@ export interface SyncSummary {
   code: string | null;
 }
 
-const MIN = 60_000;
-const HOUR = 60 * MIN;
-const DAY = 24 * HOUR;
-const KST_OFFSET_MS = 9 * HOUR;
-/** 예정 시각 20:00 KST. */
-const SCHEDULE_HOUR = 20;
-/** 예정 시각 뒤 이 시간 안에 시작 기록이 없으면 「실행되지 않음」. */
-export const MISSED_AFTER_MS = 90 * MIN;
-/** 시작 뒤 이 시간이 지나도 끝나지 않으면 「멈춤」. */
-export const STUCK_AFTER_MS = 3 * HOUR;
-/** 예정 시각보다 이만큼 일찍 서버에 닿은 시작 보고도 오늘 실행으로 센다(수동 실행·시계 오차). */
-export const EARLY_GRACE_MS = 30 * MIN;
-export const SYNC_RETENTION_MS = 90 * DAY;
+const DAY = 24 * 60 * 60_000;
+const HOUR = 60 * 60_000;
+// 시각 규칙은 화면 문구와 공유한다(shared/sync-schedule.ts).
+export { EARLY_GRACE_MS, MISSED_AFTER_MS, STUCK_AFTER_MS, SYNC_RETENTION_MS };
 
 /** nowMs 이전(같은 순간 포함)에서 가장 가까운 20:00 KST 의 UTC ms. */
 export function lastScheduledMs(nowMs: number): number {
   const kstDayStart = Math.floor((nowMs + KST_OFFSET_MS) / DAY) * DAY - KST_OFFSET_MS;
-  const today = kstDayStart + SCHEDULE_HOUR * HOUR;
+  const today = kstDayStart + SCHEDULE_HOUR_KST * HOUR;
   return nowMs >= today ? today : today - DAY;
 }
 
@@ -66,6 +68,7 @@ export function deriveSyncSummary(
   const base = {
     lastOkAt: lastSuccess ? (lastSuccess.finished_at ?? lastSuccess.started_at) : null,
     lastAttemptAt: latest?.started_at ?? null,
+    lastAttemptReceivedAt: latest?.created_at ?? null,
     newReports: lastSuccess?.new_reports ?? 0,
     lastNoteDate,
   };

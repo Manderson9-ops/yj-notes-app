@@ -25,6 +25,12 @@ function SyncLine({ sync, now }: { sync: SyncInfo; now: number }) {
         </>
       )}
       {p.rest}
+      {p.alert && (
+        <>
+          {" "}
+          <span className="nowrap">{p.alert}</span>
+        </>
+      )}
     </p>
   );
 }

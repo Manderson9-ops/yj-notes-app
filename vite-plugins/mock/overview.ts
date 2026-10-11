@@ -10,12 +10,19 @@ function syncFixture(): Overview["sync"] {
   const state = process.env.MOCK_SYNC ?? "ok";
   // 고정 시각: 화면 캡처가 실행 시각에 따라 달라지지 않게(어제 저녁 8시 10분 성공).
   const okAt = "2020-05-02T11:10:00.000Z";
-  const base = { lastOkAt: okAt, lastAttemptAt: okAt, newReports: 2, lastNoteDate: "2020-05-02" };
+  const base = {
+    lastOkAt: okAt,
+    lastAttemptAt: okAt,
+    lastAttemptReceivedAt: okAt,
+    newReports: 2,
+    lastNoteDate: "2020-05-02",
+  };
   if (state === "none")
     return {
       state: "none",
       lastOkAt: null,
       lastAttemptAt: null,
+      lastAttemptReceivedAt: null,
       newReports: 0,
       lastNoteDate: null,
       code: null,
