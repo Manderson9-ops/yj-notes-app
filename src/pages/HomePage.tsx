@@ -100,7 +100,7 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
               </>
             )}
             <br />
-            <span>{syncWhoLine(data.sync)}</span>
+            <span>{whoParts(syncWhoLine(data.sync))}</span>
             <br />
             <span>{syncNextLine(data.sync, now)}</span>
           </Notice>
@@ -188,6 +188,18 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
           </div>
         </section>
       )}
+    </>
+  );
+}
+
+/** 「(가족은 하실 일 없어요)」 같은 괄호 덩어리가 줄 중간에서 끊기지 않게 한 덩어리로 묶는다. */
+function whoParts(line: string) {
+  const i = line.indexOf("(");
+  if (i < 0) return line;
+  return (
+    <>
+      {line.slice(0, i)}
+      <span className="nowrap">{line.slice(i)}</span>
     </>
   );
 }

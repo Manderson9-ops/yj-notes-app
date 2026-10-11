@@ -99,7 +99,9 @@ describe("홈: 자동 업데이트 배너", () => {
       "오늘 저녁 알림장 자동 업데이트가 안 됐어요.",
     );
     expect(within(box).getByTestId("sync-reason")).toHaveTextContent(reason);
-    expect(within(box).getByText("관리자가 확인해요(가족은 하실 일 없어요).")).toBeVisible();
+    expect(
+      within(box).getByText(fullText("관리자가 확인해요(가족은 하실 일 없어요).")),
+    ).toBeVisible();
     expect(within(box).getByText("내일 저녁 8시에 다시 해요.")).toBeVisible();
     expect(box).toHaveTextContent("마지막 알림장: 3월 7일");
   });
@@ -126,7 +128,9 @@ describe("홈: 자동 업데이트 배너", () => {
     expect(await screen.findByTestId("sync-reason")).toHaveTextContent(
       "집 PC가 꺼져 있었던 것 같아요.",
     );
-    expect(screen.getByText("관리자가 집 PC를 확인해요(가족은 하실 일 없어요).")).toBeVisible();
+    expect(
+      screen.getByText(fullText("관리자가 집 PC를 확인해요(가족은 하실 일 없어요).")),
+    ).toBeVisible();
     expect(screen.getByTestId("sync-head")).toHaveTextContent("오늘 저녁");
   });
 
@@ -329,3 +333,9 @@ describe("syncText: 시각에 따른 문구", () => {
     expect(syncSettingsLine(sync({ lastOkAt: "깨짐" }), at(NIGHT))).toContain("아직 없어요");
   });
 });
+
+/** 문장이 여러 span 으로 나뉘어도(줄바꿈 방지 묶음) 전체 글로 찾는다. */
+function fullText(s: string) {
+  return (_: string, el: Element | null): boolean =>
+    el?.textContent === s && [...(el.children ?? [])].every((c) => c.textContent !== s);
+}
