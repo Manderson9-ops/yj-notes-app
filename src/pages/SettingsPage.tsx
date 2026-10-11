@@ -10,10 +10,34 @@ import { api } from "../lib/api";
 import { formatYmdKo, seoulDateOf } from "../lib/dateFormat";
 import { useOverview } from "../lib/notesApi";
 import { clearQueue, unsentCounts } from "../lib/logs/queue";
+import { syncSettingsParts, type SyncInfo } from "../lib/syncText";
 import { handleUnauthorized } from "../lib/queryClient";
+
+function SyncLine({ sync, now }: { sync: SyncInfo; now: number }) {
+  const p = syncSettingsParts(sync, now);
+  return (
+    <p className="muted" data-testid="sync-line">
+      {p.head}
+      {p.day && (
+        <>
+          {" "}
+          <span className="nowrap">{p.day}</span>
+        </>
+      )}
+      {p.rest}
+      {p.alert && (
+        <>
+          {" "}
+          <span className="nowrap">{p.alert}</span>
+        </>
+      )}
+    </p>
+  );
+}
 
 export function SettingsPage() {
   const qc = useQueryClient();
+  const [now] = useState(() => Date.now());
   const overview = useOverview();
   const lastLock = overview.data?.security.lastGlobalLockAt ?? null;
   const failures7d = overview.data?.security.failures7d ?? 0;
@@ -72,6 +96,12 @@ export function SettingsPage() {
           <p className="muted" data-testid="pin-failures-7d">
             최근 7일 PIN 실패: {failures7d}회
           </p>
+        </section>
+      )}
+      {overview.data && overview.data.sync.state !== "none" && (
+        <section className="settings-section" aria-labelledby="set-sync">
+          <h2 id="set-sync">자동 업데이트</h2>
+          <SyncLine sync={overview.data.sync} now={now} />
         </section>
       )}
       {fb && (

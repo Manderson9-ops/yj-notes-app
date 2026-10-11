@@ -6,6 +6,14 @@ import { QueryError } from "../components/QueryError";
 import { ThemeDecor } from "../components/decor/ThemeDecor";
 import { daysSince, formatDateKo, formatYmdKo, seoulDateOf } from "../lib/dateFormat";
 import { useOverview } from "../lib/notesApi";
+import {
+  syncHead,
+  syncLastNote,
+  syncNeedsNotice,
+  syncNextLine,
+  syncReason,
+  syncWhoLine,
+} from "../lib/syncText";
 import "../styles/notes.css";
 
 // S10 홈. 맨 위는 가장 최근 알림장(조부모의 첫 질문 「오늘 뭐 했나」), 그 바로 아래 「오늘 기록하기」, 이어서 지난 알림장,
@@ -64,16 +72,41 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
   const [now] = useState(() => Date.now());
   const staleDays = data.lastIngest ? daysSince(data.lastIngest.at, now) : null;
   const syncDate = data.lastIngest ? seoulDateOf(data.lastIngest.at) : undefined;
+  // T-S1: 자동 업데이트가 안 됐으면 경고 하나로 알린다. 적재 실패 안내와 겹치면 이 배너 하나만 보인다.
+  const syncNotice = syncNeedsNotice(data.sync);
+  const lastNote = syncLastNote(data.sync, data.range?.to ?? null);
 
   return (
     <>
-      {data.ingestState === "running" && (
+      {data.ingestState === "running" && !syncNotice && (
         <Notice tone="info">
           {/* 문장 단위로 나눈다: 번들 한글 장문 검사(G7)에 걸리지 않게(문구는 한 줄로 읽힌다) */}
           <span>자료를 갱신하는 중이에요.</span> <span>잠시 뒤 다시 확인해 주세요.</span>
         </Notice>
       )}
-      {data.ingestState === "failed" && (
+      {syncNotice && (
+        <div data-testid="sync-notice" className="sync-notice" role="status">
+          <Notice tone="warn">
+            <span className="sr-only">주의: </span>
+            <strong data-testid="sync-head">{syncHead(data.sync, now)}</strong>
+            <br />
+            <span data-testid="sync-reason">{syncReason(data.sync)}.</span>
+            {lastNote && (
+              <>
+                <br />
+                <span>
+                  {lastNote.label} <span className="nowrap">{lastNote.date}</span>
+                </span>
+              </>
+            )}
+            <br />
+            <span>{whoParts(syncWhoLine(data.sync))}</span>
+            <br />
+            <span>{syncNextLine(data.sync, now)}</span>
+          </Notice>
+        </div>
+      )}
+      {data.ingestState === "failed" && !syncNotice && (
         <Notice tone="warn">
           마지막 갱신이 실패했어요. <span>관리자에게 알려 주세요.</span>
         </Notice>
@@ -111,7 +144,7 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
 
       <section aria-labelledby="home-sync" className="home-facts">
         <h2 id="home-sync">자료 현황</h2>
-        {staleDays !== null && staleDays > STALE_DAYS && (
+        {staleDays !== null && staleDays > STALE_DAYS && !syncNotice && (
           <Notice tone="warn">마지막 동기화가 {String(staleDays)}일 전이에요.</Notice>
         )}
         <div className="card">
@@ -155,6 +188,18 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
           </div>
         </section>
       )}
+    </>
+  );
+}
+
+/** 「(가족은 하실 일 없어요)」 같은 괄호 덩어리가 줄 중간에서 끊기지 않게 한 덩어리로 묶는다. */
+function whoParts(line: string) {
+  const i = line.indexOf("(");
+  if (i < 0) return line;
+  return (
+    <>
+      {line.slice(0, i)}
+      <span className="nowrap">{line.slice(i)}</span>
     </>
   );
 }

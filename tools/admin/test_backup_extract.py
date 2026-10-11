@@ -27,12 +27,14 @@ CREATE TABLE ask_feedback (id INTEGER PRIMARY KEY, question_id INTEGER, note TEX
 CREATE TABLE ask_vote (question_id INTEGER, by TEXT, helpful INTEGER, reason TEXT, updated_at TEXT, PRIMARY KEY (question_id, by));
 CREATE TABLE ask_answer_history (question_id INTEGER, version INTEGER, answer_json TEXT, PRIMARY KEY (question_id, version));
 CREATE TABLE worker_auth_fail (at TEXT);
+CREATE TABLE sync_run (id INTEGER PRIMARY KEY, started_at TEXT, status TEXT);
 INSERT INTO ask_question VALUES (1, 'synthetic q');
 INSERT INTO ask_answer VALUES (1, '{}');
 INSERT INTO ask_feedback VALUES (1, 1, 'ok');
 INSERT INTO ask_vote VALUES (1, 'a', 0, 'synthetic reason', '2030-01-01T00:00:00.000Z');
 INSERT INTO ask_answer_history VALUES (1, 1, '{}');
 INSERT INTO worker_auth_fail VALUES ('2030-01-01T00:00:00.000Z');
+INSERT INTO sync_run VALUES (1, '2030-01-01T11:00:00.000Z', 'failed');
 """
 
 
@@ -65,6 +67,8 @@ def test_includes_ask_tables_but_not_worker_auth_fail(tmp_path, capsys):
     assert sql.index("INTO ask_question") < sql.index("INTO ask_vote")
     assert sql.index("INTO ask_question") < sql.index("INTO ask_answer_history")
     assert "worker_auth_fail" not in sql and "worker_auth_fail" not in printed
+    # 자동 업데이트 기록은 복원 대상이 아니다(T-S1)
+    assert "sync_run" not in sql and "sync_run" not in printed
 
 
 def test_output_is_valid_and_quotes_survive(tmp_path, capsys):

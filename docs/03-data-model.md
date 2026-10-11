@@ -194,6 +194,24 @@ ALTER TABLE ask_question ADD COLUMN reask_at TEXT;   -- 마지막 요청 시각(
 - 표·메모·이력은 가족 자료(S1)다. 로그·오류에 쓰지 않는다.
 
 - app_setting 키: `ask_worker_seen_at`(워커 생존 표시, 최대 60초에 한 번 갱신), `ask_worker_locked_until`(토큰 실패 잠금 해제 시각).
+
+### 2-sync. 자동 업데이트 기록 (마이그레이션 `0010_sync_run.sql`, T-S1)
+```sql
+CREATE TABLE sync_run (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  started_at TEXT NOT NULL,          -- 집 PC 가 보고한 시작 시각(ISO UTC, 서버가 현재 -2일 ~ +10분 안만 받는다)
+  finished_at TEXT,                  -- 끝 보고를 받은 서버 시각
+  status TEXT NOT NULL CHECK (status IN ('running','ok','no_new','failed')),
+  stage TEXT,                        -- fetch|merge|build|verify|media|downstream|commit|ingest|report
+  code TEXT,                         -- ^[a-z0-9_]{1,40}$ (사유 코드)
+  new_reports INTEGER, new_comments INTEGER,
+  last_note_date TEXT,               -- YYYY-MM-DD
+  created_at TEXT NOT NULL
+);
+```
+- 본문·이름·키즈노트 응답은 담지 않는다(상태·단계·코드·건수·날짜뿐). **90일 지난 행은 `POST /api/worker/sync/start` 때 지운다.**
+- **백업 복원 대상이 아니다**: 다시 만들 수 있는 로그라 `tools/admin/backup-extract.py` 의 앱 표 목록에 넣지 않는다(복원하면 지난 실행 기록이 오늘 상태를 오도한다).
+- 상태 판정은 저장하지 않고 읽을 때 계산한다(`server/lib/sync-state.ts`, `09` §5-2).
 - 질문 본문·답은 가족 자료(S1)다. 로그·오류 응답에 쓰지 않는다.
 
 ## 3. 가족 기록 종류 (`log_type.schema_json`)

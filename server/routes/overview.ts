@@ -4,6 +4,7 @@ import type { AppEnv } from "../app";
 import { jsonResponse } from "../http/errors";
 import { readWorkerSeen } from "../ask/seen";
 import { readIngestState } from "../lib/ingest-state";
+import { readSyncSummary } from "../lib/sync-state";
 import { previewOfDay } from "../../src/lib/notePreview";
 import type { Overview } from "../../src/lib/notesSchemas";
 
@@ -79,6 +80,16 @@ overviewRoutes.get("/api/overview", async (c) => {
   const ingestState = await readIngestState(db, c.get("deps").now());
 
   const nowMs = c.get("deps").now();
+  const s = await readSyncSummary(db, nowMs);
+  const sync = {
+    state: s.state,
+    lastOkAt: s.lastOkAt,
+    lastAttemptAt: s.lastAttemptAt,
+    lastAttemptReceivedAt: s.lastAttemptReceivedAt,
+    newReports: s.newReports,
+    lastNoteDate: s.lastNoteDate,
+    code: s.code,
+  };
   const askPending = await db
     .prepare(
       "SELECT COUNT(*) AS n FROM ask_question WHERE deleted_at IS NULL AND status IN ('pending','claimed','answering','reviewing')",
@@ -120,6 +131,7 @@ overviewRoutes.get("/api/overview", async (c) => {
     comments: days?.comments ?? 0,
     range: days?.first && days.last ? { from: days.first, to: days.last } : null,
     ingestState,
+    sync,
     security: { lastGlobalLockAt: lock?.value ?? null, failures7d: fail7?.n ?? 0 },
     lastIngest: ingest
       ? { at: ingest.at, status: ingest.status, commit: ingest.source_commit }

@@ -85,6 +85,26 @@ export const overviewSchema = z.object({
   range: z.object({ from: dateString, to: dateString }).nullable(),
   /** R1-6: 가장 최근 적재 실행 상태. running=갱신 중, failed=마지막 갱신 실패. */
   ingestState: z.enum(["idle", "running", "failed"]),
+  /** T-S1: 알림장 자동 업데이트 상태(서버 판정). 없으면 none. */
+  sync: z
+    .object({
+      state: z.enum(["none", "ok", "running", "failed", "missed", "stuck"]),
+      lastOkAt: z.string().nullable(),
+      lastAttemptAt: z.string().nullable(),
+      lastAttemptReceivedAt: z.string().nullable().default(null),
+      newReports: z.number().int(),
+      lastNoteDate: z.string().nullable(),
+      code: z.string().nullable(),
+    })
+    .default({
+      state: "none",
+      lastOkAt: null,
+      lastAttemptAt: null,
+      lastAttemptReceivedAt: null,
+      newReports: 0,
+      lastNoteDate: null,
+      code: null,
+    }),
   /** R1-3: 마지막 전체 잠금(ISO, UTC). 없으면 null. */
   security: z.object({
     lastGlobalLockAt: z.string().nullable(),
