@@ -5,6 +5,8 @@ import type { AppEnv } from "../app";
 import { touchWorkerSeen } from "../ask/seen";
 import { bearerMatches } from "../auth/worker";
 import { errorResponse, jsonResponse } from "../http/errors";
+import { SyncFinishSchema, SyncStartSchema } from "../../shared/sync-schema";
+import { SYNC_RETENTION_MS } from "../lib/sync-state";
 import { hasForbiddenWord } from "../../shared/ask-forbidden";
 import {
   ASK_ANSWER_MAX_BYTES,
@@ -344,4 +346,67 @@ workerRoutes.post("/api/worker/ask/:id/fail", async (c) => {
     .bind(id)
     .first<{ status: string }>();
   return jsonResponse(200, { status: row?.status ?? "failed" });
+});
+
+// 알림장 자동 업데이트 기록(T-S1). Bearer 만(위 미들웨어). 시작 때 90일 지난 행을 지운다.
+// startedAt 은 집 PC 시계라 어긋날 수 있어 너무 먼 값은 거절한다(미래 10분, 과거 2일).
+const START_SKEW_FUTURE_MS = 10 * 60_000;
+const START_SKEW_PAST_MS = 2 * 24 * 60 * 60_000;
+
+workerRoutes.post("/api/worker/sync/start", async (c) => {
+  const parsed = SyncStartSchema.safeParse(await readJson(c.req.raw));
+  if (!parsed.success) return errorResponse(422, "validation_error", "입력을 확인해 주세요.");
+  const nowMs = c.get("deps").now();
+  const startedMs = Date.parse(parsed.data.startedAt);
+  if (startedMs > nowMs + START_SKEW_FUTURE_MS || startedMs < nowMs - START_SKEW_PAST_MS) {
+    return errorResponse(422, "validation_error", "입력을 확인해 주세요.");
+  }
+  const db = c.env.DB;
+  await db
+    .prepare("DELETE FROM sync_run WHERE created_at < ?1")
+    .bind(iso(nowMs - SYNC_RETENTION_MS))
+    .run();
+  const row = await db
+    .prepare(
+      "INSERT INTO sync_run (started_at, status, created_at) VALUES (?1, 'running', ?2) RETURNING id",
+    )
+    .bind(iso(startedMs), iso(nowMs))
+    .first<{ id: number }>();
+  if (!row) return errorResponse(500, "internal_error", "잠시 뒤 다시 해 주세요.");
+  return jsonResponse(200, { id: row.id });
+});
+
+workerRoutes.post("/api/worker/sync/:id/finish", async (c) => {
+  const id = idOf(c.req.param("id"));
+  if (id === null) return notFound();
+  const parsed = SyncFinishSchema.safeParse(await readJson(c.req.raw));
+  if (!parsed.success) return errorResponse(422, "validation_error", "입력을 확인해 주세요.");
+  const v = parsed.data;
+  const db = c.env.DB;
+  // 진행 중인 행만 한 번 끝낼 수 있다(두 번째 보고는 409).
+  const res = await db
+    .prepare(
+      `UPDATE sync_run
+       SET status = ?1, stage = ?2, code = ?3, new_reports = ?4, new_comments = ?5, last_note_date = ?6, finished_at = ?7
+       WHERE id = ?8 AND status = 'running'`,
+    )
+    .bind(
+      v.status,
+      v.stage ?? null,
+      v.code ?? null,
+      v.newReports ?? null,
+      v.newComments ?? null,
+      v.lastNoteDate ?? null,
+      iso(c.get("deps").now()),
+      id,
+    )
+    .run();
+  if (res.meta.changes === 0) {
+    const exists = await db
+      .prepare("SELECT 1 AS x FROM sync_run WHERE id = ?1")
+      .bind(id)
+      .first<{ x: number }>();
+    return exists ? conflict() : notFound();
+  }
+  return new Response(null, { status: 204 });
 });
