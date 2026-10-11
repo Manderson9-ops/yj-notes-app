@@ -337,5 +337,5 @@ describe("syncText: 시각에 따른 문구", () => {
 /** 문장이 여러 span 으로 나뉘어도(줄바꿈 방지 묶음) 전체 글로 찾는다. */
 function fullText(s: string) {
   return (_: string, el: Element | null): boolean =>
-    el?.textContent === s && [...(el.children ?? [])].every((c) => c.textContent !== s);
+    el !== null && el.textContent === s && [...el.children].every((c) => c.textContent !== s);
 }
