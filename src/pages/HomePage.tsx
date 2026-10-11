@@ -6,6 +6,13 @@ import { QueryError } from "../components/QueryError";
 import { ThemeDecor } from "../components/decor/ThemeDecor";
 import { daysSince, formatDateKo, formatYmdKo, seoulDateOf } from "../lib/dateFormat";
 import { useOverview } from "../lib/notesApi";
+import {
+  SYNC_HEAD,
+  SYNC_NEXT,
+  syncLastNoteLine,
+  syncNeedsNotice,
+  syncReason,
+} from "../lib/syncText";
 import "../styles/notes.css";
 
 // S10 홈. 맨 위는 가장 최근 알림장(조부모의 첫 질문 「오늘 뭐 했나」), 그 바로 아래 「오늘 기록하기」, 이어서 지난 알림장,
@@ -64,6 +71,9 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
   const [now] = useState(() => Date.now());
   const staleDays = data.lastIngest ? daysSince(data.lastIngest.at, now) : null;
   const syncDate = data.lastIngest ? seoulDateOf(data.lastIngest.at) : undefined;
+  // T-S1: 자동 업데이트가 안 됐으면 경고 하나로 알린다. 적재 실패 안내와 겹치면 이 배너 하나만 보인다.
+  const syncNotice = syncNeedsNotice(data.sync);
+  const lastNote = syncLastNoteLine(data.sync, data.range?.to ?? null);
 
   return (
     <>
@@ -73,7 +83,24 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
           <span>자료를 갱신하는 중이에요.</span> <span>잠시 뒤 다시 확인해 주세요.</span>
         </Notice>
       )}
-      {data.ingestState === "failed" && (
+      {syncNotice && (
+        <div data-testid="sync-notice">
+          <Notice tone="warn">
+            <span>{SYNC_HEAD}</span>
+            <br />
+            <span data-testid="sync-reason">{syncReason(data.sync)}.</span>
+            {lastNote && (
+              <>
+                <br />
+                <span>{lastNote}</span>
+              </>
+            )}
+            <br />
+            <span>{SYNC_NEXT}</span>
+          </Notice>
+        </div>
+      )}
+      {data.ingestState === "failed" && !syncNotice && (
         <Notice tone="warn">
           마지막 갱신이 실패했어요. <span>관리자에게 알려 주세요.</span>
         </Notice>

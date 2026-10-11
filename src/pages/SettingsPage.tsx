@@ -10,6 +10,7 @@ import { api } from "../lib/api";
 import { formatYmdKo, seoulDateOf } from "../lib/dateFormat";
 import { useOverview } from "../lib/notesApi";
 import { clearQueue, unsentCounts } from "../lib/logs/queue";
+import { syncSettingsLine } from "../lib/syncText";
 import { handleUnauthorized } from "../lib/queryClient";
 
 export function SettingsPage() {
@@ -71,6 +72,14 @@ export function SettingsPage() {
           )}
           <p className="muted" data-testid="pin-failures-7d">
             최근 7일 PIN 실패: {failures7d}회
+          </p>
+        </section>
+      )}
+      {overview.data && overview.data.sync.state !== "none" && (
+        <section className="settings-section" aria-labelledby="set-sync">
+          <h2 id="set-sync">자동 업데이트</h2>
+          <p className="muted" data-testid="sync-line">
+            알림장 자동 업데이트: {syncSettingsLine(overview.data.sync)}
           </p>
         </section>
       )}

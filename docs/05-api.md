@@ -26,6 +26,7 @@
   range: {from,to} | null,                       // 알림장 날짜 범위
   lastIngest: {at, status:'ok', commit} | null,  // 마지막 성공 적재(finished_at, 없으면 started_at)
   ingestState: 'idle'|'running'|'failed',        // R1-6: 가장 최근 ingest_run 상태(running 6시간 초과는 failed 로 본다)
+  sync: {state:'none'|'ok'|'running'|'failed'|'missed'|'stuck', lastOkAt, lastAttemptAt, newReports, lastNoteDate, code},  // T-S1: 알림장 자동 업데이트 상태(서버 판정, `09` §5-2). 날짜·시각은 null 가능, 본문 없음
   security: {lastGlobalLockAt: string | null},   // R1-3: 마지막 전체 잠금(ISO UTC)
   ask: {pending, worker:{online, seenAt}, medianTotalMs7d},   // T-Q1: 답 기다리는 질문 수·워커 상태·7일 답 시간 중앙값(ms, 없으면 null)
   milestones: {observed, unobserved},            // observation 에 나온 이정표 수 / 나머지
@@ -121,6 +122,8 @@
 | POST | `/worker/ask/:id/fail` | `{code: [a-z0-9_]{1,40}}` → `200 {status}`: 시도가 남으면 `pending`, 아니면 `failed` |
 | GET | `/worker/ask/history?limit=60` | `200 {items:[{id, body, askedBy, createdAt, level, tryNowActions:[string], votes:[{by,helpful,reason,updatedAt}], notes:[{by,note,createdAt}]}]}` — 최근 끝난(`done`) 행동 질문(최신순, `limit` 1~100 정수 아니면 `400`). **본문이 들어 있어 Bearer 전용·`Cache-Control: no-store`·로그 금지**, 응답은 **200KB 상한**(넘으면 오래된 항목부터 뺀다). 질문당 표 12·메모 10개까지. 워커가 claim 직후 받아 60초 캐시해 관련 이전 질문을 고른다(`11` §7, `04` §3-2) |
 | GET | `/worker/ping` | `204`(생존 표시 갱신) |
+| POST | `/worker/sync/start` | `{startedAt: ISO8601}` → `200 {id}`. `422`: 형식 위반·여분 키·서버 시각 −2일/+10분 밖. 이 호출이 90일 지난 `sync_run` 행을 지운다 |
+| POST | `/worker/sync/:id/finish` | `{status:'ok'|'no_new'|'failed', stage?, code?, newReports?, newComments?, lastNoteDate?}` → `204`. zod 엄격(여분 키 거절): `stage` ∈ fetch·merge·build·verify·media·downstream·commit·ingest·report, `code` `^[a-z0-9_]{1,40}$`(`failed` 는 필수), 건수 정수 0~10000(`no_new` 는 `newReports` 0), `lastNoteDate` YYYY-MM-DD. 진행 중(`running`)인 행만 한 번 끝낼 수 있다: 두 번째 보고·이미 끝난 행은 `409`, 없는 id 는 `404`, 검증 실패는 `422`. 본문·이름은 받지 않는다 |
 
 - 모든 호출은 `ask_worker_seen_at` 을 갱신한다(60초에 한 번만 D1 에 쓴다). 오류 응답에 질문·답 본문을 넣지 않는다.
 - 경로가 정식 형태(`/api/worker/...` 소문자, 퍼센트 인코딩·이중 슬래시·끝 슬래시 없음)가 아니면 `404`.

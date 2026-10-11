@@ -112,11 +112,30 @@ wrangler d1 execute DB --remote --command "INSERT OR REPLACE INTO app_setting (k
 | R-04 | 기록이 사라졌다 | `deleted_at` 확인(소프트 삭제 복구) → 없으면 §5-1 의 앱 표 복원(해당 id 만 골라 적용 가능) |
 | R-05 | 유출 의심 | `04` §6 절차 |
 | R-06 | 키즈노트 수집 실패 | 브라우저 로그인 상태 확인 → API 응답 형식 변경이면 수집 단계 수정, 적재는 보류 |
+| R-07 | 홈에 「오늘 저녁 알림장 자동 업데이트가 안 됐어요」 | §5-2 의 사유 표와 수동 대처. 재시도는 없으니 고친 뒤 정기 작업을 직접 한 번 실행하거나 다음 저녁을 기다린다 |
+
+### 5-2. 알림장 자동 업데이트 (T-S1)
+집 PC 의 Aside 정기 작업이 **매일 20:00(KST)** 에 수집 → 비공개 파이프라인 → 앱 적재를 돌리고 결과를 앱에 보고한다. **재시도는 없다**(다음 날 저녁에 다시 한다). 실패는 **웹앱에서만** 알린다(데스크톱 알림·메신저 없음).
+- **보고 API**: `POST /api/worker/sync/start` → `POST /api/worker/sync/:id/finish`(`05` 워커 API). 인증은 물어보기 워커와 같은 Bearer 토큰(별도 허용 목록 없음, 세션 불가).
+- **finish 본문**: `{status:'ok'|'no_new'|'failed', stage?, code?, newReports?, newComments?, lastNoteDate?}`. `stage` ∈ fetch·merge·build·verify·media·downstream·commit·ingest·report.
+- **상태 판정**(읽을 때 계산, KST 기준, `server/lib/sync-state.ts`): 「예정 시각」 = 오늘 20:00 KST(지금이 20:00 전이면 어제 20:00).
+  | 상태 | 조건 | 홈 |
+  |---|---|---|
+  | none | 실행 기록이 한 번도 없음 | 배너 없음(설정 줄도 없음) |
+  | ok | 가장 최근 실행이 ok·no_new | 배너 없음 |
+  | running | 가장 최근 실행이 진행 중(시작 후 3시간 이내) | 배너 없음 |
+  | stuck | 진행 중인 채 시작 후 3시간 초과 | 경고 |
+  | failed | 가장 최근 실행이 failed | 경고(사유는 `code`) |
+  | missed | 예정 시각 이후 시작된 실행이 없고 지금 ≥ 예정 + 90분 | 경고(집 PC·Aside 꺼짐 추정) |
+  `missed` 는 다른 상태보다 먼저 본다(어제 실패로 남아 있어도 오늘 안 돌았으면 missed).
+- **사유 문구**(`code` → 가족 말): `kidsnote_login` 키즈노트 로그인이 풀렸어요 / `kidsnote_api` 키즈노트 응답이 없어요 / `changed_existing` 예전 알림장이 바뀌어 확인이 필요해요 / `media` 사진 받기가 끝나지 않았어요 / `verify` 자료 검사에서 멈췄어요 / `ingest` 앱에 올리는 중 멈췄어요 / missed 집 PC가 꺼져 있었던 것 같아요 / 그 밖(`stuck`·`unknown` 포함) 관리자 확인이 필요해요. 마지막에 항상 「내일 저녁 8시에 다시 해요.」(재시도가 아니라 정기 실행 안내).
+- **수동 대처**: 홈 경고가 뜨면 ① `missed` — 집 PC 와 Aside 가 켜져 있는지 확인, 필요하면 정기 작업을 한 번 직접 실행 ② `kidsnote_login` — 브라우저에서 키즈노트에 다시 로그인 ③ `changed_existing` — 파이프라인 로그에서 바뀐 글 id 를 확인하고 사람이 판단(자동으로 덮어쓰지 않는다) ④ `media`·`verify`·`ingest` — 파이프라인 로그(건수·id 만 기록)를 보고 원인을 고친 뒤 다시 실행. `ingest` 단계 실패로 적재가 중간에 멈췄다면 R-02 절차(같은 run 폴더로 upload 재실행)를 따른다.
+- **기록 보관**: `sync_run` 은 90일, 시작 보고 때 정리한다. 백업 복원 대상이 아니다(`03` §2-sync).
 
 ### 5-1. 백업 복구 절차 (2026-10-05 연습으로 확정)
 `wrangler d1 export` 백업은 report_doc 본문을 한 문장으로 써서 `wrangler d1 execute --file` 로 통째로 되넣으면 `SQLITE_TOOBIG`(문장 100KB 초과)으로 실패한다. 그래서 두 갈래로 복구한다.
 1. **다시 만들 수 있는 표**(알림장·관측·근거·검진·문서): `npm run db:migrate:prod` → `npm run ingest:export` → `ingest:verify` → `ingest:upload -- --remote --yes` (DATA_DIR 가 정본).
-2. **앱에만 있는 표**(`family_log`, `family_log_history`, `ask_question`, `ask_answer`, `ask_feedback`, `ask_vote`, `ask_answer_history`, `app_setting`): `python tools/admin/backup-extract.py <백업.sql> <출력.sql>` → `npx wrangler d1 execute DB --remote --file <출력.sql>`. 출력 파일은 S1 이므로 저장소 밖에 두고 적용 후 지운다. 일시 상태인 `worker_auth_fail` 표와 `app_setting` 의 `session_epoch`·`last_global_lock_at`·`ask_worker_seen_at`·`ask_worker_locked_until` 은 되살리지 않는다.
+2. **앱에만 있는 표**(`family_log`, `family_log_history`, `ask_question`, `ask_answer`, `ask_feedback`, `ask_vote`, `ask_answer_history`, `app_setting`): `python tools/admin/backup-extract.py <백업.sql> <출력.sql>` → `npx wrangler d1 execute DB --remote --file <출력.sql>`. 출력 파일은 S1 이므로 저장소 밖에 두고 적용 후 지운다.  다시 만들 수 있는 로그 `sync_run` 도 복원하지 않는다. 일시 상태인 `worker_auth_fail` 표와일시 상태인 `worker_auth_fail` 표와 `app_setting` 의 `session_epoch`·`last_global_lock_at`·`ask_worker_seen_at`·`ask_worker_locked_until` 은 되살리지 않는다.
 3. `npm run ingest:status -- --remote --yes` 가 `matches_manifest: true` 인지, 앱에서 기록 목록이 보이는지 확인.
 - 7일 이내 사고는 D1 Time Travel(`wrangler d1 time-travel restore`)이 더 빠르다.
 
