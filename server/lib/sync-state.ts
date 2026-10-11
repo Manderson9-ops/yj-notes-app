@@ -5,6 +5,8 @@ export type SyncState = "none" | "ok" | "running" | "failed" | "missed" | "stuck
 export interface SyncRunRow {
   id: number;
   started_at: string;
+  /** 서버가 시작 보고를 받은 시각(ISO). 집 PC 시계가 어긋나도 믿을 수 있는 기준. */
+  created_at: string;
   finished_at: string | null;
   status: "running" | "ok" | "no_new" | "failed";
   code: string | null;
@@ -37,6 +39,8 @@ const SCHEDULE_HOUR = 20;
 export const MISSED_AFTER_MS = 90 * MIN;
 /** 시작 뒤 이 시간이 지나도 끝나지 않으면 「멈춤」. */
 export const STUCK_AFTER_MS = 3 * HOUR;
+/** 예정 시각보다 이만큼 일찍 서버에 닿은 시작 보고도 오늘 실행으로 센다(수동 실행·시계 오차). */
+export const EARLY_GRACE_MS = 30 * MIN;
 export const SYNC_RETENTION_MS = 90 * DAY;
 
 /** nowMs 이전(같은 순간 포함)에서 가장 가까운 20:00 KST 의 UTC ms. */
@@ -67,14 +71,15 @@ export function deriveSyncSummary(
   };
   if (!latest) return { ...base, state: "none", code: null };
 
-  const startedMs = Date.parse(latest.started_at);
+  // 판정은 서버가 시작 보고를 받은 시각(created_at)으로 한다: 집 PC 시계가 틀려도 미실행·멈춤이 어긋나지 않게.
+  const receivedMs = Date.parse(latest.created_at);
   const scheduled = lastScheduledMs(nowMs);
-  // 예정 시각 이후 시작된 실행이 없고 90분이 지났다.
-  if (startedMs < scheduled && nowMs >= scheduled + MISSED_AFTER_MS) {
+  // 예정 시각(−30분 여유) 이후에 시작 보고가 없고 90분이 지났다.
+  if (receivedMs < scheduled - EARLY_GRACE_MS && nowMs >= scheduled + MISSED_AFTER_MS) {
     return { ...base, state: "missed", code: "missed" };
   }
   if (latest.status === "running") {
-    return nowMs - startedMs > STUCK_AFTER_MS
+    return nowMs - receivedMs > STUCK_AFTER_MS
       ? { ...base, state: "stuck", code: "stuck" }
       : { ...base, state: "running", code: null };
   }
@@ -86,7 +91,7 @@ export function deriveSyncSummary(
 
 export async function readSyncSummary(db: D1Database, nowMs: number): Promise<SyncSummary> {
   const cols =
-    "id, started_at, finished_at, status, code, new_reports, new_comments, last_note_date";
+    "id, started_at, created_at, finished_at, status, code, new_reports, new_comments, last_note_date";
   const latest = await db
     .prepare(`SELECT ${cols} FROM sync_run ORDER BY id DESC LIMIT 1`)
     .first<SyncRunRow>();

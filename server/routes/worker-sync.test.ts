@@ -51,6 +51,16 @@ describe("POST /api/worker/sync/start", () => {
     });
   });
 
+  it("오프셋이 붙은 시각(+09:00)도 받고 UTC 로 바꿔 저장한다", async () => {
+    const ok = await start("2029-12-31T18:59:30+09:00");
+    expect(ok.status).toBe(200);
+    const { id } = await ok.json<{ id: number }>();
+    expect(row(id)?.started_at).toBe("2029-12-31T09:59:30.000Z");
+    const z = await start("2029-12-31T09:59:31Z");
+    expect(z.status).toBe(200);
+    expect(row((await z.json<{ id: number }>()).id)?.started_at).toBe("2029-12-31T09:59:31.000Z");
+  });
+
   it("잘못된 입력은 422: 형식·누락·여분 키·너무 먼 시각", async () => {
     for (const body of [
       {},
@@ -106,6 +116,21 @@ describe("POST /api/worker/sync/:id/finish", () => {
       last_note_date: "2030-01-01",
       finished_at: nowIso(),
     });
+  });
+
+  it("ok·no_new 에는 관리자용 코드 두 가지만(needs_reading, guide_asof_due) 붙일 수 있다", async () => {
+    const id = await startId();
+    expect((await finish(id, { status: "ok", code: "media" })).status).toBe(422);
+    expect((await finish(id, { status: "no_new", code: "kidsnote_login" })).status).toBe(422);
+    expect((await finish(id, { status: "ok", code: "guide_asof_due", newReports: 2 })).status).toBe(
+      204,
+    );
+    expect(row(id)).toMatchObject({ status: "ok", code: "guide_asof_due" });
+    const id2 = await startId();
+    expect((await finish(id2, { status: "no_new", code: "needs_reading" })).status).toBe(204);
+    // 화면용 sync.code 에는 성공 실행의 코드가 나오지 않는다
+    expect((await sync()).code).toBeNull();
+    expect((await sync()).state).toBe("ok");
   });
 
   it("failed 는 code 필수, no_new 는 새 알림장 0 이어야 한다", async () => {

@@ -8,6 +8,7 @@ const SCHED = "2030-03-10T11:00:00.000Z";
 
 const run = (over: Partial<SyncRunRow> & Pick<SyncRunRow, "started_at">): SyncRunRow => ({
   id: 1,
+  created_at: over.started_at, // 집 PC 시계가 맞는 보통의 경우: 서버가 받은 시각 = 보고된 시작 시각
   finished_at: null,
   status: "ok",
   code: null,
@@ -160,5 +161,40 @@ describe("deriveSyncSummary", () => {
       lastNoteDate: "2030-03-08",
       lastOkAt: "2030-03-09T11:10:00.000Z",
     });
+  });
+
+  it("집 PC 시계가 늦어도(보고 시작이 예정보다 한참 이전) 서버가 예정 뒤에 받았으면 오늘 실행", () => {
+    const r = run({
+      started_at: "2030-03-10T09:00:00.000Z", // PC 시계는 2시간 늦음
+      created_at: "2030-03-10T11:10:00.000Z",
+      finished_at: "2030-03-10T11:20:00.000Z",
+    });
+    expect(derive(r, "2030-03-10T13:00:00.000Z").state).toBe("ok");
+  });
+
+  it("집 PC 시계가 빨라도(보고 시작이 예정 뒤) 서버가 받은 때가 어제면 missed", () => {
+    const r = run({
+      started_at: "2030-03-10T12:00:00.000Z", // PC 시계는 빠름
+      created_at: "2030-03-09T11:10:00.000Z",
+      finished_at: "2030-03-09T11:20:00.000Z",
+    });
+    expect(derive(r, "2030-03-10T12:30:00.000Z").state).toBe("missed");
+  });
+
+  it("예정 시각 30분 전부터 서버에 닿은 시작은 오늘 실행(여유), 31분 전이면 missed", () => {
+    const early = run({ started_at: SCHED, created_at: "2030-03-10T10:30:00.000Z" });
+    expect(derive(early, "2030-03-10T13:00:00.000Z").state).toBe("ok");
+    const tooEarly = run({ started_at: SCHED, created_at: "2030-03-10T10:29:59.999Z" });
+    expect(derive(tooEarly, "2030-03-10T13:00:00.000Z").state).toBe("missed");
+  });
+
+  it("멈춤도 서버가 받은 시각 기준(PC 시계가 빨라도 3시간 안 지났으면 running)", () => {
+    const r = run({
+      started_at: "2030-03-10T14:00:00.000Z",
+      created_at: "2030-03-10T11:30:00.000Z",
+      status: "running",
+    });
+    expect(derive(r, "2030-03-10T14:29:00.000Z").state).toBe("running");
+    expect(derive(r, "2030-03-10T14:31:00.000Z").state).toBe("stuck");
   });
 });

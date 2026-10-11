@@ -8,7 +8,8 @@ import { MOCK_DAYS, commentCount, firstLineOf } from "./notesData.ts";
  */
 function syncFixture(): Overview["sync"] {
   const state = process.env.MOCK_SYNC ?? "ok";
-  const okAt = new Date(Date.now() - 20 * 3_600_000).toISOString();
+  // 고정 시각: 화면 캡처가 실행 시각에 따라 달라지지 않게(어제 저녁 8시 10분 성공).
+  const okAt = "2020-05-02T11:10:00.000Z";
   const base = { lastOkAt: okAt, lastAttemptAt: okAt, newReports: 2, lastNoteDate: "2020-05-02" };
   if (state === "none")
     return {

@@ -788,3 +788,16 @@ a.card::after {
 .dialog > h2 {
   margin-top: 0;
 }
+
+/* ---- 자동 업데이트 안내(T-S1): 첫 줄만 굵게, 날짜는 줄 중간에서 끊지 않는다 ---- */
+.sync-notice .notice > p {
+  font-weight: 400;
+}
+
+.sync-notice .notice strong {
+  font-weight: 700;
+}
+
+.nowrap {
+  white-space: nowrap;
+}

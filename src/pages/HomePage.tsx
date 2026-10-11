@@ -7,11 +7,12 @@ import { ThemeDecor } from "../components/decor/ThemeDecor";
 import { daysSince, formatDateKo, formatYmdKo, seoulDateOf } from "../lib/dateFormat";
 import { useOverview } from "../lib/notesApi";
 import {
-  SYNC_HEAD,
-  SYNC_NEXT,
-  syncLastNoteLine,
+  syncHead,
+  syncLastNote,
   syncNeedsNotice,
+  syncNextLine,
   syncReason,
+  syncWhoLine,
 } from "../lib/syncText";
 import "../styles/notes.css";
 
@@ -73,30 +74,35 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
   const syncDate = data.lastIngest ? seoulDateOf(data.lastIngest.at) : undefined;
   // T-S1: 자동 업데이트가 안 됐으면 경고 하나로 알린다. 적재 실패 안내와 겹치면 이 배너 하나만 보인다.
   const syncNotice = syncNeedsNotice(data.sync);
-  const lastNote = syncLastNoteLine(data.sync, data.range?.to ?? null);
+  const lastNote = syncLastNote(data.sync, data.range?.to ?? null);
 
   return (
     <>
-      {data.ingestState === "running" && (
+      {data.ingestState === "running" && !syncNotice && (
         <Notice tone="info">
           {/* 문장 단위로 나눈다: 번들 한글 장문 검사(G7)에 걸리지 않게(문구는 한 줄로 읽힌다) */}
           <span>자료를 갱신하는 중이에요.</span> <span>잠시 뒤 다시 확인해 주세요.</span>
         </Notice>
       )}
       {syncNotice && (
-        <div data-testid="sync-notice">
+        <div data-testid="sync-notice" className="sync-notice" role="status">
           <Notice tone="warn">
-            <span>{SYNC_HEAD}</span>
+            <span className="sr-only">주의: </span>
+            <strong data-testid="sync-head">{syncHead(data.sync, now)}</strong>
             <br />
             <span data-testid="sync-reason">{syncReason(data.sync)}.</span>
             {lastNote && (
               <>
                 <br />
-                <span>{lastNote}</span>
+                <span>
+                  {lastNote.label} <span className="nowrap">{lastNote.date}</span>
+                </span>
               </>
             )}
             <br />
-            <span>{SYNC_NEXT}</span>
+            <span>{syncWhoLine(data.sync)}</span>
+            <br />
+            <span>{syncNextLine(data.sync, now)}</span>
           </Notice>
         </div>
       )}
@@ -138,7 +144,7 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
 
       <section aria-labelledby="home-sync" className="home-facts">
         <h2 id="home-sync">자료 현황</h2>
-        {staleDays !== null && staleDays > STALE_DAYS && (
+        {staleDays !== null && staleDays > STALE_DAYS && !syncNotice && (
           <Notice tone="warn">마지막 동기화가 {String(staleDays)}일 전이에요.</Notice>
         )}
         <div className="card">
