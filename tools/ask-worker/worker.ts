@@ -12,7 +12,14 @@ import { buildDigest, DIGEST_FILE, writeDigest } from "./digest.ts";
 import { createHistoryCache } from "./family.ts";
 import { parseHistory, parseReask } from "./inject.ts";
 import type { HistoryItem } from "../../shared/ask-schema.ts";
-import { createClaudeRunner, withExitRetry } from "./claude.ts";
+import {
+  createClaudeRunner,
+  createProbe,
+  PROBE_TIMEOUT_MS,
+  withExitRetry,
+  type ClaudeRunner,
+  type Probe,
+} from "./claude.ts";
 import { askHome, loadConfig, type WorkerConfig } from "./config.ts";
 import { abortableSleep, handleOne, runLoop, type LoopDeps } from "./loop.ts";
 import { createLogger, pruneLogs } from "./logger.ts";
@@ -21,7 +28,12 @@ import { loadEmergencyMd } from "./emergency.ts";
 import { expandQuery } from "./expand.ts";
 import { buildPack } from "./pack.ts";
 import { answerQuestion, type PipelineDeps } from "./pipeline.ts";
-import { ANSWER_SCHEMA_FILE, REVIEW_PROMPT_FILE, SYSTEM_PROMPT_FILE } from "./prompts.ts";
+import {
+  ANSWER_SCHEMA_FILE,
+  PROBE_PROMPT_FILE,
+  REVIEW_PROMPT_FILE,
+  SYSTEM_PROMPT_FILE,
+} from "./prompts.ts";
 
 // claude CLI 의 검증기는 $schema(2020-12) 키를 모르므로 CLI 로 넘길 때만 제거한다(파일은 draft 2020-12 그대로).
 export function cliSchemaJson(fileText: string): string {
@@ -34,19 +46,40 @@ export function cliSchemaJson(fileText: string): string {
 export const SYNTHETIC_QUESTION =
   "테스트아이가 점심에 밥을 잘 안 먹어요. 며칠째 반만 먹고 남겨요. 어떻게 하면 좋을까요?";
 
+/** 작성·검토용 러너(비정상 종료 1회 재실행 — ASK_AUTH_PAUSE=1 이면 auth 는 재실행하지 않는다). */
+export function makeClaudeRunner(cfg: WorkerConfig): ClaudeRunner {
+  return withExitRetry(
+    createClaudeRunner({
+      bin: cfg.claudeBin,
+      home: cfg.home,
+      timeoutMs: cfg.claudeTimeoutMs,
+    }),
+    2000,
+    cfg.authPause,
+  );
+}
+
+/** 시작·해제 시험 호출(시간 상한 60s, 재실행 없음). ASK_AUTH_PAUSE=0 이면 undefined(시험 없이 바로 claim). */
+export function makeProbe(cfg: WorkerConfig): Probe | undefined {
+  if (!cfg.authPause) return undefined;
+  return createProbe(
+    createClaudeRunner({ bin: cfg.claudeBin, home: cfg.home, timeoutMs: PROBE_TIMEOUT_MS }),
+    { model: cfg.expandModel, systemPromptFile: PROBE_PROMPT_FILE },
+  );
+}
+
+/** 워커 시작 로그용: CLAUDE_CODE_EFFORT_LEVEL 이 있는지(값은 남기지 않는다). 자식 claude 가 그 값을 쓴다. */
+export function effortEnvPresent(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.CLAUDE_CODE_EFFORT_LEVEL ?? "") !== "";
+}
+
 export function makePipelineDeps(
   cfg: WorkerConfig,
   pack: { dataDir: string; ingestRoot?: string; cacheDir: string },
   /** 가족 의견 가져오기(없으면 가족 결과 없이 답한다). */
   getHistory?: () => Promise<HistoryItem[]>,
 ): PipelineDeps {
-  const runClaude = withExitRetry(
-    createClaudeRunner({
-      bin: cfg.claudeBin,
-      home: cfg.home,
-      timeoutMs: cfg.claudeTimeoutMs,
-    }),
-  );
+  const runClaude = makeClaudeRunner(cfg);
   // 질문 확장은 짧은 제한 시간의 빠른 모델 호출(실패해도 확장 없이 계속한다)
   const runExpand = createClaudeRunner({
     bin: cfg.claudeBin,
@@ -86,6 +119,7 @@ export function makePipelineDeps(
     answerSchemaJson: cliSchemaJson(readFileSync(ANSWER_SCHEMA_FILE, "utf8")),
     targetScore: cfg.targetScore,
     minPublishScore: cfg.minPublishScore,
+    reviewModel: cfg.reviewModel,
   };
 }
 
@@ -167,7 +201,8 @@ export async function main(args: string[]): Promise<number> {
   if (!cfg.dataDir) throw new Error("DATA_DIR 가 필요해요 (worker.env 또는 환경변수)");
   const home = askHome();
   const log = createLogger(join(home, "logs"), undefined, process.stdout.isTTY);
-  pruneLogs(join(home, "logs"));
+  pruneLogs(join(home, "logs"), cfg.logKeepDays);
+  log("effort_env", { present: effortEnvPresent() });
   const lock = acquireLock(join(home, "worker.lock"));
   if (!lock) {
     log("already_running");
@@ -191,6 +226,7 @@ export async function main(args: string[]): Promise<number> {
       { dataDir: cfg.dataDir, cacheDir: join(home, "cache") },
       () => history.get(),
     );
+    const probe = makeProbe(cfg);
     const loopDeps: LoopDeps = {
       client,
       process: (q, hooks, signal) => answerQuestion(pipe, q, hooks, signal),
@@ -202,8 +238,16 @@ export async function main(args: string[]): Promise<number> {
       log,
       sleep: abortableSleep,
       pollMs: cfg.pollMs,
+      ...(probe ? { probe } : {}),
     };
     if (flag(args, "--once")) {
+      // 루프와 같이 시험 호출이 성공한 뒤에만 claim 한다(로그인 만료면 질문의 시도를 쓰지 않는다)
+      const p = probe ? await probe(ac.signal) : { ok: true as const };
+      if (!p.ok) {
+        log("probe_failed", { exitKind: p.kind });
+        console.error(`시험 호출 실패(${p.kind}) — claim 하지 않았어요`);
+        return 1;
+      }
       const r = await handleOne(loopDeps, ac.signal);
       console.log(r.claimed ? "한 건 처리했어요" : "대기 중인 질문이 없어요");
     } else {

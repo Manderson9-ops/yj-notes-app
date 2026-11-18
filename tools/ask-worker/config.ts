@@ -68,6 +68,12 @@ export interface WorkerConfig {
   claudeTimeoutMs: number;
   /** 질문 확장에 쓰는 빠른 모델(기본 sonnet — 실측 haiku 보다 빨랐다. 안 되면 다른 쪽으로 한 번 더). */
   expandModel: string;
+  /** 검토·재검토 모델(기본 opus, ASK_REVIEW_MODEL). 작성·재작성은 opus 그대로. */
+  reviewModel: string;
+  /** 로그인 만료(exitKind=auth) 때 claim 을 멈추고 시험 호출로만 푼다(기본 켬, ASK_AUTH_PAUSE=0 이면 끔). */
+  authPause: boolean;
+  /** 워커 로그 보관 일수(기본 14, ASK_LOG_KEEP_DAYS). */
+  logKeepDays: number;
   home: string;
 }
 
@@ -77,6 +83,17 @@ export interface LoadOptions {
   env?: NodeJS.ProcessEnv;
   requireToken?: boolean;
   readFile?: (p: string) => string;
+}
+
+const MODEL_RE = /^[a-z0-9._-]{3,40}$/i;
+
+/** 허용 패턴에 맞으면 그 값, 아니면 기본값. */
+function model(v: string | undefined, d: string): string {
+  return v !== undefined && MODEL_RE.test(v) ? v : d;
+}
+
+export function isModelName(v: string): boolean {
+  return MODEL_RE.test(v);
 }
 
 function num(v: string | undefined, d: number, min: number, max: number): number {
@@ -129,9 +146,10 @@ export function loadConfig(opts: LoadOptions = {}): WorkerConfig {
     targetScore: 9.5,
     minPublishScore: num(f.ASK_MIN_PUBLISH_SCORE, 8.5, 0, 10),
     claudeTimeoutMs: num(f.ASK_CLAUDE_TIMEOUT_MS, 240_000, 30_000, 900_000),
-    expandModel: /^[a-z0-9._-]{3,40}$/i.test(f.ASK_EXPAND_MODEL ?? "")
-      ? (f.ASK_EXPAND_MODEL ?? "sonnet")
-      : "sonnet",
+    expandModel: model(f.ASK_EXPAND_MODEL, "sonnet"),
+    reviewModel: model(f.ASK_REVIEW_MODEL, "opus"),
+    authPause: (f.ASK_AUTH_PAUSE ?? "1").trim() !== "0",
+    logKeepDays: num(f.ASK_LOG_KEEP_DAYS, 14, 1, 3650),
     home,
   };
 }
