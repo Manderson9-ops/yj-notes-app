@@ -13,6 +13,7 @@ import { reportRoutes } from "./routes/reports";
 import { logRoutes } from "./routes/logs";
 import { sessionRoutes } from "./routes/session";
 import { askRoutes } from "./routes/ask";
+import { askTurnRoutes } from "./routes/ask-turn";
 import { workerRoutes } from "./routes/worker";
 
 export interface AppVariables {
@@ -43,6 +44,7 @@ export function createApp(deps: Deps = defaultDeps): Hono<AppEnv> {
   app.route("/", fileRoutes);
   app.route("/", logRoutes);
   app.route("/", askRoutes);
+  app.route("/", askTurnRoutes);
   app.route("/", workerRoutes);
 
   return app;

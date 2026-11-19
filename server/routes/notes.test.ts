@@ -190,6 +190,7 @@ describe("empty database", () => {
         pending: 0,
         worker: { online: false, seenAt: null },
         medianTotalMs7d: null,
+        redUnhandled: 0,
         feedback7d: { up: 0, down: 0, notes: 0 },
       },
       noteDays: 0,

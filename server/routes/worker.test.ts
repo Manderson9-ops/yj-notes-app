@@ -428,17 +428,32 @@ async function finishQuestion(
 }
 
 describe("claim: 다시 답변(reask) 덩어리", () => {
-  it("처음 질문에는 reask 가 없고, 다시 답변 요청 뒤에는 이전 답·이유·횟수가 온다", async () => {
+  // T-Q5 부터 /reask 는 질문을 되돌리지 않는다(카드만 만드는 턴). 배포 시점에 이미 대기 중이던 옛 방식 질문은
+  // 질문 claim 이 그대로 처리해야 하므로, 옛 상태(답이 이력으로 옮겨지고 질문이 pending)를 DB 로 직접 만든다.
+  function legacyReaskState(id: number, reason: string, by: string): void {
+    h.fake.sqlite
+      .prepare(
+        `INSERT INTO ask_answer_history (question_id, version, level, answer_json, review_score, model, total_ms, created_at)
+         SELECT question_id, 1, level, answer_json, review_score, model, total_ms, created_at FROM ask_answer WHERE question_id = ?`,
+      )
+      .run(id);
+    h.fake.sqlite.prepare("DELETE FROM ask_answer WHERE question_id = ?").run(id);
+    h.fake.sqlite
+      .prepare(
+        `UPDATE ask_question SET status = 'pending', attempts = 0, lease_until = NULL, reask_count = 1,
+           reask_reason = ?, reask_by = ?, reask_at = ? WHERE id = ?`,
+      )
+      .run(reason, by, new Date(h.clock.t).toISOString(), id);
+  }
+
+  it("처음 질문에는 reask 가 없고, 옛 방식 다시 답변 대기 질문에는 이전 답·이유·횟수가 온다", async () => {
     const id = await finishQuestion("합성 질문");
     const first = await workerCall(h, "POST", "/api/worker/ask/claim");
     expect(first.status).toBe(204);
-    await sessionCall(h, cookie, "POST", `/api/ask/${String(id)}/reask`, {
-      by: "아빠",
-      choice: "우리 상황과 달라요",
-      text: "합성 사정이 있어요",
-    });
+    legacyReaskState(id, "우리 상황과 달라요 · 합성 사정이 있어요", "아빠");
     const res = await workerCall(h, "POST", "/api/worker/ask/claim");
     const j = await res.json<{
+      type?: string;
       question: { id: number };
       reask?: {
         count: number;
@@ -447,6 +462,7 @@ describe("claim: 다시 답변(reask) 덩어리", () => {
         previousAnswer: { summary: string } | null;
       };
     }>();
+    expect(j.type).toBe("question");
     expect(j.question.id).toBe(id);
     expect(j.reask).toMatchObject({
       count: 1,
@@ -456,12 +472,13 @@ describe("claim: 다시 답변(reask) 덩어리", () => {
     expect(j.reask?.previousAnswer?.summary).toContain("합성 상황");
   });
 
-  it("처음 답변 claim 응답에는 reask 키가 없다", async () => {
+  it("처음 답변 claim 응답에는 reask 키가 없다(type 만 더해진다)", async () => {
     await ask("합성 질문");
     const j = await (
       await workerCall(h, "POST", "/api/worker/ask/claim")
     ).json<Record<string, unknown>>();
-    expect(Object.keys(j)).toEqual(["question"]);
+    expect(j).not.toHaveProperty("reask");
+    expect(Object.keys(j).sort()).toEqual(["question", "type"]);
   });
 });
 

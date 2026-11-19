@@ -18,4 +18,6 @@ export interface Env {
   APP_VERSION?: string;
   /** 선택(집 PC 워커 연결 시 필수). 워커 Bearer 토큰의 SHA-256 hex(64자). 없거나 형식이 틀리면 /api/worker/* 는 503 (fail closed). 비밀값. */
   ASK_WORKER_TOKEN_HASH?: string;
+  /** 선택(T-Q5). "0" 이면 claim 이 대화 턴을 고르지 않는다(질문만, 응답 모양도 T-Q5 이전과 같다). 그 밖·없음 = 켜짐. 워커만 되돌릴 때 먼저 0 으로 바꾼다. */
+  ASK_TURN_CLAIM?: string;
 }
