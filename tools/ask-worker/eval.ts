@@ -7,6 +7,12 @@
 // --reask <json>: 다시 답변 상황을 주입한다. 형식: {"reason","by","count"?,"previousAnswer"} 이면 모든 문항에, {"<골든 id>": {…}} 이면 그 문항에만.
 //   reason 은 「선택지」 또는 「선택지 · 자유 글」(선택지: 너무 일반적이에요 / 이미 해 봤어요 / 우리 상황과 달라요 / 더 자세히 알고 싶어요).
 // 두 파일 모두 저장소 밖 경로만 허용한다(결과에는 본문을 쓰지 않는다).
+// --thread <json>: 멀티턴 평가(T-Q5). 이어진 대화(원 질문·지금 카드·앞선 후속 문답)를 주입한다. 형식: {"question":{"body",…},"card":<Answer>,"turns":[…]}
+//   이면 모든 문항에, {"<골든 id>": {…}} 이면 그 문항에만. 골든 한 줄의 question 이 그 대화 뒤에 새로 들어오는 후속 질문이다.
+//   --prompt 없이 --thread 만 주면 카드 갱신 파이프라인(대화 맥락 포함)을 돈다.
+// --prompt followup: 후속 짧은 답(prompts/followup.md·review-followup.md·checkFollowup)으로 평가한다. 전체 실행은 --thread 가 필요하고,
+//   검토 모델 기본은 ASK_FOLLOWUP_REVIEW_MODEL 이다. --review-only 와 함께 쓰면 저장된 짧은 답을 후속 점검표로 검토·채점한다.
+//   저장 답 파일에는 근거 묶음·대화가 들어가므로 저장소 밖(<DATA_DIR>/ask-eval/)에만 둔다.
 // --review-model <모델>: 이 실행의 review·review2 가 worker.env 의 ASK_REVIEW_MODEL 대신 이 모델을 쓴다(운영 설정을 바꾸지 않고 비교).
 // --save-answers: answers-<시각>.json(형식 2)에 문항·run 마다 첫 작성본(stage "first", 검토 전 — 예외로 끝나도 저장)과
 //   최종 답(stage "final")을 검토 입력(근거 묶음 promptPack·질문 정보 pq·검사 정보 info)과 함께 저장한다.
@@ -19,6 +25,13 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import {
+  FollowupSchema,
+  type ClaimReask,
+  type ClaimThread,
+  type ClaimTurnResponse,
+  type Followup,
+} from "../../shared/ask-schema.ts";
+import {
   answerSchema,
   computeScore,
   ISSUE_CATEGORIES,
@@ -27,11 +40,13 @@ import {
   type IssueCategory,
   type ReviewIssue,
 } from "./answer-schema.ts";
-import { checkAnswer, type PackInfo } from "./checks.ts";
-import { ClaudeError, claudeVersion, type ClaudeRunner } from "./claude.ts";
+import { checkAnswer, checkFollowup, type CheckIssue, type PackInfo } from "./checks.ts";
+import { ClaudeError, claudeVersion, type ClaudeRequest, type ClaudeRunner } from "./claude.ts";
 import { assertOutsideRepo, isModelName, loadConfig, type WorkerConfig } from "./config.ts";
 import { renderMarkdown, resolveResultFile, summarize, type EvalItem } from "./eval-stats.ts";
-import { parseHistory, parseReask } from "./inject.ts";
+import { cardLevelOf, answerFollowup, cardQuestion, followupReviewRequest } from "./followup.ts";
+import type { FollowupHooks, FollowupResult } from "./followup.ts";
+import { parseHistory, parseReask, parseThread } from "./inject.ts";
 import { PackError } from "./pack.ts";
 import {
   answerQuestion,
@@ -42,7 +57,7 @@ import {
   type PipelineDeps,
   type PipelineHooks,
 } from "./pipeline.ts";
-import { REVIEW_PROMPT_FILE, type PromptQuestion } from "./prompts.ts";
+import { FOLLOWUP_REVIEW_PROMPT_FILE, REVIEW_PROMPT_FILE, type PromptQuestion } from "./prompts.ts";
 import { makeClaudeRunner, makePipelineDeps } from "./worker.ts";
 
 const lineSchema = z.object({
@@ -69,12 +84,13 @@ export interface SavedAnswer {
   run: number;
   /** first = 첫 작성본(검토 전, HARD 0건), final = 게시될 최종 답. */
   stage: "first" | "final";
-  /** not_behavior 는 null(워커는 스키마상 1을 보내지만 화면에는 단계가 없다). */
+  /** not_behavior 는 null(워커는 스키마상 1을 보내지만 화면에는 단계가 없다). 짧은 답(--prompt followup)도 null. */
   level: number | null;
   /** final 만: 게시 점수·재작성 수·남은 지적(검토자 + 코드 SOFT). */
   score?: number;
   rewrites?: number;
   issues?: ReviewIssue[];
+  /** 카드 답, 또는 --prompt followup 이면 후속 짧은 답. */
   answer: unknown;
   /** 검토 프롬프트에 들어간 근거 묶음(가족 기록 포함 — 저장소 밖에만). */
   promptPack: string;
@@ -195,28 +211,84 @@ export interface EvalIo {
 
 const USAGE = [
   "사용: ask-worker:eval -- --set <golden.jsonl> --out <결과 폴더> [--runs 2] [--limit N] [--save-answers] [--review-model <모델>] [--history <json>] [--reask <json>]",
-  "      ask-worker:eval -- --review-only <answers 파일|폴더> --out <결과 폴더> [--review-model <모델>] [--score]",
+  "      ask-worker:eval -- --set <golden.jsonl> --out <결과 폴더> --thread <json> [--prompt followup] [위 옵션]   (멀티턴: 골든 한 줄 = 그 대화 뒤의 후속 질문)",
+  "      ask-worker:eval -- --review-only <answers 파일|폴더> --out <결과 폴더> [--review-model <모델>] [--score] [--prompt followup]",
 ].join("\n");
+
+/** 평가가 돌리는 파이프라인: 첫 질문 답 / 대화 맥락이 있는 카드 갱신 / 후속 짧은 답. */
+type EvalMode = "question" | "card" | "followup";
+
+/** 골든 한 줄(후속 질문) + 주입한 대화 → 운영 claim 과 같은 모양의 턴 입력. 카드 평가는 잠금·한도 없이 reask 만 실을 수 있다. */
+function turnFor(
+  g: { question: string; askedBy?: string | undefined; redFlag?: boolean | undefined },
+  thread: ClaimThread,
+  stage: "reply" | "card",
+  reask?: ClaimReask,
+): ClaimTurnResponse {
+  const redFlag = g.redFlag ?? false;
+  return {
+    type: "turn",
+    stage,
+    cardUpdatesLeft: 3,
+    redLock: redFlag || thread.question.redFlag,
+    turn: {
+      id: 0,
+      seq: thread.turns.length + 1,
+      kind: reask ? "reask" : "followup",
+      body: g.question,
+      redFlag,
+      reaskReason: reask?.reason ?? null,
+      askedBy: g.askedBy ?? "가족",
+      reply: null,
+      cardReason: null,
+      ...(reask ? { reask } : {}),
+    },
+    thread,
+  };
+}
 
 export async function main(args: string[], io: EvalIo = {}): Promise<number> {
   const outDir = opt(args, "--out");
   const reviewOnly = opt(args, "--review-only");
   const setPath = opt(args, "--set");
   const reviewModelOpt = opt(args, "--review-model");
-  if (!outDir || (!reviewOnly && !setPath) || (reviewModelOpt && !isModelName(reviewModelOpt))) {
+  const promptOpt = opt(args, "--prompt");
+  const followup = promptOpt === "followup";
+  if (
+    !outDir ||
+    (!reviewOnly && !setPath) ||
+    (reviewModelOpt && !isModelName(reviewModelOpt)) ||
+    (promptOpt !== undefined && !followup) ||
+    // 후속 짧은 답의 전체 실행은 앞선 대화(--thread)가 있어야 한다
+    (followup && !reviewOnly && !opt(args, "--thread"))
+  ) {
     console.error(USAGE);
     return 1;
   }
   assertOutsideRepo(outDir);
   const cfg = io.cfg ?? loadConfig({ requireToken: false });
-  const reviewModel = reviewModelOpt ?? cfg.reviewModel;
+  const reviewModel = reviewModelOpt ?? (followup ? cfg.followupReviewModel : cfg.reviewModel);
   const version = io.claudeVersion ?? claudeVersion(cfg.claudeBin);
   const stamp = (io.now?.() ?? new Date()).toISOString().replace(/[:.]/g, "-");
   mkdirSync(outDir, { recursive: true });
   if (reviewOnly) {
-    return await runReviewOnly(args, reviewOnly, outDir, { cfg, io, reviewModel, version, stamp });
+    return await runReviewOnly(args, reviewOnly, outDir, {
+      cfg,
+      io,
+      reviewModel,
+      version,
+      stamp,
+      followup,
+    });
   }
-  return await runFull(args, setPath ?? "", outDir, { cfg, io, reviewModel, version, stamp });
+  return await runFull(args, setPath ?? "", outDir, {
+    cfg,
+    io,
+    reviewModel,
+    version,
+    stamp,
+    followup,
+  });
 }
 
 interface RunCtx {
@@ -225,16 +297,21 @@ interface RunCtx {
   reviewModel: string;
   version: string;
   stamp: string;
+  followup: boolean;
 }
 
 async function runFull(args: string[], setPath: string, outDir: string, c: RunCtx) {
   assertOutsideRepo(setPath);
   const historyPath = opt(args, "--history");
   const reaskPath = opt(args, "--reask");
+  const threadPath = opt(args, "--thread");
   if (historyPath) assertOutsideRepo(historyPath);
   if (reaskPath) assertOutsideRepo(reaskPath);
+  if (threadPath) assertOutsideRepo(threadPath);
   const history = historyPath ? parseHistory(readFileSync(historyPath, "utf8")) : null;
   const reaskOf = reaskPath ? parseReask(readFileSync(reaskPath, "utf8")) : () => undefined;
+  const threadOf = threadPath ? parseThread(readFileSync(threadPath, "utf8")) : () => undefined;
+  const mode: EvalMode = c.followup ? "followup" : threadPath ? "card" : "question";
   if (!c.io.deps && !c.cfg.dataDir) throw new Error("DATA_DIR 가 필요해요");
   const runs = Math.max(1, Math.min(3, Number(opt(args, "--runs") ?? 2)));
   const limit = Number(opt(args, "--limit") ?? Infinity);
@@ -254,7 +331,12 @@ async function runFull(args: string[], setPath: string, outDir: string, c: RunCt
       { dataDir: c.cfg.dataDir, cacheDir: join(c.cfg.home, "cache") },
       history ? () => Promise.resolve(history) : undefined,
     );
-  const deps: PipelineDeps = { ...base, reviewModel: c.reviewModel };
+  const deps: PipelineDeps = {
+    ...base,
+    reviewModel: c.reviewModel,
+    // 짧은 답 평가의 검토 모델은 --review-model(없으면 ASK_FOLLOWUP_REVIEW_MODEL)이다
+    ...(base.followup ? { followup: { ...base.followup, reviewModel: c.reviewModel } } : {}),
+  };
   const items: EvalItem[] = [];
   const head = { claudeVersion: c.version, reviewModel: c.reviewModel };
   const flush = () => {
@@ -299,16 +381,65 @@ async function runFull(args: string[], setPath: string, outDir: string, c: RunCt
         },
       };
       try {
-        const r = await answerQuestion(
-          deps,
-          {
-            body: g.question,
-            askedBy: g.askedBy ?? "가족",
-            redFlag: g.redFlag ?? false,
-            reask: reaskOf(g.id),
-          },
-          hooks,
-        );
+        if (mode === "followup") {
+          const thread = threadOf(g.id);
+          if (!thread) throw new PipelineError("thread_missing");
+          const fhooks: FollowupHooks = {
+            ...hooks,
+            onFirstDraft: (
+              reply: Followup | null,
+              hard: readonly CheckIssue[],
+              ctx: DraftContext,
+            ) => {
+              st.ctx = ctx;
+              if (!saveAnswers) return;
+              if (reply && hard.length === 0) {
+                saved.entries.push({
+                  id: g.id,
+                  run: n,
+                  stage: "first",
+                  level: null,
+                  answer: reply,
+                  ...ctx,
+                });
+              } else saved.noFirstDraft.push({ id: g.id, run: n });
+            },
+          };
+          const r: FollowupResult = await answerFollowup(deps, turnFor(g, thread, "reply"), fhooks);
+          item.runs.push({
+            level: 0,
+            cardNeeded: r.reply.cardUpdate.needed,
+            score: r.reviewScore,
+            deductions: r.deductions,
+            totalMs: r.workMs,
+            timings: r.timings,
+            models,
+          });
+          if (saveAnswers && st.ctx) {
+            saved.entries.push({
+              id: g.id,
+              run: n,
+              stage: "final",
+              level: null,
+              score: r.reviewScore,
+              rewrites: r.rewrites,
+              issues: r.issues,
+              answer: r.reply,
+              ...st.ctx,
+            });
+          }
+          continue;
+        }
+        const thread = mode === "card" ? threadOf(g.id) : undefined;
+        const base1: PromptQuestion = thread
+          ? cardQuestion(turnFor(g, thread, "card", reaskOf(g.id)))
+          : {
+              body: g.question,
+              askedBy: g.askedBy ?? "가족",
+              redFlag: g.redFlag ?? false,
+              reask: reaskOf(g.id),
+            };
+        const r = await answerQuestion(deps, base1, hooks);
         item.runs.push({
           level: r.level,
           score: r.reviewScore,
@@ -380,17 +511,31 @@ async function runReviewOnly(args: string[], src: string, outDir: string, c: Run
   };
   for (const e of entries) {
     try {
-      const answer = answerSchema.parse(e.answer);
       // 운영 첫 검토와 같은 입력(앞 검토 없음). 근거 묶음은 다시 만들지 않는다.
-      const r = await run(
-        reviewRequest(
+      let request: ClaudeRequest;
+      let softOf: () => CheckIssue[];
+      if (c.followup) {
+        const reply = FollowupSchema.parse(e.answer);
+        request = followupReviewRequest(
+          { reviewPromptFile: FOLLOWUP_REVIEW_PROMPT_FILE, reviewModel: c.reviewModel },
+          e.promptPack,
+          e.pq,
+          reply,
+          null,
+        );
+        softOf = () => checkFollowup(reply, e.info, { cardLevel: cardLevelOf(e.pq) }).soft;
+      } else {
+        const answer = answerSchema.parse(e.answer);
+        request = reviewRequest(
           { reviewPromptFile: REVIEW_PROMPT_FILE, reviewModel: c.reviewModel },
           e.promptPack,
           e.pq,
           answer,
           null,
-        ),
-      );
+        );
+        softOf = () => checkAnswer(answer, e.info, e.pq.redFlag).soft;
+      }
+      const r = await run(request);
       const parsed = reviewSchema.safeParse(r.output);
       if (!parsed.success) throw new PipelineError("review_invalid");
       const reviewer = mergeReview(parsed.data, null);
@@ -400,10 +545,7 @@ async function runReviewOnly(args: string[], src: string, outDir: string, c: Run
         model: r.model,
         counts: countByCategory(reviewer),
       };
-      if (score) {
-        const soft = checkAnswer(answer, e.info, e.pq.redFlag).soft;
-        row.score = computeScore(scoreIssues(reviewer, soft));
-      }
+      if (score) row.score = computeScore(scoreIssues(reviewer, softOf()));
       rows.push(row);
     } catch (err) {
       rows.push({ id: e.id, run: e.run, error: errorTag("review", err) });

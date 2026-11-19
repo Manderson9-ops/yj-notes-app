@@ -1,10 +1,20 @@
 // 워커 루프: claim → progress → 파이프라인 → answer 업로드, 실패 시 fail. 네트워크 오류는 지수 백오프.
+// T-Q5: claim 이 턴(짧은 답 단계 또는 카드 단계 한 가지)을 주면 handleTurn 이 처리한다. 한 claim 은 한 단계만 하고 끝낸다.
 // 로그인 만료(exitKind=auth, ASK_AUTH_PAUSE=1)면 프로세스를 끝내지 않고 루프 안에서 claim 을 멈추고 시험 호출로만 푼다.
-import { ApiError, NetworkError, type AskClient, type ClaimedQuestion } from "./client.ts";
+import {
+  ApiError,
+  isTurnClaim,
+  NetworkError,
+  type AskClient,
+  type ClaimedQuestion,
+  type ClaimedTurn,
+} from "./client.ts";
+import type { Followup, TurnProgress, TurnReply } from "../../shared/ask-schema.ts";
 import { ClaudeError, type Probe } from "./claude.ts";
 import type { Logger } from "./logger.ts";
 import type { CheckIssue } from "./checks.ts";
 import { PackError } from "./pack.ts";
+import type { FollowupResult } from "./followup.ts";
 import { PipelineError, type PipelineHooks, type PipelineResult } from "./pipeline.ts";
 
 export type Processor = (
@@ -13,9 +23,20 @@ export type Processor = (
   signal: AbortSignal,
 ) => Promise<PipelineResult>;
 
+/** 턴 처리 훅: 첫 작성본 훅(onFirstDraft)은 평가 도구 전용이라 운영 루프는 쓰지 않는다. */
+export type TurnHooks = Omit<PipelineHooks, "onFirstDraft">;
+
+/** 턴 단계별 처리기: reply = 짧은 답 파이프라인, card = 카드 파이프라인(대화 맥락 포함, onDraft 없음). */
+export interface TurnProcessors {
+  reply: (c: ClaimedTurn, hooks: TurnHooks, signal: AbortSignal) => Promise<FollowupResult>;
+  card: (c: ClaimedTurn, hooks: TurnHooks, signal: AbortSignal) => Promise<PipelineResult>;
+}
+
 export interface LoopDeps {
   client: AskClient;
   process: Processor;
+  /** 턴 처리기(없으면 턴 claim 은 internal_error 로 실패 보고한다). */
+  turn?: TurnProcessors;
   log: Logger;
   sleep: (ms: number, signal: AbortSignal) => Promise<void>;
   pollMs: number;
@@ -78,15 +99,17 @@ export async function handleOne(
   signal: AbortSignal,
 ): Promise<{ claimed: boolean; netError: boolean; authFailed?: true }> {
   const { client, log } = deps;
-  let q: ClaimedQuestion | null;
+  let claimed: ClaimedQuestion | ClaimedTurn | null;
   try {
-    q = await client.claim(signal);
+    claimed = await client.claim(signal);
   } catch (e) {
     if (signal.aborted) return { claimed: false, netError: false };
     log("claim_error", { kind: e instanceof ApiError ? `api_${e.status}` : "network" });
     return { claimed: false, netError: true };
   }
-  if (!q) return { claimed: false, netError: false };
+  if (!claimed) return { claimed: false, netError: false };
+  if (isTurnClaim(claimed)) return await handleTurn(deps, claimed, signal);
+  const q: ClaimedQuestion = claimed;
 
   const started = Date.now();
   log("claimed", { id: q.id, redFlag: q.redFlag });
@@ -173,6 +196,217 @@ export async function handleOne(
       await deps.afterProcess();
     } catch {
       log("after_process_error", { id: q.id });
+    }
+  }
+  return { claimed: true, netError, ...(authFailed ? { authFailed: true as const } : {}) };
+}
+
+// ───────────────────────── 턴(T-Q5) ─────────────────────────
+
+/** 카드 갱신 판단: 필요(needed)여도 잠금·한도면 카드를 이어 만들지 않고 이유(cardSkip)만 남긴다. 잠금을 먼저 본다. */
+export function decideCard(
+  c: Pick<ClaimedTurn, "redLock" | "cardUpdatesLeft"> & { turn: { redFlag: boolean } },
+  reply: Followup,
+): { cardWanted: boolean; cardSkip: "limit" | "redlock" | null } {
+  if (!reply.cardUpdate.needed) return { cardWanted: false, cardSkip: null };
+  if (c.redLock && !c.turn.redFlag) return { cardWanted: false, cardSkip: "redlock" };
+  if (c.cardUpdatesLeft <= 0 && !c.turn.redFlag) return { cardWanted: false, cardSkip: "limit" };
+  return { cardWanted: true, cardSkip: null };
+}
+
+/** 이 claim 의 일이 더 이상 이 워커의 것이 아니라는 신호(진행 보고의 409·404) — 실패로 세지 않고 버린다. */
+class TurnAbandoned extends Error {
+  readonly code: string;
+  constructor(code: string) {
+    super(`abandoned_${code}`);
+    this.name = "TurnAbandoned";
+    this.code = code;
+  }
+}
+
+/** 409(이미 끝났거나 다른 claim 의 것)·404(부모 질문 삭제)이면 그 숫자, 아니면 null. */
+function conflictCode(e: unknown): string | null {
+  return e instanceof ApiError && (e.status === 409 || e.status === 404) ? String(e.status) : null;
+}
+
+/**
+ * 업로드 응답 표(턴): 버릴 응답이면 로그의 code 를, 아니면 null(실패로 `/fail`).
+ * 409·404 → 그대로, `/card` 의 422 redflag_level(일반 턴)·429 card_limit → redlock·limit.
+ */
+function abandonCodeOf(e: unknown, c: ClaimedTurn): string | null {
+  if (e instanceof TurnAbandoned) return e.code;
+  const conflict = conflictCode(e);
+  if (conflict) return conflict;
+  if (!(e instanceof ApiError) || c.stage !== "card") return null;
+  if (e.status === 422 && e.code === "redflag_level" && !c.turn.redFlag) return "redlock";
+  if (e.status === 429 && e.code === "card_limit") return "limit";
+  return null;
+}
+
+/** 턴 한 건(한 단계) 처리. 짧은 답이든 카드든 확정 업로드가 끝나면 그 claim 을 끝내고 루프로 돌아간다. */
+async function handleTurn(
+  deps: LoopDeps,
+  c: ClaimedTurn,
+  signal: AbortSignal,
+): Promise<{ claimed: boolean; netError: boolean; authFailed?: true }> {
+  const { client, log } = deps;
+  const turnId = c.turn.id;
+  const stage = c.stage;
+  const started = Date.now();
+  log("turn_claimed", { turnId, stage, redFlag: c.turn.redFlag });
+  // 작업 단위 AbortController: 하트비트 409·404 는 이것만 끊는다(바깥 종료 signal 과 구분한다).
+  const work = new AbortController();
+  const stopWork = () => {
+    work.abort();
+  };
+  signal.addEventListener("abort", stopWork, { once: true });
+  let hbStatus: "answering" | "reviewing" = "answering";
+  let hbCode: string | null = null;
+  let confirmSent = false;
+  const progressBody = (): TurnProgress =>
+    stage === "card" ? { stage: "card" } : { stage: "reply", status: hbStatus };
+  const hbMs = deps.heartbeatMs ?? 60_000;
+  const hb =
+    hbMs > 0
+      ? setInterval(() => {
+          client.turnProgress(turnId, progressBody()).catch((e: unknown) => {
+            const code = conflictCode(e);
+            // 확정 요청이 이미 나갔으면 그 응답으로 판단한다. 그 밖의 오류(네트워크·5xx)는 버린다.
+            if (code && !confirmSent && hbCode === null) {
+              hbCode = `hb_${code}`;
+              work.abort();
+            }
+          });
+        }, hbMs)
+      : undefined;
+  const step = async (status: "answering" | "reviewing"): Promise<void> => {
+    hbStatus = status;
+    try {
+      await client.turnProgress(turnId, progressBody());
+    } catch (e) {
+      const code = conflictCode(e);
+      if (code) throw new TurnAbandoned(code);
+      // 진행 표시는 보조라 그 밖의 오류는 무시하고 계속한다
+    }
+  };
+  const hooks: TurnHooks = {
+    onAnswering: () => step("answering"),
+    onReviewing: () => step("reviewing"),
+    onStage: (s, ms) => {
+      log("turn_stage", { turnId, stage: s, ms });
+    },
+    onCheckIssues: (s, issues) => {
+      if (issues.length > 0) {
+        log("turn_check_issues", {
+          turnId,
+          stage: s,
+          cats: issueCategories(issues),
+          hard: issues.filter((i) => i.severity === "hard").length,
+        });
+      }
+    },
+  };
+  const upload = async <T>(send: () => Promise<T>): Promise<T> => {
+    confirmSent = true;
+    for (let i = 1; ; i++) {
+      try {
+        return await send();
+      } catch (e) {
+        if (!(e instanceof NetworkError) || i === 3) throw e;
+        await deps.sleep(backoffMs(i, deps.backoffBaseMs, deps.backoffMaxMs), signal);
+      }
+    }
+  };
+  /** 하트비트가 409·404 로 이 작업을 끊었으면 그 code(없으면 null). 클로저에서 바뀌는 값이라 함수로 읽는다. */
+  const hbSeen = (): string | null => hbCode;
+  const settled = (): void => {
+    const code = hbSeen();
+    if (code !== null) throw new TurnAbandoned(code);
+  };
+  let netError = false;
+  let authFailed = false;
+  try {
+    if (!deps.turn) throw new Error("turn_processors_missing");
+    if (stage === "reply") {
+      const r = await deps.turn.reply(c, hooks, work.signal);
+      settled();
+      const { cardWanted, cardSkip } = decideCard(c, r.reply);
+      const body: TurnReply = {
+        reply: r.reply,
+        reviewScore: r.reviewScore,
+        model: r.model,
+        workMs: Math.round(Date.now() - started),
+        cardWanted,
+        cardSkip,
+        cardReason: r.reply.cardUpdate.reason,
+      };
+      const up = await upload(() => client.turnReply(turnId, body));
+      log("turn_answered", {
+        turnId,
+        score: r.reviewScore,
+        rewritten: r.rewritten,
+        cardWanted,
+        cardSkip: cardSkip ?? undefined,
+        cardStatus: up.cardStatus ?? undefined,
+        ms: Date.now() - started,
+        packTokens: r.packTokens,
+      });
+    } else {
+      const r = await deps.turn.card(c, hooks, work.signal);
+      settled();
+      await upload(() =>
+        client.turnCard(turnId, {
+          level: r.level,
+          answer: r.answer,
+          reviewScore: r.reviewScore,
+          model: r.model,
+          workMs: Math.round(Date.now() - started),
+        }),
+      );
+      log("card_done", {
+        turnId,
+        level: r.level,
+        score: r.reviewScore,
+        rewritten: r.rewritten,
+        ms: Date.now() - started,
+        packTokens: r.packTokens,
+      });
+    }
+  } catch (e) {
+    // 바깥 종료 signal 이 걸렸으면 워커 종료다(하트비트 abort 로 끝난 작업과 가른다).
+    const abandon = signal.aborted ? null : (hbSeen() ?? abandonCodeOf(e, c));
+    if (abandon !== null) {
+      log("turn_abandoned", { turnId, stage, code: abandon });
+    } else {
+      const redLevel =
+        e instanceof ApiError && stage === "card" && e.status === 422 && e.code === "redflag_level";
+      const code = signal.aborted ? "worker_stopped" : redLevel ? "redflag_level" : failCodeOf(e);
+      netError = e instanceof NetworkError;
+      const exitKind = e instanceof ClaudeError ? e.exitKind : undefined;
+      authFailed = !signal.aborted && exitKind === "auth";
+      log("turn_failed", {
+        turnId,
+        stage,
+        code,
+        ms: Date.now() - started,
+        exitKind,
+        apiCode: e instanceof ApiError ? e.code : undefined,
+      });
+      try {
+        await client.turnFail(turnId, stage, code);
+      } catch {
+        log("fail_report_error", { turnId });
+      }
+    }
+  } finally {
+    if (hb) clearInterval(hb);
+    signal.removeEventListener("abort", stopWork);
+  }
+  if (deps.afterProcess) {
+    try {
+      await deps.afterProcess();
+    } catch {
+      log("after_process_error", { turnId });
     }
   }
   return { claimed: true, netError, ...(authFailed ? { authFailed: true as const } : {}) };

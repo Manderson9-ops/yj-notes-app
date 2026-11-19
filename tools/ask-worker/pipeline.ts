@@ -19,6 +19,7 @@ import { buildEmergencySection } from "./emergency.ts";
 import {
   buildFamilySection,
   buildReaskSection,
+  buildThreadSection,
   familyInfo,
   pickFamily,
   reaskInfo,
@@ -61,7 +62,17 @@ export interface PipelineDeps {
   minPublishScore: number;
   /** 검토·재검토 모델(ASK_REVIEW_MODEL). 없으면 러너 기본(opus). */
   reviewModel?: string;
+  /** 후속 짧은 답(T-Q5) 설정. 없으면 짧은 답 단계를 처리하지 못한다(followup_unconfigured). */
+  followup?: FollowupConfig;
   now?: () => number;
+}
+
+/** 후속 짧은 답 전용 프롬프트·스키마·검토 모델(ASK_FOLLOWUP_REVIEW_MODEL). 작성·재작성은 opus 그대로. */
+export interface FollowupConfig {
+  systemPromptFile: string;
+  reviewPromptFile: string;
+  schemaJson: string;
+  reviewModel?: string | undefined;
 }
 
 /** 검토 입력을 다시 만들 때 필요한 값(eval --save-answers 가 저장, --review-only 가 사용). */
@@ -122,6 +133,48 @@ export function reviewRequest(
 /** 점수용 지적 = 검토자 지적 + 코드 쪽 SOFT 지적(같은 감점표). */
 export function scoreIssues(reviewer: ReviewIssue[], soft: readonly CheckIssue[]): ReviewIssue[] {
   return [...reviewer, ...softToReviewIssues(soft)];
+}
+
+/**
+ * 가족 의견 구역을 묶음에 덧붙인다(관련 이전 질문 최대 3). 가져오기에 실패하면 그대로 돌려준다.
+ * 첫 질문 파이프라인과 후속 짧은 답 파이프라인이 같이 쓴다.
+ */
+export async function addFamily(
+  deps: Pick<PipelineDeps, "getHistory" | "today">,
+  q: { id?: number | undefined; body: string },
+  e: Expansion | undefined,
+  promptPack: string,
+  info: PackInfo & { tokens: number },
+  stage: <T>(name: string, fn: () => Promise<T>) => Promise<T>,
+): Promise<{ promptPack: string; info: PackInfo & { tokens: number } }> {
+  const getHistory = deps.getHistory;
+  if (!getHistory) return { promptPack, info };
+  let hist: HistoryItem[] = [];
+  try {
+    hist = await stage("history", () => getHistory());
+  } catch {
+    hist = [];
+  }
+  const nowMs = Date.parse(deps.today?.() ?? "") || Date.now();
+  const picks = pickFamily(
+    selectRelated(
+      hist,
+      {
+        id: q.id,
+        body: q.body,
+        keywords: e ? [...e.keywords, ...e.synonyms] : [],
+        domains: e?.domains ?? [],
+      },
+      nowMs,
+    ),
+  );
+  const section = buildFamilySection(picks);
+  if (section === "") return { promptPack, info };
+  const fam = familyInfo(picks);
+  return {
+    promptPack: `${promptPack}\n\n${section}`,
+    info: { ...info, refs: [...info.refs, ...fam.refs], family: fam },
+  };
 }
 
 interface Candidate {
@@ -225,45 +278,26 @@ export async function answerQuestion(
     today: deps.today?.(),
   };
   if (q.redFlag && deps.emergencyMd) {
-    const em = buildEmergencySection(deps.emergencyMd, detectRedFlag(q.body).rules);
+    // 응급 절은 위급을 낸 글로 고른다(후속 위급 턴이면 턴 본문 — 원 질문 본문을 넘기면 규칙이 비어 절이 붙지 않는다).
+    const em = buildEmergencySection(
+      deps.emergencyMd,
+      detectRedFlag(q.emergencyText ?? q.body).rules,
+    );
     info = { ...info, pack: `${info.pack}\n${em.text}`, refs: [...info.refs, ...em.refs] };
   }
 
   // 가족 의견: 관련 이전 질문(최대 3)과 다시 답변 요청을 묶음에 덧붙인다. 날짜·작성자 대조(info.pack)는 기록 묶음만으로 한다.
   let promptPack = info.pack;
   if (deps.getHistory && !q.redFlag) {
-    const getHistory = deps.getHistory;
-    let hist: HistoryItem[] = [];
-    try {
-      hist = await stage("history", () => getHistory());
-    } catch {
-      hist = [];
-    }
-    const nowMs = Date.parse(deps.today?.() ?? "") || Date.now();
-    const picks = pickFamily(
-      selectRelated(
-        hist,
-        {
-          id: q.id,
-          body: q.body,
-          keywords: e ? [...e.keywords, ...e.synonyms] : [],
-          domains: e?.domains ?? [],
-        },
-        nowMs,
-      ),
-    );
-    const section = buildFamilySection(picks);
-    if (section !== "") {
-      const fam = familyInfo(picks);
-      promptPack = `${promptPack}\n\n${section}`;
-      info = { ...info, refs: [...info.refs, ...fam.refs], family: fam };
-    }
+    ({ promptPack, info } = await addFamily(deps, q, e, promptPack, info, stage));
   }
   const reaskSection = buildReaskSection(q.reask);
   if (reaskSection !== "") {
     promptPack = `${promptPack}\n\n${reaskSection}`;
     info = { ...info, reask: reaskInfo(q.reask) };
   }
+  const threadSection = buildThreadSection(q.thread);
+  if (threadSection !== "") promptPack = `${promptPack}\n\n${threadSection}`;
 
   const first = checkAnswer(
     await generate("generate", generatePrompt(promptPack, pq)),

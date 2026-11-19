@@ -27,9 +27,13 @@ import { acquireLock } from "./lock.ts";
 import { loadEmergencyMd } from "./emergency.ts";
 import { expandQuery } from "./expand.ts";
 import { buildPack } from "./pack.ts";
+import { answerFollowup, cardQuestion } from "./followup.ts";
 import { answerQuestion, type PipelineDeps } from "./pipeline.ts";
 import {
   ANSWER_SCHEMA_FILE,
+  FOLLOWUP_REVIEW_PROMPT_FILE,
+  FOLLOWUP_SCHEMA_FILE,
+  FOLLOWUP_SYSTEM_PROMPT_FILE,
   PROBE_PROMPT_FILE,
   REVIEW_PROMPT_FILE,
   SYSTEM_PROMPT_FILE,
@@ -120,6 +124,12 @@ export function makePipelineDeps(
     targetScore: cfg.targetScore,
     minPublishScore: cfg.minPublishScore,
     reviewModel: cfg.reviewModel,
+    followup: {
+      systemPromptFile: FOLLOWUP_SYSTEM_PROMPT_FILE,
+      reviewPromptFile: FOLLOWUP_REVIEW_PROMPT_FILE,
+      schemaJson: cliSchemaJson(readFileSync(FOLLOWUP_SCHEMA_FILE, "utf8")),
+      reviewModel: cfg.followupReviewModel,
+    },
   };
 }
 
@@ -230,6 +240,11 @@ export async function main(args: string[]): Promise<number> {
     const loopDeps: LoopDeps = {
       client,
       process: (q, hooks, signal) => answerQuestion(pipe, q, hooks, signal),
+      // 턴: 짧은 답 단계와 카드 단계는 서로 다른 claim 이다(카드는 대화 맥락과 함께, onDraft 없음)
+      turn: {
+        reply: (c, hooks, signal) => answerFollowup(pipe, c, hooks, signal),
+        card: (c, hooks, signal) => answerQuestion(pipe, cardQuestion(c), hooks, signal),
+      },
       // 처리 뒤 로컬 의견 요약 파일 갱신(본문 없음: 개수·질문 번호만)
       afterProcess: async () => {
         const items = await history.get(true);

@@ -14,12 +14,35 @@
 | `tools/ask-worker/answer.schema.json` | 답변 JSON 스키마(draft 2020-12). 앱의 `shared/ask-schema.ts` 와 같은 내용 |
 | `tools/ask-worker/checks.ts` | 결정적 검사(스키마·금지어·redFlag→10·ref/날짜 실재) |
 | `tools/ask-worker/scheduler.ts` | 작업 스케줄러 등록/삭제/상태 |
-| `tools/ask-worker/eval.ts` | 골든 세트 평가 |
+| `tools/ask-worker/eval.ts` | 골든 세트 평가(멀티턴 `--thread`·`--prompt followup` 포함) |
+| `tools/ask-worker/followup.ts` | 후속 짧은 답 파이프라인(T-Q5)·카드 갱신 입력 만들기 |
+| `tools/ask-worker/prompts/followup.md`·`review-followup.md` | 짧은 답 작성 규칙·검토 점검표(감점 범주는 첫 질문과 같은 8종) |
+| `tools/ask-worker/followup.schema.json` | 짧은 답 JSON Schema. `shared/ask-schema.ts` 의 `FollowupSchema` 와 같은 내용(`npm run ask:schema` 로 만들고 시험이 일치를 본다) |
 
 흐름: claim → progress(answering) → 질문 확장 → 근거 묶음 → 작성(claude) → 결정적 검사 → progress(reviewing) → 검토(claude)
 → 점수 < 9.5 면 지적만 고치는 재작성 **1회**·재검토(더 높은 점수 채택) → answer 업로드. 결정적 검사에서 걸리면 검토를 건너뛰고 바로 재작성한다. 품질 정책 상세는 docs/11 §3-2. 9.5 미만으로 게시된 답은 `reviewScore` 로 서버에 저장되고, 앱이 「품질 검사 기준보다 낮아 참고용이에요」를 작게 보여 준다.
 실패하면 `fail(code)` 로 되돌린다(3회 실패 시 서버가 failed 처리). 코드: `pack_failed`, `claude_exit`, `timeout`,
 `checks_failed`, `low_score`(게시 하한 8.5 미만), `review_invalid`, `upload_<HTTP>`, `worker_stopped`, `internal_error`.
+턴(T-Q5)에서만 더 나오는 코드: `redflag_level`(위급 턴의 카드가 10단계가 아니라고 422 를 받음), `followup_unconfigured`(짧은 답 설정 없음 — 시험·평가 전용).
+
+### 대화(턴) 흐름 (T-Q5)
+
+가족이 답 카드 뒤에 이어 묻는 후속 질문(`followup`)과 👎 이유로 카드를 다시 만드는 요청(`reask`)은 **턴**이다(서버 표 `ask_turn`). claim 이 질문 대신 턴을 주면(응답에 `type:"turn"`) 한 claim 은 **한 단계만** 하고 끝낸다.
+
+| claim 의 `stage` | 하는 일 | 끝나는 호출 |
+|---|---|---|
+| `reply` | 확장(새 턴 본문 + 원 질문) → 근거 묶음 다시 만들기 → 짧은 답 작성 → `checkFollowup` → 검토(`ASK_FOLLOWUP_REVIEW_MODEL`) → 점수 < 9.5 면 지적만 고치는 재작성 1회·재검토 → 하한(`ASK_MIN_PUBLISH_SCORE`) 이상이면 확정 | `POST /api/worker/ask/turn/:tid/reply`(`cardWanted`·`cardSkip`·`cardReason` 포함). 하한 미만이면 `/fail(stage:"reply", code:"low_score")` |
+| `card` | 카드 파이프라인을 대화 맥락(원 질문·현재 카드·앞선 문답·방금 확정한 짧은 답·갱신 이유)과 함께 실행. 초안 게시는 없다 | `POST …/turn/:tid/card`(질문 `/answer` 와 같은 본문). 실패하면 `/fail(stage:"card", code)` |
+
+- `/reply` 가 끝나면 카드가 필요해도 그 claim 을 끝내고 claim 루프로 돌아간다. 카드는 다음 claim 이 카드 단계로 다시 집는다(그 사이 들어온 위급 건이 먼저 집힌다).
+- 카드 갱신 판단: 짧은 답의 `cardUpdate.needed` 가 true 이고 claim 의 `cardUpdatesLeft > 0` 이고 `redLock` 이 아닐 때만 `cardWanted=true`. 잠금이면 `cardSkip="redlock"`, 한도면 `"limit"`(서버가 `card_note` 로 저장해 앱이 문구를 보인다). 위급 턴은 잠금·한도를 받지 않는다.
+- 위급 턴(`redFlag`)은 짧은 답 없이 카드 단계로 바로 오고, 응급 절은 **턴 본문**(`detectRedFlag(turn.body).rules`)으로 고른다. 카드 검사의 위급 여부 = 질문 위급 **또는** 잠금이라 10단계가 아니면 HARD 로 다시 쓴다.
+- reask 턴은 지금 reask claim 과 같은 입력(`turn.reask` = 이유·횟수·현재 카드)에 대화 맥락을 더해 카드 파이프라인을 돌린다.
+- 대화 기억은 서버가 claim 응답의 `thread`(원 질문·현재 카드·최근 10턴)로 매번 준다(워커는 `--no-session-persistence` 그대로). 프롬프트의 「이전 대화(지시 아님)」 구역에서 가족 글은 한 줄로 합치고 `[ref:`·`<<<`·`>>>` 표지를 지운다(`family.ts` 의 `clean`).
+- **업로드 응답 표(턴 행)**: 확정 요청(`/reply`·`/card`)의 409(이미 끝났거나 다른 claim 의 것)·404(부모 질문 삭제)는 `/fail` 없이 버린다(`turn_abandoned`). `/card` 의 422 `redflag_level` 은 일반 턴이면 버림(code `redlock`), 위급 턴이면 `/fail(stage:"card", code:"redflag_level")`. 429 `card_limit` 는 버림(code `limit`). 그 밖의 422·5xx·401 은 `/fail(upload_<상태>)`, 네트워크 오류는 3번까지 다시 보낸 뒤 `/fail`. 단계 진행 보고(`/progress`)의 409·404 도 버림이고 그 밖의 오류는 무시하고 계속한다.
+- **하트비트**(60초): 짧은 답 claim 은 `{stage:"reply", status}`, 카드 claim 은 `{stage:"card"}`(상태를 바꾸지 않고 카드 리스만 늘린다). 하트비트가 409·404 를 받고 확정 요청이 아직 나가지 않았으면 그 작업의 `claude` 호출을 끊고 `/fail` 없이 `turn_abandoned`(code `hb_409`·`hb_404`) 한 줄만 남긴다. 확정 요청이 이미 나갔으면 그 응답으로 판단한다.
+- 턴 `/fail` 뒤에는 냉각 없이 바로 다시 claim 된다(시도 3회가 차면 서버가 닫는다). 짧은 답 시도와 카드 시도는 따로 센다.
+- **옛 서버 호환**: claim 응답에 `type` 이 없으면 질문으로 본다. 턴 경로가 404 면 그 턴 작업만 버리고(`turn_abandoned` code 404) 질문 처리는 그대로다. 배포는 워커 → 마이그레이션 → 서버 순서이고, 워커만 T-Q5 이전으로 되돌릴 때는 서버의 `ASK_TURN_CLAIM` 을 0 으로 먼저 바꾼다(0 이면 claim 이 턴을 고르지 않고 응답 모양이 이전과 같다).
 
 ## 1. 토큰 만들기와 Pages 비밀값
 
@@ -52,6 +75,7 @@ DATA_DIR=<DATA_DIR 경로>
 # ASK_CLAUDE_TIMEOUT_MS=240000
 # ASK_EXPAND_MODEL=sonnet        (질문 확장용 모델. 안 되면 다른 쪽(haiku)으로 한 번 더. 실측: sonnet low 약 5초, haiku 12~19초)
 # ASK_REVIEW_MODEL=opus          (검토·재검토 모델. 작성·재작성은 opus 그대로. 영문·숫자·._- 3~40자가 아니면 opus)
+# ASK_FOLLOWUP_REVIEW_MODEL=sonnet (후속 짧은 답(T-Q5)의 검토·재검토 모델. 허용 패턴은 ASK_REVIEW_MODEL 과 같고 밖이면 sonnet. 후속의 카드 갱신 검토는 ASK_REVIEW_MODEL 을 따른다. 짧은 답 품질이 모자라면 opus 로 두는 것이 되돌리기다)
 # ASK_AUTH_PAUSE=1               (로그인 만료(exitKind=auth) 때 claim 을 멈추고 시험 호출로만 푼다. 0 이면 끔 — 아래 §4)
 # ASK_LOG_KEEP_DAYS=14           (워커 로그 보관 일수, 1~3650)
 ```
@@ -83,6 +107,19 @@ npm run ask-worker:uninstall
 ## 4. 로그와 상태
 
 - 로그: `%USERPROFILE%\.yj-ask\logs\worker-YYYY-MM-DD.log` (JSON 한 줄씩, 기본 14일 보관 — `ASK_LOG_KEEP_DAYS`). **질문·답변 본문은 기록하지 않고** id·단계·시간·상태·코드만 남는다.
+- 턴(T-Q5)의 줄은 질문과 이름이 다르고 번호 필드가 `id` 가 아니라 `turnId` 다(질문 번호와 턴 번호는 다른 표라 겹칠 수 있다). 그래서 첫 질문 집계(`event -eq answered`·`event -eq stage`)에 턴이 섞이지 않는다:
+
+  | `event` | 필드 | 뜻 |
+  |---|---|---|
+  | `turn_claimed` | `turnId`·`stage`(`reply`·`card`)·`redFlag` | 턴 claim |
+  | `turn_stage` | `turnId`·`stage`(파이프라인 단계 이름)·`ms` | 단계별 시간(질문의 `stage` 줄과 같은 이름: `expand`·`pack`·`generate`·`review`·`rewrite`·`review2`·`history`) |
+  | `turn_check_issues` | `turnId`·`stage`·`cats`·`hard` | 결정적 검사 지적(범주 이름만) |
+  | `turn_answered` | `turnId`·`score`·`rewritten`·`cardWanted`·`cardSkip`·`cardStatus`·`ms`·`packTokens` | 짧은 답 확정 |
+  | `card_done` | `turnId`·`level`·`score`·`rewritten`·`ms`·`packTokens` | 갱신한 카드 게시 |
+  | `turn_failed` | `turnId`·`stage`·`code`·`ms`·`exitKind`·`apiCode` | 실패 보고(`apiCode` = 업로드가 거절된 응답 본문의 `code`, 본문 내용은 남기지 않는다) |
+  | `turn_abandoned` | `turnId`·`stage`·`code`(`409`·`404`·`redlock`·`limit`·`hb_409`·`hb_404`) | `/fail` 없이 버림 |
+  | `fail_report_error` | `turnId` | `/fail` 자체가 실패(리스 만료가 정리한다) |
+
 - 주요 줄(`event`): `claimed`·`stage`(`id`·`stage`·`ms`)·`answered`·`failed`(`id`·`code`·`ms`, claude 실패면 `exitKind`), 시작 때 `effort_env`(`present` — 환경변수 `CLAUDE_CODE_EFFORT_LEVEL` 이 있는지만. 있으면 자식 claude 가 그 값을 쓴다)·`loop_start`, 로그인 만료 때 `auth_paused`·`auth_resumed`, 시작 시험 실패 때 `probe_failed`(`exitKind`).
 - `exitKind`: claude 가 비정상 종료(`claude_exit`)하거나 오류 봉투(`claude_error`)를 내면 stderr·봉투의 `result` 문구를 정규식으로만 분류해 `usage_limit`(사용량 한도)·`auth`(로그인 만료)·`overloaded`(과부하)·`other` 중 하나를 남긴다. 문구 자체는 저장하지 않는다. CLI 문구가 바뀌어 맞는 것이 없으면 `other`(동작은 그 전과 같다).
 - **로그인 만료 일시정지**(`ASK_AUTH_PAUSE=1`, 기본): 워커는 시작할 때 질문 자료 없는 합성 프롬프트로 시험 호출(시간 상한 60초)을 한 번 하고, **성공한 뒤에만 claim 한다**. 시험이 `auth` 로 실패하면 일시정지, 그 밖의 실패(네트워크가 아직 없는 부팅 직후 등)면 60초 뒤 다시 시험한다. 처리 중 작성·검토·재작성·재검토 어느 단계든 `auth` 가 나면 그 질문의 나머지 단계와 2초 재실행을 하지 않고 지금 코드(`claude_exit`, 오류 봉투면 `claude_error`)로 fail 한 뒤 일시정지한다(그 질문은 시도 1회를 쓴다. 질문 확장은 실패를 삼키므로 그 auth 는 작성 단계에서 잡힌다). `--once` 도 시험 호출이 성공해야 claim 한다. 일시정지 중에는 claim 하지 않고 10분마다 시험 호출을 해서 **성공했을 때만** 푼다(사용량 한도·시간 초과로 실패하면 계속 멈춰 있다). 프로세스는 끝나지 않는다. 다시 로그인한 뒤 워커를 다시 시작하면 시작 시험이 바로 풀어 준다. `ASK_AUTH_PAUSE=0` 이면 시험·일시정지·재실행 생략을 모두 하지 않고 `exitKind` 기록만 남는다.
@@ -117,6 +154,22 @@ npm run ask-worker:eval-compare -- <결과 A> <결과 B> [--set <golden.jsonl>]
 - `--save-answers` 파일(`answers-<시각>.json`, 형식 2): 문항·run 마다 `stage` 가 `first`(첫 작성본, 검토 전 — 그 run 이 `low_score` 등 예외로 끝나도 저장)와 `final`(게시될 답)인 항목, 각 항목에 검토 입력(`promptPack` 근거 묶음·`pq` 질문 정보·`info` 결정적 검사 입력). 첫 작성이 HARD 라 초안이 될 수 없는 run 은 `noFirstDraft` 에 적힌다. **근거 묶음에 가족 기록이 들어가므로 `<DATA_DIR>\ask-eval\` 아래에만 둔다.** 형식 2 가 아닌 옛 파일은 `--review-only` 가 받지 않는다.
 - `--review-only` 결과(`review-<시각>.json`): 답마다 범주별 **검토자 지적 수**(코드가 만든 SOFT 항목은 넣지 않는다)와 검토자 실제 모델 ID, 검토 호출이 실패한 답은 `error`. `--score` 면 답마다 검토자 지적 + 코드 SOFT 항목으로 운영과 같은 점수식(10 − 감점)의 점수와 평균(실패한 답은 평균에서 빼고 `failed` 로 센다). 앞 검토 없이 새로 보므로 운영 최종 점수보다 낮게 나올 수 있다.
 - 비교 결과의 오류 수(`errors`, 오류가 난 문항 수): `review`(검토·재검토 단계)·`lowScore`(단계 무관)·`unreviewed` 와 그 합 `gate`, 비교에서 빼는 `authoring`(작성 단계 도구 실패 등). `--set` 을 주면 각 결과의 문항 id 집합이 세트와 같은지(`idSetMatchesSet`, 다르면 중간에 멈춘 실행)도 낸다.
+
+### 5-3. 멀티턴 평가 옵션 (T-Q5)
+
+```powershell
+# 후속 짧은 답 평가: 골든 한 줄의 question 이 --thread 대화 뒤에 새로 들어오는 후속 질문이다
+npm run ask-worker:eval -- --set <후속 골든.jsonl> --out <결과 폴더> --thread <thread.json> --prompt followup --runs 2 --save-answers
+# 저장된 짧은 답을 후속 점검표로 채점(검토 모델 기본은 ASK_FOLLOWUP_REVIEW_MODEL, 운영 경로와 따로 보려면 --review-model opus)
+npm run ask-worker:eval -- --review-only <answers 파일 또는 폴더> --out <결과 폴더> --prompt followup --review-model opus --score
+# 대화 맥락이 있는 카드 갱신 평가(--prompt 없이 --thread 만)
+npm run ask-worker:eval -- --set <골든.jsonl> --out <결과 폴더> --thread <thread.json>
+```
+
+- `--thread <json>`: 이어진 대화를 주입한다. **한 덩어리** `{"question": {"body": "원 질문", "askedBy": "엄마"}, "card": <Answer>|null, "turns": [{"by": "아빠", "body": "앞선 후속 질문", "reply": <Followup>|null}]}`(모든 문항에 적용)이거나 **문항별** `{"<골든 id>": {…}}`. `question.id`·`createdAt`·`redFlag`, 턴의 `kind`(`followup`|`reask`)·`reaskReason` 은 생략하면 기본값이다. `card` 는 `AnswerSchema`, `reply` 는 `FollowupSchema`(`shared/ask-schema.ts`)를 만족해야 하고 턴은 최대 10개다. 맵에 없는 문항은 `thread_missing` 오류로 남는다. 저장소 밖 경로만 허용한다.
+- `--prompt followup`: 짧은 답 작성 규칙(`prompts/followup.md`)·`checkFollowup`·후속 점검표(`review-followup.md`)로 평가한다. 전체 실행은 `--thread` 가 있어야 한다(없으면 사용법). 결과의 `level` 은 0(단계 없음)이고 run 마다 `cardNeeded`(모델이 카드 갱신이 필요하다고 판단했는가)가 남는다 — 「단계가 바뀌어야 하는 후속」「안 바뀌어야 하는 후속」 판단을 점검하는 용도다. `--review-model` 이 없으면 검토 모델은 `ASK_FOLLOWUP_REVIEW_MODEL` 이다.
+- `--save-answers` 와 `--review-only`: 짧은 답도 같은 형식 2 파일(`answers-<시각>.json`)에 저장한다(`answer` 가 `Followup`, `level` 은 null, `promptPack` 에 근거 묶음과 「이전 대화」 구역이 들어간다 — 가족 글이 들어 있으니 `<DATA_DIR>\ask-eval\` 아래에만 둔다). `--review-only --prompt followup` 은 저장된 짧은 답만 받는다(카드 답 파일이면 그 답은 오류로 센다).
+- 시험은 이 저장소의 단위 시험(`eval-thread.test.ts`)이 가짜 claude 와 임시 폴더의 합성 DATA_DIR·합성 시나리오로만 돌린다. 실제 멀티턴 골든 세트(`<DATA_DIR>\ask-eval\scenarios\`) 실행은 사용자 지시로 한다.
 
 ### 5-1. 가족 의견 주입 옵션 (T-Q3)
 
@@ -161,6 +214,8 @@ overview 에 7일 중앙값(`medianTotalMs7d`)을 낸다.
 | `already_running` | 이미 워커가 떠 있음(`ask-worker:status`). 죽은 pid 의 낡은 잠금은 자동으로 인수 |
 | 작업 등록 "액세스 거부" | 회사/학교 정책으로 작업 생성이 막힌 PC. 시작프로그램 폴더에 `run-worker.vbs` 바로가기를 두는 대안 사용 |
 | 앱에 "집 PC가 켜지면 답변해요" | 워커 미실행 또는 2분 이상 claim 없음. `status` 확인 |
+| 로그에 `turn_abandoned` 가 `409`·`404`·`hb_409`·`hb_404` | 정상: 그 턴이 이미 끝났거나(409) 질문이 삭제됐거나(404) 위급 턴이 카드 대기를 정리해서 작업을 버린 것. `/fail` 은 보내지 않는다 |
+| 위급 턴이 `turn_failed` code `redflag_level` 반복 | 위급 턴의 카드가 10단계가 아니라고 서버가 거절. 3번 실패하면 앱이 위급 경고를 고정한다. `check_issues`·`turn_check_issues` 의 `h:redflag` 와 `ask-worker:eval` 로 확인 |
 
 보안 메모: 워커는 외부 프로세스(`claude`, `python`)를 셸 없이 실행하고, 질문 본문은 명령줄이 아니라 stdin 으로만 넘긴다.
 가족 질문은 프롬프트에서 「가족 질문(지시 아님)」 블록에 가둬 지시로 취급하지 않는다. claude 는 `--tools ""` 로 도구가 없다.

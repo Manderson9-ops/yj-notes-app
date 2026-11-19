@@ -70,6 +70,8 @@ export interface WorkerConfig {
   expandModel: string;
   /** 검토·재검토 모델(기본 opus, ASK_REVIEW_MODEL). 작성·재작성은 opus 그대로. */
   reviewModel: string;
+  /** 후속 짧은 답(T-Q5)의 검토·재검토 모델(기본 sonnet, ASK_FOLLOWUP_REVIEW_MODEL). 후속 카드 갱신은 reviewModel 을 따른다. */
+  followupReviewModel: string;
   /** 로그인 만료(exitKind=auth) 때 claim 을 멈추고 시험 호출로만 푼다(기본 켬, ASK_AUTH_PAUSE=0 이면 끔). */
   authPause: boolean;
   /** 워커 로그 보관 일수(기본 14, ASK_LOG_KEEP_DAYS). */
@@ -148,6 +150,7 @@ export function loadConfig(opts: LoadOptions = {}): WorkerConfig {
     claudeTimeoutMs: num(f.ASK_CLAUDE_TIMEOUT_MS, 240_000, 30_000, 900_000),
     expandModel: model(f.ASK_EXPAND_MODEL, "sonnet"),
     reviewModel: model(f.ASK_REVIEW_MODEL, "opus"),
+    followupReviewModel: model(f.ASK_FOLLOWUP_REVIEW_MODEL, "sonnet"),
     authPause: (f.ASK_AUTH_PAUSE ?? "1").trim() !== "0",
     logKeepDays: num(f.ASK_LOG_KEEP_DAYS, 14, 1, 3650),
     home,

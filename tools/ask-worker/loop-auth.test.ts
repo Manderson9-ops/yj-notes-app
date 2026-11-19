@@ -78,6 +78,10 @@ function harness(
       timeline.push(`fail:${String(id)}:${code}`);
       return Promise.resolve();
     },
+    turnProgress: () => Promise.resolve(),
+    turnReply: () => Promise.resolve({ cardStatus: null }),
+    turnCard: () => Promise.resolve(),
+    turnFail: () => Promise.resolve(),
     history: () => Promise.resolve([]),
     ping: () => Promise.resolve(),
   };
@@ -245,6 +249,10 @@ describe("폴링 3s (가짜 시계)", () => {
       progress: () => Promise.resolve(),
       answer: () => Promise.resolve(),
       fail: () => Promise.resolve(),
+      turnProgress: () => Promise.resolve(),
+      turnReply: () => Promise.resolve({ cardStatus: null }),
+      turnCard: () => Promise.resolve(),
+      turnFail: () => Promise.resolve(),
       history: () => Promise.resolve([]),
       ping: () => Promise.resolve(),
     };
