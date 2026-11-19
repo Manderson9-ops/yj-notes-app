@@ -13,7 +13,7 @@ import {
 } from "./answer-schema.ts";
 import { checkAnswer, softToReviewIssues, type CheckIssue, type PackInfo } from "./checks.ts";
 import { suggestLevel } from "./level-suggest.ts";
-import type { ClaudeRunner } from "./claude.ts";
+import type { ClaudeRequest, ClaudeRunner } from "./claude.ts";
 import { detectRedFlag } from "../../server/ask/redflags.ts";
 import { buildEmergencySection } from "./emergency.ts";
 import {
@@ -59,7 +59,16 @@ export interface PipelineDeps {
   answerSchemaJson: string;
   targetScore: number;
   minPublishScore: number;
+  /** 검토·재검토 모델(ASK_REVIEW_MODEL). 없으면 러너 기본(opus). */
+  reviewModel?: string;
   now?: () => number;
+}
+
+/** 검토 입력을 다시 만들 때 필요한 값(eval --save-answers 가 저장, --review-only 가 사용). */
+export interface DraftContext {
+  promptPack: string;
+  pq: PromptQuestion;
+  info: PackInfo & { tokens: number };
 }
 
 export interface PipelineHooks {
@@ -68,6 +77,13 @@ export interface PipelineHooks {
   onStage?: (stage: string, ms: number) => void;
   /** 결정적 검사 지적(진단용). 질문·답 본문은 넘기지 않는다. */
   onCheckIssues?: (stage: string, issues: CheckIssue[]) => void;
+  /**
+   * 첫 작성본(첫 checkAnswer 직후·검토 전, HARD 유무와 관계없이). 평가 도구가 검토 전 답을 모으는 데 쓴다.
+   * 운영 워커는 넘기지 않는다(아무 일도 하지 않음).
+   */
+  onFirstDraft?: (answer: Answer | null, hard: readonly CheckIssue[], ctx: DraftContext) => void;
+  /** claude 호출 단계별 실제 모델 ID(평가 기록용). */
+  onModel?: (stage: string, model: string) => void;
 }
 
 export interface PipelineResult {
@@ -86,6 +102,27 @@ export interface PipelineResult {
 }
 
 const REVIEW_SCHEMA_JSON = JSON.stringify(REVIEW_JSON_SCHEMA);
+
+/** 검토 호출 요청(운영 검토와 eval --review-only 가 같은 입력을 쓰도록 한 곳에서 만든다). */
+export function reviewRequest(
+  o: { reviewPromptFile: string; reviewModel?: string | undefined },
+  pack: string,
+  pq: PromptQuestion,
+  answer: Answer,
+  previous: ReviewIssue[] | null,
+): ClaudeRequest {
+  return {
+    ...(o.reviewModel ? { model: o.reviewModel } : {}),
+    prompt: reviewPrompt(pack, pq, JSON.stringify(answer), previous),
+    systemPromptFile: o.reviewPromptFile,
+    schemaJson: REVIEW_SCHEMA_JSON,
+  };
+}
+
+/** 점수용 지적 = 검토자 지적 + 코드 쪽 SOFT 지적(같은 감점표). */
+export function scoreIssues(reviewer: ReviewIssue[], soft: readonly CheckIssue[]): ReviewIssue[] {
+  return [...reviewer, ...softToReviewIssues(soft)];
+}
 
 interface Candidate {
   answer: Answer;
@@ -124,6 +161,7 @@ export async function answerQuestion(
       ),
     );
     model = r.model;
+    hooks.onModel?.(name, r.model);
     return r.output;
   };
   let reviewing = false;
@@ -139,19 +177,13 @@ export async function answerQuestion(
       await hooks.onReviewing?.();
     }
     const r = await stage(name, () =>
-      deps.runClaude(
-        {
-          prompt: reviewPrompt(pack, pq, JSON.stringify(answer), previous),
-          systemPromptFile: deps.reviewPromptFile,
-          schemaJson: REVIEW_SCHEMA_JSON,
-        },
-        signal,
-      ),
+      deps.runClaude(reviewRequest(deps, pack, pq, answer, previous), signal),
     );
+    hooks.onModel?.(name, r.model);
     const parsed = reviewSchema.safeParse(r.output);
     if (!parsed.success) throw new PipelineError("review_invalid");
     const reviewer = mergeReview(parsed.data, previous);
-    const issues = [...reviewer, ...softToReviewIssues(soft)];
+    const issues = scoreIssues(reviewer, soft);
     return { answer, issues, reviewer, score: computeScore(issues) };
   };
 
@@ -239,6 +271,7 @@ export async function answerQuestion(
     q.redFlag,
   );
   hooks.onCheckIssues?.("generate", first.items);
+  hooks.onFirstDraft?.(first.answer, first.hard, { promptPack, pq, info });
   let best: Candidate | null = null;
   let fixes: string[] = first.issues;
   let prevAnswer: Answer | null = first.answer;

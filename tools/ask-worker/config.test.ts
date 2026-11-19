@@ -116,3 +116,29 @@ describe("loadConfig", () => {
     expect(cfg.pollMs).toBe(2000);
   });
 });
+
+describe("T-Q4a 설정 키", () => {
+  const dir = mkdtempSync(join(tmpdir(), "yj-cfg-q4a-"));
+  const load = (extra: string) => {
+    const f = join(dir, `w-${Math.random().toString(36).slice(2)}.env`);
+    writeFileSync(f, `APP_ORIGIN=https://a.example.test\nASK_WORKER_TOKEN=${TOKEN}\n${extra}`);
+    return loadConfig({ file: f, env: {} });
+  };
+  it("ASK_REVIEW_MODEL: 기본 opus, 허용 패턴 밖이면 opus", () => {
+    expect(load("").reviewModel).toBe("opus");
+    expect(load("ASK_REVIEW_MODEL=sonnet\n").reviewModel).toBe("sonnet");
+    expect(load("ASK_REVIEW_MODEL=claude-sonnet-5-5\n").reviewModel).toBe("claude-sonnet-5-5");
+    expect(load("ASK_REVIEW_MODEL=so net; rm\n").reviewModel).toBe("opus");
+    expect(load("ASK_REVIEW_MODEL=x\n").reviewModel).toBe("opus");
+  });
+  it("ASK_AUTH_PAUSE: 기본 켬, 0 이면 끔", () => {
+    expect(load("").authPause).toBe(true);
+    expect(load("ASK_AUTH_PAUSE=1\n").authPause).toBe(true);
+    expect(load("ASK_AUTH_PAUSE=0\n").authPause).toBe(false);
+  });
+  it("ASK_LOG_KEEP_DAYS: 기본 14, 범위 1~3650", () => {
+    expect(load("").logKeepDays).toBe(14);
+    expect(load("ASK_LOG_KEEP_DAYS=120\n").logKeepDays).toBe(120);
+    expect(load("ASK_LOG_KEEP_DAYS=0\n").logKeepDays).toBe(1);
+  });
+});

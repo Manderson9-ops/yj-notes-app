@@ -51,6 +51,9 @@ DATA_DIR=<DATA_DIR 경로>
 # ASK_MIN_PUBLISH_SCORE=8.5
 # ASK_CLAUDE_TIMEOUT_MS=240000
 # ASK_EXPAND_MODEL=sonnet        (질문 확장용 모델. 안 되면 다른 쪽(haiku)으로 한 번 더. 실측: sonnet low 약 5초, haiku 12~19초)
+# ASK_REVIEW_MODEL=opus          (검토·재검토 모델. 작성·재작성은 opus 그대로. 영문·숫자·._- 3~40자가 아니면 opus)
+# ASK_AUTH_PAUSE=1               (로그인 만료(exitKind=auth) 때 claim 을 멈추고 시험 호출로만 푼다. 0 이면 끔 — 아래 §4)
+# ASK_LOG_KEEP_DAYS=14           (워커 로그 보관 일수, 1~3650)
 ```
 
 `DATA_DIR` 는 읽기 전용으로만 쓴다(알림장·guide·근거 DB). 최신 ingest export 는
@@ -79,7 +82,10 @@ npm run ask-worker:uninstall
 
 ## 4. 로그와 상태
 
-- 로그: `%USERPROFILE%\.yj-ask\logs\worker-YYYY-MM-DD.log` (JSON 한 줄씩, 14일 보관). **질문·답변 본문은 기록하지 않고** id·단계·시간·상태·코드만 남는다.
+- 로그: `%USERPROFILE%\.yj-ask\logs\worker-YYYY-MM-DD.log` (JSON 한 줄씩, 기본 14일 보관 — `ASK_LOG_KEEP_DAYS`). **질문·답변 본문은 기록하지 않고** id·단계·시간·상태·코드만 남는다.
+- 주요 줄(`event`): `claimed`·`stage`(`id`·`stage`·`ms`)·`answered`·`failed`(`id`·`code`·`ms`, claude 실패면 `exitKind`), 시작 때 `effort_env`(`present` — 환경변수 `CLAUDE_CODE_EFFORT_LEVEL` 이 있는지만. 있으면 자식 claude 가 그 값을 쓴다)·`loop_start`, 로그인 만료 때 `auth_paused`·`auth_resumed`, 시작 시험 실패 때 `probe_failed`(`exitKind`).
+- `exitKind`: claude 가 비정상 종료(`claude_exit`)하거나 오류 봉투(`claude_error`)를 내면 stderr·봉투의 `result` 문구를 정규식으로만 분류해 `usage_limit`(사용량 한도)·`auth`(로그인 만료)·`overloaded`(과부하)·`other` 중 하나를 남긴다. 문구 자체는 저장하지 않는다. CLI 문구가 바뀌어 맞는 것이 없으면 `other`(동작은 그 전과 같다).
+- **로그인 만료 일시정지**(`ASK_AUTH_PAUSE=1`, 기본): 워커는 시작할 때 질문 자료 없는 합성 프롬프트로 시험 호출(시간 상한 60초)을 한 번 하고, **성공한 뒤에만 claim 한다**. 시험이 `auth` 로 실패하면 일시정지, 그 밖의 실패(네트워크가 아직 없는 부팅 직후 등)면 60초 뒤 다시 시험한다. 처리 중 작성·검토·재작성·재검토 어느 단계든 `auth` 가 나면 그 질문의 나머지 단계와 2초 재실행을 하지 않고 지금 코드(`claude_exit`, 오류 봉투면 `claude_error`)로 fail 한 뒤 일시정지한다(그 질문은 시도 1회를 쓴다. 질문 확장은 실패를 삼키므로 그 auth 는 작성 단계에서 잡힌다). `--once` 도 시험 호출이 성공해야 claim 한다. 일시정지 중에는 claim 하지 않고 10분마다 시험 호출을 해서 **성공했을 때만** 푼다(사용량 한도·시간 초과로 실패하면 계속 멈춰 있다). 프로세스는 끝나지 않는다. 다시 로그인한 뒤 워커를 다시 시작하면 시작 시험이 바로 풀어 준다. `ASK_AUTH_PAUSE=0` 이면 시험·일시정지·재실행 생략을 모두 하지 않고 `exitKind` 기록만 남는다.
 - 근거 묶음 캐시: `%USERPROFILE%\.yj-ask\cache\child-<export run id>.json` (export 가 새로 올라온 run 으로 바뀔 때만 다시 만든다).
 - 앱 홈의 워커 표시는 서버의 `ask_worker_seen_at`(claim·ping 때 60초에 한 번 갱신) 기준 2분 이내면 온라인.
 
@@ -93,6 +99,24 @@ npm run ask-worker:eval -- --set "<DATA_DIR>\ask-eval\golden.jsonl" --out "<DATA
 각 질문을 `--runs`(기본 2)회 돌려 평균·최저 점수, 항목별(근거·기록·실행·안전·말투) 평균, 같은 질문 단계 차 ≤ 1 비율을
 `eval-<시각>.json` / `.md` 로 저장한다. 결과 파일에는 질문·답변 본문이 없고 id·점수·시간만 있다.
 `--set`·`--out`·`--history`·`--reask` 가 저장소 안이면 거부한다. 저장소에는 형식만 두고 실제 질문·답은 두지 않는다.
+결과 머리에 `claudeVersion`(`claude --version`)과 `reviewModel` 이, run 마다 단계별 실제 모델 ID(`models`)가 남는다.
+오류는 `단계:코드`(예: `review:claude_exit` — 마지막으로 진행한 단계)로 남는다.
+
+### 5-2. 검토 모델 비교용 옵션 (T-Q4a)
+
+```powershell
+# 검토 모델만 바꿔 전체 실행(worker.env 는 그대로). --save-answers 는 첫 작성본과 최종 답을 검토 입력과 함께 저장
+npm run ask-worker:eval -- --set <golden.jsonl> --out "<DATA_DIR>\ask-eval\<폴더>" --runs 2 --save-answers --review-model sonnet
+# 저장된 답에 검토 단계만(근거 묶음을 다시 만들지 않는다). 기본은 첫 작성본, --score 면 최종 답을 운영 점수식으로 채점
+npm run ask-worker:eval -- --review-only "<answers 파일 또는 그것 하나만 든 폴더>" --out <결과 폴더> --review-model opus [--score]
+# 두 전체 실행 비교: 두 실행 모두 오류 없이 끝난 문항의 교집합으로 평균·단계 일관성 비율, 실행별 오류 수
+npm run ask-worker:eval-compare -- <결과 A> <결과 B> [--set <golden.jsonl>]
+```
+
+- `--review-model <모델>`: 그 실행의 검토·재검토만 이 모델을 쓴다(작성·재작성은 그대로).
+- `--save-answers` 파일(`answers-<시각>.json`, 형식 2): 문항·run 마다 `stage` 가 `first`(첫 작성본, 검토 전 — 그 run 이 `low_score` 등 예외로 끝나도 저장)와 `final`(게시될 답)인 항목, 각 항목에 검토 입력(`promptPack` 근거 묶음·`pq` 질문 정보·`info` 결정적 검사 입력). 첫 작성이 HARD 라 초안이 될 수 없는 run 은 `noFirstDraft` 에 적힌다. **근거 묶음에 가족 기록이 들어가므로 `<DATA_DIR>\ask-eval\` 아래에만 둔다.** 형식 2 가 아닌 옛 파일은 `--review-only` 가 받지 않는다.
+- `--review-only` 결과(`review-<시각>.json`): 답마다 범주별 **검토자 지적 수**(코드가 만든 SOFT 항목은 넣지 않는다)와 검토자 실제 모델 ID, 검토 호출이 실패한 답은 `error`. `--score` 면 답마다 검토자 지적 + 코드 SOFT 항목으로 운영과 같은 점수식(10 − 감점)의 점수와 평균(실패한 답은 평균에서 빼고 `failed` 로 센다). 앞 검토 없이 새로 보므로 운영 최종 점수보다 낮게 나올 수 있다.
+- 비교 결과의 오류 수(`errors`, 오류가 난 문항 수): `review`(검토·재검토 단계)·`lowScore`(단계 무관)·`unreviewed` 와 그 합 `gate`, 비교에서 빼는 `authoring`(작성 단계 도구 실패 등). `--set` 을 주면 각 결과의 문항 id 집합이 세트와 같은지(`idSetMatchesSet`, 다르면 중간에 멈춘 실행)도 낸다.
 
 ### 5-1. 가족 의견 주입 옵션 (T-Q3)
 
@@ -117,6 +141,7 @@ overview 에 7일 중앙값(`medianTotalMs7d`)을 낸다.
     Where-Object event -eq answered | ForEach-Object ms | Sort-Object |
     ForEach-Object -Begin { $a = @() } -Process { $a += $_ } -End { "n=$($a.Count) p50=$($a[[int]($a.Count*0.5)]) p90=$($a[[int]($a.Count*0.9)])" }
   ```
+- claude 미리 띄우기 벤치(T-Q4a, 합성 프롬프트로 `claude -p` 약 30회): `node tools/ask-worker/prespawn-bench.ts --out <저장소·DATA_DIR 밖 폴더> [--bin <claude.exe>]`. 「즉시 쓰기」와 「6초 뒤 쓰기」의 stdin 쓰기 → 종료 시간을 5쌍(순서 교대) 재고, 두 프로세스를 겹쳐 띄우는 실행 10회의 비정상 종료를 센다. 쌍별 차 중앙값 ≥ 3초·4/5 쌍 이상 6초 뒤 쪽이 빠름·겹쳐 띄우기 비정상 종료(시간 초과 포함) 0 이면 `adopt: true`. 쓰기 전에 프로세스가 끝난 실행은 `exited_before_write` 로 적는다.
 - 합성 드라이런 실측(Opus, 합성 픽스처, 재작성 없음): 근거 묶음 0.2초, 작성 약 24초, 검토 약 10초, 합계 약 35초(점수 9.7). 재작성이 들어가면 재작성 약 20초 + 재검토 약 12초가 더해져 최대 약 70초. claim 대기(최대 10초)와 PC 부하에 따라 달라진다.
 
 ## 7. 문제 해결
@@ -128,7 +153,9 @@ overview 에 7일 중앙값(`medianTotalMs7d`)을 낸다.
 | `claim_error api_503` | 서버에 `ASK_WORKER_TOKEN_HASH` 미설정(fail closed) |
 | `claim_error api_429` | 실패 시도 과다로 잠금(15분). 토큰 확인 후 대기 |
 | `claim_error network` 반복 | 인터넷·DNS. 워커는 2초에서 60초까지 지수 백오프로 재시도 |
-| 모든 질문이 `claude_exit` | `claude` 로그인 만료. 터미널에서 `claude` 실행해 로그인. `CLAUDE_BIN` 경로 확인 |
+| 모든 질문이 `claude_exit` | 로그 `failed` 줄의 `exitKind` 를 본다. `auth` 면 로그인 만료 — 터미널에서 `claude` 실행해 로그인 후 워커 다시 시작(그대로 두면 최대 10분 뒤 시험 호출이 풀어 준다). `usage_limit`·`overloaded` 면 한도·과부하. `CLAUDE_BIN` 경로 확인 |
+| 로그에 `auth_paused` 뒤로 claim 이 없음 | 로그인 만료로 일시정지 중(§4). 다시 로그인하면 풀린다. 끄려면 `ASK_AUTH_PAUSE=0` |
+| 시작 뒤 `probe_failed` 가 1분마다 | 시작 시험 호출이 로그인 외 이유로 실패(네트워크·사용량 한도). 성공할 때까지 claim 하지 않는다 |
 | `pack_failed` | `DATA_DIR`, 최신 ingest export 폴더(`manifest.json` 포함), Python 경로(`PYTHON_BIN`) 확인 |
 | `checks_failed` / `low_score` | 근거 묶음에 질문 관련 자료가 거의 없거나 모델이 반복 위반. 같은 질문이 3회 실패하면 서버가 failed 처리. `ask-worker:eval` 로 확인 |
 | `already_running` | 이미 워커가 떠 있음(`ask-worker:status`). 죽은 pid 의 낡은 잠금은 자동으로 인수 |

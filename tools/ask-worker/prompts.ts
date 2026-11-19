@@ -11,6 +11,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 export const SYSTEM_PROMPT_FILE = join(HERE, "prompts", "system.md");
 export const REVIEW_PROMPT_FILE = join(HERE, "prompts", "review.md");
+/** 시작·해제 시험 호출용(질문 자료 없음, T-Q4a). */
+export const PROBE_PROMPT_FILE = join(HERE, "prompts", "probe.md");
 export const ANSWER_SCHEMA_FILE = join(HERE, "answer.schema.json");
 
 export const loadAnswerSchemaJson = (): string =>

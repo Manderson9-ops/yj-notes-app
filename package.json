@@ -46,7 +46,8 @@
     "ask-worker:install": "node tools/ask-worker/scheduler.ts install",
     "ask-worker:uninstall": "node tools/ask-worker/scheduler.ts uninstall",
     "ask-worker:status": "node tools/ask-worker/scheduler.ts status",
-    "ask-worker:eval": "node tools/ask-worker/eval.ts"
+    "ask-worker:eval": "node tools/ask-worker/eval.ts",
+    "ask-worker:eval-compare": "node tools/ask-worker/eval-stats.ts --compare"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.0",
