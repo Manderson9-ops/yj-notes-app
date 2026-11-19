@@ -81,6 +81,7 @@ M3 종료 뒤 실제 자료를 넣는 단계에서 아래 카드를 병렬로 �
 | T-Q1 | 앱·서버: D1 `0008`(질문·답·의견), 세션 API, 워커 API(Bearer 토큰 전용 가드·실패 제한), 답변 스키마(`shared`)와 JSON Schema 내보내기(`npm run ask:schema`), 위급 신호 모듈, 화면 S50·S51·S91, 목업 API, e2e | 구현·리뷰 대기(보안 경계 `guard.ts`·`server/auth/worker.ts` 는 설계 담당 검토 필요) |
 | T-Q2 | 집 PC 워커 `tools/ask-worker`: 10초 claim 루프, 근거 묶음, claude(Opus, 도구 없음) 호출, 독립 검토(≥9.5), Windows 작업 스케줄러 설치, 골든 평가 | 별도 작업(T-Q1 병합 후 연결) |
 | T-Q4a | 물어보기 속도 1(워커만): 실패 종류 기록(`exitKind`)·로그인 만료 일시정지와 시작·해제 시험 호출(`ASK_AUTH_PAUSE`), 검토 모델 분리(`ASK_REVIEW_MODEL`), 평가 도구(`--review-model`·`--review-only`·`--score`·저장 형식 2·비교 모드·오류 단계 꼬리표·모델 ID 기록), 로그 보관 일수(`ASK_LOG_KEEP_DAYS`), claude 미리 띄우기 벤치 | 구현·리뷰 대기 |
+| T-Q5 | 물어보기 대화(질문 → 대답 → 확인(재질문) → 대답): D1 `0011`(`ask_turn`·`card_updates`·`red_lock`·`origin_question_id`), 턴 API(`POST /api/ask/:id/turn`)·턴 워커 API(progress·reply·card·fail)·claim 에 턴 합치기(`ASK_TURN_CLAIM`), 후속 짧은 답(`FollowupSchema`)·카드 갱신·위급 잠금·다시 답변 흡수(`kind='reask'`), 워커 후속 파이프라인(`checkFollowup`·`ASK_FOLLOWUP_REVIEW_MODEL`)·멀티턴 평가(`--thread`), 화면(말풍선·입력창·잠금), T-Q4b 없이 먼저 만듦(ADR-0009) | 구현·리뷰 대기 |
 | 운영 | `ASK_WORKER_TOKEN_HASH` 등록(`09` §2) → `0008` 적용(`09` §3-1d 순서) → 배포 → 워커 설치 | 관리자 |
 
 다음(M5 남은 것): ① 조부모 사용 테스트(관리자, `08` §6 사용성) ② 현행 정적 사이트 전환(D-03, INC-01 종료) ③ 키즈노트 증분은 v1 절차(`07` §3)로 계속.
