@@ -224,7 +224,137 @@ export const WorkerFailSchema = z.strictObject({
   code: z.string().regex(/^[a-z0-9_]{1,40}$/),
 });
 
+// ───────────────────────── T-Q5 대화(후속 질문·짧은 답·카드 갱신) ─────────────────────────
+
+/** 후속 질문 상한(위급 턴은 세지 않는다). 11번째는 429 turn_limit. */
+export const ASK_TURN_MAX = 10;
+/** 짧은 답 본문 상한. */
+export const ASK_TURN_REPLY_MAX = 600;
+/** thread 로 워커에 싣는 이전 턴 수(위급 턴 포함, 최근 것만). */
+export const ASK_THREAD_TURNS = 10;
+export const ASK_TURN_KINDS = ["followup", "reask"] as const;
+export type AskTurnKind = (typeof ASK_TURN_KINDS)[number];
+/** 카드 단계 상태: none(카드 갱신 없음/끝)·pending(만드는 중)·done·failed. */
+export const ASK_CARD_STATUSES = ["none", "pending", "done", "failed"] as const;
+export type AskCardStatus = (typeof ASK_CARD_STATUSES)[number];
+/** 카드를 갱신하지 않은 이유 표지(화면 문구용). */
+export const ASK_CARD_NOTES = ["limit", "redlock"] as const;
+export type AskCardNote = (typeof ASK_CARD_NOTES)[number];
+
+/** 후속 짧은 답. 카드 전체가 아니라 질문에 대한 대답 한 덩어리 + 카드 갱신 필요 여부. */
+export const FollowupSchema = z.strictObject({
+  reply: text(ASK_TURN_REPLY_MAX),
+  say: text(ASK_LIMITS.tryNowSay).optional(),
+  fromRecords: z
+    .array(
+      z.strictObject({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        what: text(ASK_LIMITS.recordWhat),
+        link: text(ASK_LIMITS.recordLink),
+        source: z.enum(RECORD_SOURCES),
+      }),
+    )
+    .max(2),
+  evidence: z.array(z.strictObject({ ref: text(120), point: text(ASK_LIMITS.point) })).max(2),
+  /** 원래 답 카드를 새 버전으로 고쳐야 하면 needed=true(이유 ≤160, 필요 없으면 빈 문자열 가능). */
+  cardUpdate: z.strictObject({ needed: z.boolean(), reason: z.string().max(160) }),
+  limits: text(ASK_LIMITS.limits).optional(),
+});
+export type Followup = z.infer<typeof FollowupSchema>;
+
+/** POST /api/ask/:id/turn 본문(후속 질문). */
+export const TurnCreateSchema = z.strictObject({
+  body: z.string().trim().min(1).max(ASK_BODY_MAX),
+  askedBy: AskerSchema,
+});
+
+/** 짧은 답 단계 진행 / 카드 단계 하트비트(카드 단계는 status 를 바꾸지 않고 카드 리스만 늘린다). */
+export const TurnProgressSchema = z.union([
+  z.strictObject({ stage: z.literal("reply"), status: z.enum(["answering", "reviewing"]) }),
+  z.strictObject({ stage: z.literal("card") }),
+]);
+export type TurnProgress = z.infer<typeof TurnProgressSchema>;
+
+/** 짧은 답 확정. reviewScore 는 숫자만(null 은 T-Q4b 의 미검토 확정이라 지금은 받지 않는다). */
+export const TurnReplySchema = z.strictObject({
+  reply: FollowupSchema,
+  reviewScore: z.number().min(0).max(10),
+  model: z.string().trim().min(1).max(60),
+  workMs: z.number().int().min(0).max(86_400_000),
+  /** 카드를 이어서 만들 것인가(cardUpdate.needed && 남은 횟수 > 0 && 위급 잠금 아님). */
+  cardWanted: z.boolean(),
+  /** cardWanted 가 false 인 이유(limit·redlock). 카드가 필요 없었으면 null. */
+  cardSkip: z.enum(ASK_CARD_NOTES).nullable(),
+  /** cardUpdate.reason 그대로(카드 단계 claim 에서 다시 실어 준다). */
+  cardReason: z.string().max(160),
+});
+export type TurnReply = z.infer<typeof TurnReplySchema>;
+
+/** 턴 실패 보고: 어느 단계가 실패했는지 함께. */
+export const TurnFailSchema = z.strictObject({
+  stage: z.enum(["reply", "card"]),
+  code: z.string().regex(/^[a-z0-9_]{1,40}$/),
+});
+export type TurnFail = z.infer<typeof TurnFailSchema>;
+
+/** claim 응답의 thread: 원 질문·현재 카드·지금 턴 앞의 최근 턴들. */
+export const ClaimThreadSchema = z.object({
+  question: z.object({
+    id: z.number().int(),
+    body: z.string(),
+    askedBy: z.string(),
+    createdAt: z.string(),
+    redFlag: z.boolean(),
+  }),
+  card: AnswerSchema.nullable(),
+  turns: z.array(
+    z.object({
+      by: z.string(),
+      body: z.string(),
+      reply: FollowupSchema.nullable(),
+      /** 추가 필드(reask 턴은 본문이 비어 있을 수 있어 이유를 함께 싣는다). */
+      kind: z.enum(ASK_TURN_KINDS),
+      reaskReason: z.string().nullable(),
+    }),
+  ),
+});
+export type ClaimThread = z.infer<typeof ClaimThreadSchema>;
+
+/** claim 응답의 turn 덩어리(지금 처리할 턴). */
+export const ClaimTurnSchema = z.object({
+  id: z.number().int(),
+  seq: z.number().int(),
+  kind: z.enum(ASK_TURN_KINDS),
+  body: z.string(),
+  redFlag: z.boolean(),
+  reaskReason: z.string().nullable(),
+  askedBy: z.string(),
+  /** 카드 단계 claim 일 때만: 이 턴이 확정한 짧은 답. */
+  reply: FollowupSchema.nullable(),
+  /** 카드 단계 claim 일 때만: /reply 때 받은 cardUpdate.reason. */
+  cardReason: z.string().nullable(),
+  /** reask 턴일 때만: buildReaskSection 입력(count = 그 질문의 reask_count, previousAnswer = 지금 카드). */
+  reask: ClaimReaskSchema.optional(),
+});
+export type ClaimTurn = z.infer<typeof ClaimTurnSchema>;
+
+/** 턴 claim 응답 전체. 최상위 question 이 없다 — 옛 워커가 질문으로 오해해 처리하지 못하게(§2 배포 순서). */
+export const ClaimTurnResponseSchema = z.object({
+  type: z.literal("turn"),
+  stage: z.enum(["reply", "card"]),
+  cardUpdatesLeft: z.number().int().min(0),
+  redLock: z.boolean(),
+  turn: ClaimTurnSchema,
+  thread: ClaimThreadSchema,
+});
+export type ClaimTurnResponse = z.infer<typeof ClaimTurnResponseSchema>;
+
 /** 워커 --json-schema 용 JSON Schema (draft-7). */
 export function answerJsonSchema(): Record<string, unknown> {
   return z.toJSONSchema(AnswerSchema, { target: "draft-7" });
+}
+
+/** 후속 짧은 답용 JSON Schema (draft-7). */
+export function followupJsonSchema(): Record<string, unknown> {
+  return z.toJSONSchema(FollowupSchema, { target: "draft-7" });
 }
