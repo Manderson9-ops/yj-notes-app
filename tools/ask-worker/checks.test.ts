@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hasForbiddenWord } from "../../shared/ask-forbidden.ts";
-import { checkAnswer } from "./checks.ts";
-import { goodAnswer, PACK } from "./fixtures.ts";
+import { checkAnswer, checkFollowup } from "./checks.ts";
+import { goodAnswer, goodFollowup, PACK } from "./fixtures.ts";
 import { levelTitle } from "./levels.ts";
 
 describe("공용 금지어(shared/ask-forbidden)", () => {
@@ -283,5 +283,139 @@ describe("다시 답변 단계 안정(T-Q3 2차)", () => {
       false,
     );
     expect(r.soft.some((i) => i.text.includes("단계가 이전"))).toBe(false);
+  });
+});
+
+describe("checkFollowup (T-Q5 후속 짧은 답)", () => {
+  const cats = (r: ReturnType<typeof checkFollowup>, sev: "hard" | "soft") =>
+    r.items.filter((i) => i.severity === sev).map((i) => i.category);
+
+  it("정상 답은 지적이 없다", () => {
+    const r = checkFollowup(goodFollowup(), PACK, { cardLevel: 4 });
+    expect(r.ok).toBe(true);
+    expect(r.items).toEqual([]);
+    expect(r.reply?.reply).toContain("간식");
+  });
+
+  it("스키마 위반: 추가 키·길이·cardUpdate 누락·빈 reply → HARD schema, reply null", () => {
+    const bad: unknown[] = [
+      { ...goodFollowup(), extra: 1 },
+      goodFollowup({ reply: "가".repeat(601) }),
+      goodFollowup({ reply: "" }),
+      { ...goodFollowup(), cardUpdate: undefined },
+      goodFollowup({
+        fromRecords: Array.from({ length: 3 }, () => goodFollowup().fromRecords[0]!),
+      }),
+      "문자열",
+    ];
+    for (const raw of bad) {
+      const r = checkFollowup(raw, PACK);
+      expect(r.reply).toBeNull();
+      expect(cats(r, "hard")).toContain("schema");
+      expect(r.ok).toBe(false);
+    }
+  });
+
+  it("금지어 → HARD forbidden(reply·say·cardUpdate.reason 어디든)", () => {
+    for (const over of [
+      { reply: "정상 범위예요." },
+      { say: "이상해요" },
+      { cardUpdate: { needed: true, reason: "발달 지연 우려" } },
+    ]) {
+      expect(cats(checkFollowup(goodFollowup(over), PACK), "hard"), JSON.stringify(over)).toContain(
+        "forbidden",
+      );
+    }
+  });
+
+  it("내부 표지·내부 규칙·검색 건수 누수 → HARD leak", () => {
+    for (const reply of [
+      "지난 기록 묶음을 보면 괜찮아요.",
+      "records/note 에 있어요.",
+      "INT-FEED-01 을 써요.",
+      "전수 검색 결과예요.",
+      "알림장에 12건 나와요.",
+      "보수적인 쪽으로 봐요.",
+    ]) {
+      expect(cats(checkFollowup(goodFollowup({ reply }), PACK), "hard"), reply).toContain("leak");
+    }
+    const fromRecords = [{ ...goodFollowup().fromRecords[0]!, link: "가이드 § 3 과 이어져요" }];
+    expect(cats(checkFollowup(goodFollowup({ fromRecords }), PACK), "hard")).toContain("leak");
+    // 근거 ref 는 evidence.ref 에만 쓴다: 거기 있는 INT-/NORM- 모양은 누수가 아니다
+    const ok = checkFollowup(
+      goodFollowup({ evidence: [{ ref: "SYN-IV-01", point: "식사 시간이 일정하면 도움이 돼요" }] }),
+      PACK,
+    );
+    expect(cats(ok, "hard")).not.toContain("leak");
+  });
+
+  it("evidence.ref 가 묶음에 없으면 HARD factual (FAMILY-Q 는 이번 가족 결과에 있어야 한다)", () => {
+    const r = checkFollowup(
+      goodFollowup({ evidence: [{ ref: "NOPE-9", point: "없는 근거" }] }),
+      PACK,
+    );
+    expect(cats(r, "hard")).toEqual(["factual"]);
+    const fam = goodFollowup({ evidence: [{ ref: "FAMILY-Q7", point: "지난번 질문" }] });
+    expect(cats(checkFollowup(fam, PACK), "hard")).toEqual(["factual"]);
+    expect(checkFollowup(fam, { ...PACK, refs: [...PACK.refs, "FAMILY-Q7"] }).hard).toEqual([]);
+  });
+
+  it("fromRecords.date 가 묶음에 없으면 HARD factual", () => {
+    const rec = { ...goodFollowup().fromRecords[0]!, date: "2021-01-01" };
+    const r = checkFollowup(goodFollowup({ fromRecords: [rec] }), PACK);
+    expect(r.hard.map((i) => i.text)).toEqual([
+      "fromRecords 날짜가 근거 묶음에 없어요: 2021-01-01",
+    ]);
+  });
+
+  it("cardUpdate.needed=false 인데 reply 가 단계가 바뀐다고 하면 SOFT template", () => {
+    for (const reply of [
+      "단계를 올려야 해요.",
+      "더 높은 단계로 봐야 해요.",
+      "단계가 달라질 수 있어요.",
+      "단계를 낮춰도 돼요.",
+    ]) {
+      const r = checkFollowup(goodFollowup({ reply }), PACK, { cardLevel: 4 });
+      expect(cats(r, "soft"), reply).toEqual(["template"]);
+      expect(r.hard).toEqual([]);
+      // 카드를 바꾸기로 했으면(needed=true) 이 규칙은 걸리지 않는다
+      const fixed = checkFollowup(
+        goodFollowup({ reply, cardUpdate: { needed: true, reason: "새 지속 기간" } }),
+        PACK,
+        { cardLevel: 4 },
+      );
+      expect(cats(fixed, "soft"), reply).toEqual([]);
+    }
+  });
+
+  it("reply 안 단계 숫자는 카드 단계와 다르면 SOFT template(같으면 허용, 카드 단계를 모르면 모두)", () => {
+    expect(
+      cats(
+        checkFollowup(goodFollowup({ reply: "지금 6단계예요." }), PACK, { cardLevel: 4 }),
+        "soft",
+      ),
+    ).toEqual(["template"]);
+    expect(
+      cats(
+        checkFollowup(goodFollowup({ reply: "지금 4단계 그대로예요." }), PACK, { cardLevel: 4 }),
+        "soft",
+      ),
+    ).toEqual([]);
+    expect(
+      cats(checkFollowup(goodFollowup({ reply: "지금 4단계 그대로예요." }), PACK), "soft"),
+    ).toEqual(["template"]);
+    const msg = checkFollowup(
+      goodFollowup({ reply: "7단계쯤이에요.", cardUpdate: { needed: true, reason: "r" } }),
+      PACK,
+      { cardLevel: 4 },
+    ).soft[0]?.text;
+    expect(msg).toContain("단계 숫자를 쓰지 않아요");
+  });
+
+  it("SOFT 는 막지 않는다(ok=false 이지만 hard 없음)", () => {
+    const r = checkFollowup(goodFollowup({ reply: "지금 6단계예요." }), PACK, { cardLevel: 4 });
+    expect(r.ok).toBe(false);
+    expect(r.hard).toHaveLength(0);
+    expect(r.reply).not.toBeNull();
   });
 });

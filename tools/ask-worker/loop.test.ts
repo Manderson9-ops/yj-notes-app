@@ -91,6 +91,10 @@ function make(opts: {
       rec.calls.push(`fail:${id}:${code}`);
       return Promise.resolve();
     },
+    turnProgress: () => Promise.resolve(),
+    turnReply: () => Promise.resolve({ cardStatus: null }),
+    turnCard: () => Promise.resolve(),
+    turnFail: () => Promise.resolve(),
     history: () => Promise.resolve([]),
     ping: () => Promise.resolve(),
   };

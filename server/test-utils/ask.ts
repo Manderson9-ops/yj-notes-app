@@ -1,5 +1,5 @@
 // 물어보기 시험 도구: 세션 요청·워커 요청·합성 답변. 합성 자료만(테스트아이).
-import type { Answer } from "../../shared/ask-schema";
+import type { Answer, Followup, TurnReply } from "../../shared/ask-schema";
 import { ORIGIN, TEST_WORKER_TOKEN, type Harness } from "./harness";
 
 export function sessionCall(
@@ -77,4 +77,29 @@ export function workerAnswerBody(level = 5, over: Partial<Answer> = {}) {
 
 export function rows<T>(h: Harness, sql: string): T[] {
   return h.fake.sqlite.prepare(sql).all() as T[];
+}
+
+/** 합성 후속 짧은 답(카드 갱신 필요 없음). */
+export function syntheticFollowup(over: Partial<Followup> = {}): Followup {
+  return {
+    reply: "합성 짧은 답이에요. 오늘은 먼저 안아 주세요.",
+    fromRecords: [],
+    evidence: [],
+    cardUpdate: { needed: false, reason: "" },
+    ...over,
+  };
+}
+
+/** 턴 `/reply` 본문. 기본은 카드 갱신 없음. */
+export function workerReplyBody(over: Partial<TurnReply> = {}): TurnReply {
+  return {
+    reply: syntheticFollowup(),
+    reviewScore: 9.6,
+    model: "sonnet-synthetic",
+    workMs: 8_000,
+    cardWanted: false,
+    cardSkip: null,
+    cardReason: "",
+    ...over,
+  };
 }

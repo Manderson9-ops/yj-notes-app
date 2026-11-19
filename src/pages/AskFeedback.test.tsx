@@ -260,7 +260,7 @@ describe("이유 고르기 (라디오 그룹)", () => {
     expect(radio(names[3] ?? "")).toHaveAttribute("aria-checked", "true");
   });
 
-  it("남은 횟수 안내: 3번 → 2번, 모두 쓰면 「세 번까지예요」 + 다시 답변 버튼 숨김", async () => {
+  it("남은 횟수 안내(cardUpdates): 3번 → 2번, 모두 쓰면 「카드는 3번까지 …」 + 다시 답변 버튼 숨김", async () => {
     routes["GET /ask/7"] = () => json(200, detail({ votes: [vote("아빠", false)] }));
     const first = renderAt();
     expect(await screen.findByText("다시 답변을 3번 더 받을 수 있어요.")).toBeInTheDocument();
@@ -270,7 +270,7 @@ describe("이유 고르기 (라디오 그룹)", () => {
         200,
         detail({
           votes: [vote("아빠", false)],
-          reask: { count: 1, reason: "x", by: "엄마" },
+          cardUpdates: { used: 1, max: 3 },
           history: [
             { version: 1, level: 5, createdAt: "2020-01-14T00:00:00.000Z", answer: ANSWER },
           ],
@@ -285,11 +285,15 @@ describe("이유 고르기 (라디오 그룹)", () => {
         200,
         detail({
           votes: [vote("아빠", false)],
-          reask: { count: 3, reason: "x", by: "엄마" },
+          cardUpdates: { used: 3, max: 3 },
         }),
       );
     renderAt();
-    expect(await screen.findByText("다시 답변은 세 번까지예요.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "카드는 3번까지 다시 만들 수 있어요 · 궁금한 점은 이어서 물어봐 주세요",
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "다시 답변 받기" })).toBeNull();
     expect(screen.getByRole("button", { name: "다시 답변 없이 이유만 저장" })).toBeInTheDocument();
   });

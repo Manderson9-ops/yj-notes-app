@@ -115,3 +115,15 @@ export async function stableElementShot(page: Page, target: Locator, name: strin
   }
   await page.emulateMedia({ reducedMotion: null });
 }
+
+/**
+ * 뷰포트를 문서 높이만큼 키운다(폭 360): 아래쪽에 따라오는(sticky) 탭바가 긴 화면의 끝을 가리면 axe 가 겹침(target-size)으로 본다.
+ * 대화(T-Q5)로 상세 화면이 길어져 고정 높이(3600·4200)로는 모자란다. 키운 뒤 높이가 바뀌므로 두 번 맞춘다.
+ */
+export async function tallViewport(page: Page, width = 360) {
+  for (let i = 0; i < 2; i++) {
+    const h = Number(await page.evaluate("document.documentElement.scrollHeight"));
+    await page.setViewportSize({ width, height: Math.max(740, h + 160) });
+    await settle(page);
+  }
+}

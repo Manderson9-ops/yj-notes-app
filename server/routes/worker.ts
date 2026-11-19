@@ -3,9 +3,16 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { touchWorkerSeen } from "../ask/seen";
+import { LEASE_MS, MAX_ATTEMPTS, WORKER_ACTIVE, collectStrings } from "../ask/turns";
 import { bearerMatches } from "../auth/worker";
 import { errorResponse, jsonResponse } from "../http/errors";
 import { SyncFinishSchema, SyncStartSchema } from "../../shared/sync-schema";
+import {
+  closeTurnLeftovers,
+  pickTurnCandidate,
+  registerWorkerTurnRoutes,
+  turnClaimResponse,
+} from "./worker-turn";
 import { SYNC_RETENTION_MS } from "../lib/sync-state";
 import { hasForbiddenWord } from "../../shared/ask-forbidden";
 import {
@@ -24,10 +31,9 @@ import {
 
 export const workerRoutes = new Hono<AppEnv>();
 
-export const LEASE_MS = 5 * 60_000;
-export const MAX_ATTEMPTS = 3;
+export { LEASE_MS, MAX_ATTEMPTS };
 const ID = /^[0-9]{1,9}$/;
-const ACTIVE = "('claimed','answering','reviewing')";
+const ACTIVE = WORKER_ACTIVE;
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 const notFound = () => errorResponse(404, "not_found", "찾을 수 없어요.");
@@ -41,6 +47,8 @@ workerRoutes.use("/api/worker/*", async (c, next) => {
   await next();
 });
 
+registerWorkerTurnRoutes(workerRoutes);
+
 async function readJson(req: Request): Promise<unknown> {
   try {
     return await req.json();
@@ -49,60 +57,35 @@ async function readJson(req: Request): Promise<unknown> {
   }
 }
 
-function collectStrings(v: unknown, out: string[]): void {
-  if (typeof v === "string") out.push(v);
-  else if (Array.isArray(v)) for (const x of v) collectStrings(x, out);
-  else if (typeof v === "object" && v !== null)
-    for (const x of Object.values(v)) collectStrings(x, out);
-}
-
 workerRoutes.get("/api/worker/ping", async (c) => {
   await touchWorkerSeen(c.env.DB, c.get("deps").now());
   return new Response(null, { status: 204 });
 });
 
-workerRoutes.post("/api/worker/ask/claim", async (c) => {
-  const db = c.env.DB;
-  const nowMs = c.get("deps").now();
-  const now = iso(nowMs);
-  await touchWorkerSeen(db, nowMs);
+/** 서버 환경변수 ASK_TURN_CLAIM: "0" 이면 claim 이 대화 턴을 고르지 않는다(질문만, 응답 모양도 이전과 같다). 그 밖은 켜짐. */
+const turnClaimOn = (env: { ASK_TURN_CLAIM?: string }): boolean =>
+  env.ASK_TURN_CLAIM?.trim() !== "0";
 
-  // 리스가 끝났는데 시도가 한도에 이른 질문은 실패로 닫는다.
-  await db
-    .prepare(
-      `UPDATE ask_question SET status = 'failed', fail_code = 'too_many_attempts', lease_until = NULL, updated_at = ?1
-       WHERE deleted_at IS NULL AND status IN ${ACTIVE} AND lease_until < ?1 AND attempts >= ?2`,
-    )
-    .bind(now, MAX_ATTEMPTS)
-    .run();
+interface ClaimedQuestion {
+  id: number;
+  body: string;
+  asked_by: string;
+  created_at: string;
+  red_flag: number;
+  reask_count: number;
+  reask_reason: string | null;
+  reask_by: string | null;
+}
 
-  // 한 문장으로 고르고 잡는다(원자적): 두 워커가 동시에 불러도 한 건은 한 번만 잡힌다.
-  const claimed = await db
-    .prepare(
-      `UPDATE ask_question
-       SET status = 'claimed', claimed_at = ?1, lease_until = ?2, attempts = attempts + 1, updated_at = ?1
-       WHERE id = (
-         SELECT id FROM ask_question
-         WHERE deleted_at IS NULL
-           AND (status = 'pending' OR (status IN ${ACTIVE} AND lease_until < ?1))
-           AND attempts < ?3
-         ORDER BY red_flag DESC, created_at, id LIMIT 1)
-       RETURNING id, body, asked_by, created_at, red_flag, reask_count, reask_reason, reask_by`,
-    )
-    .bind(now, iso(nowMs + LEASE_MS), MAX_ATTEMPTS)
-    .first<{
-      id: number;
-      body: string;
-      asked_by: string;
-      created_at: string;
-      red_flag: number;
-      reask_count: number;
-      reask_reason: string | null;
-      reask_by: string | null;
-    }>();
-  if (!claimed) return new Response(null, { status: 204 });
+const QUESTION_RETURNING =
+  "RETURNING id, body, asked_by, created_at, red_flag, reask_count, reask_reason, reask_by";
 
-  // 다시 답변이면 직전 답(가장 최근 이력)과 이유를 함께 준다.
+/** 집은 질문으로 claim 응답을 만든다. 다시 답변(옛 방식으로 대기 중이던 질문)이면 직전 답과 이유를 함께 준다. */
+async function questionClaimResponse(
+  db: D1Database,
+  claimed: ClaimedQuestion,
+  withType: boolean,
+): Promise<Response> {
   let reask: { count: number; reason: string; by: string; previousAnswer: unknown } | undefined;
   if (claimed.reask_count > 0) {
     const prev = await db
@@ -128,6 +111,7 @@ workerRoutes.post("/api/worker/ask/claim", async (c) => {
     };
   }
   return jsonResponse(200, {
+    ...(withType ? { type: "question" } : {}),
     question: {
       id: claimed.id,
       body: claimed.body,
@@ -137,6 +121,86 @@ workerRoutes.post("/api/worker/ask/claim", async (c) => {
     },
     ...(reask ? { reask } : {}),
   });
+}
+
+workerRoutes.post("/api/worker/ask/claim", async (c) => {
+  const db = c.env.DB;
+  const nowMs = c.get("deps").now();
+  const now = iso(nowMs);
+  await touchWorkerSeen(db, nowMs);
+
+  // 리스가 끝났는데 시도가 한도에 이른 질문은 실패로 닫는다.
+  await db
+    .prepare(
+      `UPDATE ask_question SET status = 'failed', fail_code = 'too_many_attempts', lease_until = NULL, updated_at = ?1
+       WHERE deleted_at IS NULL AND status IN ${ACTIVE} AND lease_until < ?1 AND attempts >= ?2`,
+    )
+    .bind(now, MAX_ATTEMPTS)
+    .run();
+
+  if (!turnClaimOn(c.env)) {
+    // 턴을 고르지 않는 모양(T-Q5 이전과 같다): 한 문장으로 고르고 잡는다(원자적).
+    const claimed = await db
+      .prepare(
+        `UPDATE ask_question
+         SET status = 'claimed', claimed_at = ?1, lease_until = ?2, attempts = attempts + 1, updated_at = ?1
+         WHERE id = (
+           SELECT id FROM ask_question
+           WHERE deleted_at IS NULL
+             AND (status = 'pending' OR (status IN ${ACTIVE} AND lease_until < ?1))
+             AND attempts < ?3
+           ORDER BY red_flag DESC, created_at, id LIMIT 1)
+         ${QUESTION_RETURNING}`,
+      )
+      .bind(now, iso(nowMs + LEASE_MS), MAX_ATTEMPTS)
+      .first<ClaimedQuestion>();
+    if (!claimed) return new Response(null, { status: 204 });
+    return questionClaimResponse(db, claimed, false);
+  }
+
+  // 질문과 턴을 함께 본다: 두 표의 후보 1건씩을 골라 `red_flag DESC, created_at` 으로 겨루고, 이긴 쪽을 같은 대기 조건을
+  // 다시 건 UPDATE 로 집는다. 0행이면(그사이 다른 claim 이 집음) 처음부터 1번 더 하고, 또 0행이면 204 다.
+  await closeTurnLeftovers(db, now);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const q = await db
+      .prepare(
+        `SELECT id, red_flag, created_at FROM ask_question
+         WHERE deleted_at IS NULL
+           AND (status = 'pending' OR (status IN ${ACTIVE} AND lease_until < ?1))
+           AND attempts < ?2
+         ORDER BY red_flag DESC, created_at, id LIMIT 1`,
+      )
+      .bind(now, MAX_ATTEMPTS)
+      .first<{ id: number; red_flag: number; created_at: string }>();
+    const t = await pickTurnCandidate(db, now);
+    if (!q && !t) return new Response(null, { status: 204 });
+    // 같은 순위면 질문이 먼저다.
+    const turnFirst =
+      t !== null &&
+      (q === null ||
+        t.red_flag > q.red_flag ||
+        (t.red_flag === q.red_flag && t.created_at < q.created_at));
+    if (turnFirst) {
+      const resp = await turnClaimResponse(db, t, nowMs);
+      if (resp) return jsonResponse(200, resp);
+      continue;
+    }
+    if (q) {
+      const claimed = await db
+        .prepare(
+          `UPDATE ask_question
+           SET status = 'claimed', claimed_at = ?1, lease_until = ?2, attempts = attempts + 1, updated_at = ?1
+           WHERE id = ?4 AND deleted_at IS NULL
+             AND (status = 'pending' OR (status IN ${ACTIVE} AND lease_until < ?1))
+             AND attempts < ?3
+           ${QUESTION_RETURNING}`,
+        )
+        .bind(now, iso(nowMs + LEASE_MS), MAX_ATTEMPTS, q.id)
+        .first<ClaimedQuestion>();
+      if (claimed) return questionClaimResponse(db, claimed, true);
+    }
+  }
+  return new Response(null, { status: 204 });
 });
 
 // 워커 전용: 최근 끝난 질문과 가족 의견(표·메모). 본문이 들어 있으므로 Bearer 만(위 미들웨어), 로그에 내용을 쓰지 않는다. 크기 상한 200KB.

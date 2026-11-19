@@ -14,3 +14,4 @@ fixtures
 .github
 # 생성 파일(npm run ask:schema)
 tools/ask-worker/answer.schema.json
+tools/ask-worker/followup.schema.json

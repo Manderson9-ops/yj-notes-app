@@ -189,7 +189,7 @@ ALTER TABLE ask_question ADD COLUMN reask_by TEXT;
 ALTER TABLE ask_question ADD COLUMN reask_at TEXT;   -- 마지막 요청 시각(명세 보강): 대기·소요 시간을 이 시각부터 센다
 ```
 - **데이터 이동**: 마이그레이션이 `ask_feedback.helpful` 이 있는 행을 `ask_vote` 로 옮긴다(같은 사람은 마지막 값). `ask_feedback` 은 **메모 전용**으로 남고 `helpful` 열은 더 쓰지 않는다(지우지 않음: 되돌릴 수 있게). 옮긴 표에는 이유가 없다.
-- `reask_reason` = 「선택지」 또는 「선택지 · 자유 글」(선택지 4종: 너무 일반적이에요 / 이미 해 봤어요 / 우리 상황과 달라요 / 더 자세히 알고 싶어요). 다시 답변이 시작되면 `ask_answer` 의 현재 행을 `ask_answer_history` 로 옮기고 지운다(그동안 질문은 `pending`).
+- `reask_reason` = 「선택지」 또는 「선택지 · 자유 글」(선택지 4종: 너무 일반적이에요 / 이미 해 봤어요 / 우리 상황과 달라요 / 더 자세히 알고 싶어요). 다시 답변이 시작되면 `ask_answer` 의 현재 행을 `ask_answer_history` 로 옮기고 지운다(그동안 질문은 `pending`) — **T-Q5(`0011`) 이전 방식**이다. T-Q5 부터는 질문을 되돌리거나 답을 지우지 않고, 카드 갱신 때 `ask_answer` 를 UPDATE 하면서 이전 카드를 이력으로 옮긴다(아래 2-ask-3).
 - 백업 추출(`tools/admin/backup-extract.py`)의 앱 표 목록에 `ask_vote`·`ask_answer_history` 가 들어 있다(`09` §5-1).
 - 표·메모·이력은 가족 자료(S1)다. 로그·오류에 쓰지 않는다.
 
@@ -213,6 +213,55 @@ CREATE TABLE sync_run (
 - **백업 복원 대상이 아니다**: 다시 만들 수 있는 로그라 `tools/admin/backup-extract.py` 의 앱 표 목록에 넣지 않는다(복원하면 지난 실행 기록이 오늘 상태를 오도한다).
 - 상태 판정은 저장하지 않고 읽을 때 계산한다(`server/lib/sync-state.ts`, `09` §5-2).
 - 질문 본문·답은 가족 자료(S1)다. 로그·오류 응답에 쓰지 않는다.
+
+### 2-ask-3. 물어보기 대화 표 (마이그레이션 `0011_ask_turn.sql`, T-Q5, 설명은 `11`)
+
+한 턴 = 가족이 보낸 후속 질문(`followup`) 또는 👎 이유로 카드를 다시 만드는 요청(`reask`) 하나. 질문 행은 대화 내내 `done` 이고, 진행 상태는 턴에 둔다.
+
+```sql
+CREATE TABLE ask_turn (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  question_id INTEGER NOT NULL REFERENCES ask_question(id),
+  seq INTEGER NOT NULL,                     -- 질문 안의 순번(1부터, 위급 턴도 센다). UNIQUE(question_id, seq)
+  kind TEXT NOT NULL CHECK (kind IN ('followup','reask')),
+  asked_by TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '' CHECK (length(body) <= 1000),   -- reask 의 자유 글은 비어 있을 수 있다
+  reask_reason TEXT CHECK (reask_reason IS NULL OR length(reask_reason) <= 300),
+  red_flag INTEGER NOT NULL DEFAULT 0,      -- 위급 후속(한도·동시 1건·카드 갱신 횟수에서 제외, claim 최우선)
+  status TEXT NOT NULL CHECK (status IN ('pending','claimed','answering','reviewing','done','failed')),  -- 짧은 답 단계(카드만 만드는 턴은 처음부터 'done')
+  reply_json TEXT CHECK (reply_json IS NULL OR length(reply_json) <= 8192),   -- shared/ask-schema.ts FollowupSchema. reask·위급 턴은 NULL
+  review_score REAL,
+  card_status TEXT NOT NULL DEFAULT 'none' CHECK (card_status IN ('none','pending','done','failed')),  -- 카드 단계
+  card_version INTEGER,                     -- 이 턴이 만든 카드 번호(= 이력 이동 뒤 최신 이력 번호 + 1)
+  card_attempts INTEGER NOT NULL DEFAULT 0, card_lease_until TEXT,   -- 카드 단계 회계(짧은 답 단계의 attempts·lease_until 과 따로)
+  card_note TEXT,                           -- 카드를 갱신하지 않은 이유 'limit'(3번 사용) | 'redlock'(위급 잠금)
+  card_fail_code TEXT,
+  card_reason TEXT CHECK (card_reason IS NULL OR length(card_reason) <= 160),  -- 짧은 답이 낸 cardUpdate.reason
+  reply_model TEXT, card_model TEXT,
+  created_at TEXT NOT NULL, replied_at TEXT, claimed_at TEXT, lease_until TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0, fail_code TEXT,
+  wait_ms INTEGER, work_ms INTEGER,         -- 짧은 답 단계: 질문→집음 / 집음→확정(워커 보고)
+  card_work_ms INTEGER, total_ms INTEGER,   -- 카드 단계 작업 시간 / 턴 생성→마지막 단계 끝(서버 계산)
+  updated_at TEXT NOT NULL, deleted_at TEXT,
+  -- T-Q4b 용(0011 에 만들어 두지만 T-Q5 는 쓰지 않는다): 초안 게시·서버 냉각·인증 환급
+  draft_json TEXT CHECK (draft_json IS NULL OR length(draft_json) <= 61440), draft_at TEXT, draft_ms INTEGER,
+  retry_after TEXT, auth_refunds INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_ask_turn_status ON ask_turn(status, created_at);
+CREATE INDEX idx_ask_turn_card_status ON ask_turn(card_status, created_at);
+CREATE UNIQUE INDEX idx_ask_turn_question_seq ON ask_turn(question_id, seq);
+
+ALTER TABLE ask_question ADD COLUMN card_updates INTEGER NOT NULL DEFAULT 0;   -- 카드 갱신 횟수(일반 후속의 cardUpdate 와 reask 합쳐 최대 ASK_REASK_MAX=3, 위급 갱신은 세지 않음)
+ALTER TABLE ask_question ADD COLUMN red_lock INTEGER NOT NULL DEFAULT 0;       -- 위급 잠금: 카드는 10단계로 굳는다(해제 경로 없음). 서버는 red_flag OR red_lock 으로 본다
+ALTER TABLE ask_question ADD COLUMN origin_question_id INTEGER;                -- 대화 중 위급 글이 와서 새 위급 질문으로 이어진 경우 원 질문 번호
+UPDATE ask_question SET card_updates = reask_count, red_lock = red_flag;       -- 기존 행 이행
+```
+
+- **활성 턴**(입력 잠금·`threadActive`·홈 대기 수): `status IN ('pending','claimed','answering','reviewing') OR card_status = 'pending'`(삭제 안 된 턴).
+- **카드 갱신**: 서버가 한 묶음에서 현재 `ask_answer` 를 `ask_answer_history` 로 옮기고(`INSERT … SELECT`, 버전은 `MAX+1`) `ask_answer` 를 UPDATE 한다(DELETE 없음). 시간 열(`wait_ms`·`work_ms`·`total_ms`)은 첫 답의 값을 둔다.
+- `reask_count` 는 「다시 답변 요청 수」(reask 턴을 만들 때 +1), `card_updates` 는 「실제로 갱신된 카드 수」(`/card` 성공 때 +1, 위급 턴은 제외)이며 한도 판정은 `card_updates` 만 쓴다.
+- 질문·턴 본문과 짧은 답은 가족 자료(S1)다. 로그·오류에 쓰지 않는다. 질문 삭제(소프트)는 같은 묶음에서 그 질문의 턴도 `deleted_at` 을 채운다.
+- 백업 추출(`tools/admin/backup-extract.py`)의 앱 표 목록에 `ask_turn` 이 들어 있다(질문 뒤, `09` §5-1).
 
 ## 3. 가족 기록 종류 (`log_type.schema_json`)
 

@@ -10,3 +10,6 @@ SESSION_SECRET=FAKE_PLACEHOLDER_session_secret_change_me
 IP_HASH_SALT=FAKE_PLACEHOLDER_ip_hash_salt
 # ASK_WORKER_TOKEN_HASH (선택, 물어보기 집 PC 워커용): 워커 Bearer 토큰의 SHA-256 hex(64자). 토큰 원본은 서버에 두지 않는다(docs/09 §2, docs/04 §3-2). 없거나 64자 hex 가 아니면(아래 자리표시자 포함) /api/worker/* 는 503.
 ASK_WORKER_TOKEN_HASH=FAKE_PLACEHOLDER_ask_worker_token_hash
+# ASK_TURN_CLAIM (선택, T-Q5): "0" 이면 워커 claim 이 대화 턴(후속 질문·카드 갱신)을 고르지 않는다(질문만, 응답 모양도 T-Q5 이전과 같다). 없거나 "0" 이외면 켜짐.
+# 워커를 T-Q5 이전 버전으로 되돌리기 전에 먼저 0 으로 바꾼다(옛 워커는 턴 응답을 처리하지 못한다). 되돌린 뒤 새 워커로 복귀하면 1(또는 삭제).
+# ASK_TURN_CLAIM=1

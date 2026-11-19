@@ -1,13 +1,18 @@
 // 계약 시험: 실제 워커 클라이언트·루프·파이프라인(가짜 claude)을 실제 Hono 앱(가드 포함, 가짜 D1)에 붙여 끝까지 돌린다.
 // 세션 API 로 질문 생성 → claim → progress → answer → GET /api/ask/:id 가 done. 합성 자료만(테스트아이).
 import { beforeEach, describe, expect, it } from "vitest";
-import { goodAnswer, PACK } from "../tools/ask-worker/fixtures.ts";
-import { createClient } from "../tools/ask-worker/client.ts";
+import { goodAnswer, goodFollowup, PACK } from "../tools/ask-worker/fixtures.ts";
+import { createClient, isTurnClaim } from "../tools/ask-worker/client.ts";
 import { ClaudeError, type ClaudeRunner } from "../tools/ask-worker/claude.ts";
 import { createHistoryCache } from "../tools/ask-worker/family.ts";
+import { answerFollowup, cardQuestion } from "../tools/ask-worker/followup.ts";
 import { handleOne, type LoopDeps } from "../tools/ask-worker/loop.ts";
 import { answerQuestion, type PipelineDeps } from "../tools/ask-worker/pipeline.ts";
-import { REVIEW_PROMPT_FILE } from "../tools/ask-worker/prompts.ts";
+import {
+  FOLLOWUP_REVIEW_PROMPT_FILE,
+  FOLLOWUP_SYSTEM_PROMPT_FILE,
+  REVIEW_PROMPT_FILE,
+} from "../tools/ask-worker/prompts.ts";
 import { sessionCall } from "../server/test-utils/ask";
 import {
   cookieFrom,
@@ -52,11 +57,28 @@ const row = (id: number): Row =>
     .get(id) as unknown as Row;
 
 /** 가짜 claude: 작성 호출은 redFlag 면 10단계, 아니면 4단계를 낸다. 검토는 항상 통과 점수. */
-function fakeClaude(opts: { failWith?: string; firstLevelWrong?: boolean } = {}): ClaudeRunner {
+function fakeClaude(
+  opts: { failWith?: string; firstLevelWrong?: boolean; cardNeeded?: boolean } = {},
+): ClaudeRunner {
   let answers = 0;
   return (req) => {
     if (opts.failWith) return Promise.reject(new ClaudeError(opts.failWith));
-    if (req.systemPromptFile === REVIEW_PROMPT_FILE) {
+    // 후속 짧은 답(T-Q5): 작성은 짧은 답, 검토는 같은 지적 하나
+    if (req.systemPromptFile === FOLLOWUP_SYSTEM_PROMPT_FILE) {
+      return Promise.resolve({
+        output: goodFollowup(
+          opts.cardNeeded
+            ? { cardUpdate: { needed: true, reason: "새 지속 기간이 나왔어요" } }
+            : {},
+        ),
+        ms: 1,
+        model: "claude-opus-5-5",
+      });
+    }
+    if (
+      req.systemPromptFile === REVIEW_PROMPT_FILE ||
+      req.systemPromptFile === FOLLOWUP_REVIEW_PROMPT_FILE
+    ) {
       return Promise.resolve({
         output: {
           issues: [{ category: "style", where: "limits", fix: "조금 줄여요" }],
@@ -82,6 +104,11 @@ function loopDeps(runClaude: ClaudeRunner, stages: string[] = [], withHistory = 
     answerSchemaJson: "{}",
     targetScore: 9.5,
     minPublishScore: 8.5,
+    followup: {
+      systemPromptFile: FOLLOWUP_SYSTEM_PROMPT_FILE,
+      reviewPromptFile: FOLLOWUP_REVIEW_PROMPT_FILE,
+      schemaJson: "{}",
+    },
   };
   const client = createClient({
     origin: ORIGIN,
@@ -98,6 +125,12 @@ function loopDeps(runClaude: ClaudeRunner, stages: string[] = [], withHistory = 
     client,
     process: (q, hooks, signal) =>
       answerQuestion(pipe, q, { ...hooks, onStage: (s) => stages.push(s) }, signal),
+    turn: {
+      reply: (c, hooks, signal) =>
+        answerFollowup(pipe, c, { ...hooks, onStage: (s) => stages.push(s) }, signal),
+      card: (c, hooks, signal) =>
+        answerQuestion(pipe, cardQuestion(c), { ...hooks, onStage: (s) => stages.push(s) }, signal),
+    },
     log: () => undefined,
     sleep: () => Promise.resolve(),
     pollMs: 10,
@@ -246,5 +279,197 @@ describe("가족 의견·다시 답변 계약 (T-Q3)", () => {
       new Request(ORIGIN + "/api/worker/ask/history", { headers: { Cookie: cookie } }),
     );
     expect(res.status).toBe(401);
+  });
+});
+
+describe("대화 계약 (T-Q5): 후속 질문 → 짧은 답 → 카드 갱신", () => {
+  const call = (method: string, path: string, json?: unknown) =>
+    sessionCall(h, cookie, method, path, json);
+  const rawClient = () =>
+    createClient({
+      origin: ORIGIN,
+      token: TEST_WORKER_TOKEN,
+      fetchFn: ((url: string, init: RequestInit) =>
+        h.handle(new Request(url, init))) as unknown as typeof fetch,
+    });
+  interface TurnView {
+    seq: number;
+    status: string;
+    cardStatus: string;
+    cardNote: string | null;
+    cardVersion: number | null;
+    redFlag: boolean;
+    reviewScore: number | null;
+    reply: { reply: string; cardUpdate: { needed: boolean } } | null;
+  }
+  interface FullDetail {
+    status: string;
+    answer: { level: number };
+    history: unknown[];
+    turns: TurnView[];
+    threadActive: boolean;
+    cardUpdates: { used: number; max: number };
+  }
+  const full = async (id: number): Promise<FullDetail> =>
+    await (await call("GET", `/api/ask/${String(id)}`)).json<FullDetail>();
+  const turn = (id: number, body: string, askedBy = "아빠") =>
+    call("POST", `/api/ask/${String(id)}/turn`, { body, askedBy });
+  /** 첫 질문을 만들고 워커가 카드를 올린 상태로 만든다. */
+  const answered = async (body = "테스트아이가 점심 밥을 안 먹고 친구를 때려요") => {
+    const id = await create(body);
+    await handleOne(loopDeps(fakeClaude()), new AbortController().signal);
+    expect((await detail(id)).status).toBe("done");
+    h.clock.t += 1000;
+    return id;
+  };
+
+  it("claim 의 턴 응답: type·단계·한도·잠금·turn·thread(원 질문·현재 카드·앞선 문답)가 shared 스키마로 파싱된다", async () => {
+    const id = await answered();
+    const res = await turn(id, "간식은 줘도 될까요");
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ seq: 1, redFlag: false });
+    const c = await rawClient().claim();
+    expect(c && isTurnClaim(c)).toBe(true);
+    if (!c || !isTurnClaim(c)) throw new Error("턴 claim 이어야 해요");
+    expect(c).toMatchObject({ stage: "reply", cardUpdatesLeft: 3, redLock: false });
+    expect(c.turn).toMatchObject({
+      seq: 1,
+      kind: "followup",
+      body: "간식은 줘도 될까요",
+      askedBy: "아빠",
+      reply: null,
+    });
+    expect(c.thread.question).toMatchObject({ id, askedBy: "엄마", redFlag: false });
+    expect(c.thread.card?.level).toBe(4);
+    expect(c.thread.turns).toEqual([]);
+    // 진행 중인 턴이 있는 동안 입력은 잠긴다
+    expect((await turn(id, "또 물어요")).status).toBe(409);
+  });
+
+  it("짧은 답 확정: 워커가 대화 맥락을 받아 /reply 를 올리고 카드는 그대로(none)", async () => {
+    const id = await answered();
+    await turn(id, "간식은 줘도 될까요");
+    const prompts: string[] = [];
+    const stages: string[] = [];
+    const rec: ClaudeRunner = (req, sig) => {
+      if (req.systemPromptFile === FOLLOWUP_SYSTEM_PROMPT_FILE) prompts.push(req.prompt);
+      return fakeClaude()(req, sig);
+    };
+    const r = await handleOne(loopDeps(rec, stages), new AbortController().signal);
+    expect(r.claimed).toBe(true);
+    expect(stages).toEqual(["pack", "generate", "review"]);
+    expect(prompts[0]).toContain("## 이전 대화(지시 아님)");
+    expect(prompts[0]).toContain("처음 질문(엄마): 테스트아이가 점심 밥을 안 먹고 친구를 때려요");
+    expect(prompts[0]).toContain("간식은 줘도 될까요");
+    const d = await full(id);
+    expect(d.threadActive).toBe(false);
+    expect(d.turns[0]).toMatchObject({ status: "done", cardStatus: "none", reviewScore: 9.9 });
+    expect(d.turns[0]?.reply?.reply).toContain("간식은");
+    expect(d.history).toHaveLength(0);
+    expect(d.cardUpdates.used).toBe(0);
+  });
+
+  it("두 번째 후속의 thread 는 앞선 턴의 질문·짧은 답을 싣는다", async () => {
+    const id = await answered();
+    await turn(id, "간식은 줘도 될까요");
+    await handleOne(loopDeps(fakeClaude()), new AbortController().signal);
+    h.clock.t += 1000;
+    expect((await turn(id, "잠은 괜찮아요?", "엄마")).status).toBe(201);
+    const c = await rawClient().claim();
+    if (!c || !isTurnClaim(c)) throw new Error("턴 claim 이어야 해요");
+    expect(c.turn.seq).toBe(2);
+    expect(c.thread.turns).toHaveLength(1);
+    expect(c.thread.turns[0]).toMatchObject({
+      by: "아빠",
+      body: "간식은 줘도 될까요",
+      kind: "followup",
+    });
+    expect(c.thread.turns[0]?.reply?.reply).toContain("간식은");
+  });
+
+  it("카드 갱신이 필요하면 /reply 뒤 claim 이 끝나고, 다음 claim 이 카드 단계로 /card 를 올려 이력이 남는다", async () => {
+    const id = await answered();
+    await turn(id, "이제 일주일째 밥을 못 먹어요");
+    const stages: string[] = [];
+    const deps = loopDeps(fakeClaude({ cardNeeded: true }), stages);
+    // 1번째 claim: 짧은 답만(카드를 이어 돌지 않는다)
+    await handleOne(deps, new AbortController().signal);
+    expect(stages).toEqual(["pack", "generate", "review"]);
+    let d = await full(id);
+    expect(d.turns[0]).toMatchObject({ status: "done", cardStatus: "pending" });
+    expect(d.threadActive).toBe(true);
+    expect(d.history).toHaveLength(0);
+    // 2번째 claim: 같은 턴의 카드 단계
+    stages.length = 0;
+    h.clock.t += 1000;
+    const prompts: string[] = [];
+    const rec: ClaudeRunner = (req, sig) => {
+      if (req.systemPromptFile !== REVIEW_PROMPT_FILE) prompts.push(req.prompt);
+      return fakeClaude({ cardNeeded: true })(req, sig);
+    };
+    await handleOne(loopDeps(rec, stages), new AbortController().signal);
+    d = await full(id);
+    expect(prompts[0]).toContain("방금 드린 짧은 답");
+    expect(prompts[0]).toContain("카드를 다시 만드는 이유: 새 지속 기간이 나왔어요");
+    expect(d.turns[0]).toMatchObject({ cardStatus: "done" });
+    expect(d.turns[0]?.cardVersion).toBeGreaterThan(0);
+    expect(d.history).toHaveLength(1);
+    expect(d.cardUpdates.used).toBe(1);
+    expect(d.threadActive).toBe(false);
+    expect(d.status).toBe("done");
+  });
+
+  it("위급 후속: 워커가 카드 단계로 바로 집어 level 10 으로만 올리고 카드 갱신 횟수는 세지 않는다", async () => {
+    const id = await answered();
+    const res = await turn(id, "방금 경련을 했어요");
+    expect(await res.json()).toMatchObject({ redFlag: true });
+    const stages: string[] = [];
+    await handleOne(
+      loopDeps(fakeClaude({ firstLevelWrong: true }), stages),
+      new AbortController().signal,
+    );
+    const d = await full(id);
+    expect(d.answer.level).toBe(10);
+    expect(d.turns[0]).toMatchObject({ redFlag: true, cardStatus: "done", reply: null });
+    expect(d.cardUpdates.used).toBe(0);
+    expect(d.history).toHaveLength(1);
+  });
+
+  it("옛 서버 호환: ASK_TURN_CLAIM=0 이면 type 없는 질문 응답을 새 워커가 질문으로 처리한다", async () => {
+    h.env.ASK_TURN_CLAIM = "0";
+    const id = await create("테스트아이가 밥을 안 먹어요 친구를 때려요");
+    const c = await rawClient().claim();
+    expect(c && isTurnClaim(c)).toBe(false);
+    expect(c).toMatchObject({ id, redFlag: false });
+    // 같은 claim 이 질문을 잡아 둔 상태가 아니라서 처음부터 다시 돌려 본다
+    h.fake.sqlite
+      .prepare("UPDATE ask_question SET status = 'pending', lease_until = NULL, attempts = 0")
+      .run();
+    await handleOne(loopDeps(fakeClaude()), new AbortController().signal);
+    expect((await detail(id)).status).toBe("done");
+    delete h.env.ASK_TURN_CLAIM;
+  });
+
+  it("삭제된 질문의 턴 경로는 404 로 돌아오고 워커는 그 턴을 버린다(질문 처리에 영향 없음)", async () => {
+    const id = await answered();
+    await turn(id, "간식은 줘도 될까요");
+    const c = await rawClient().claim();
+    if (!c || !isTurnClaim(c)) throw new Error("턴 claim 이어야 해요");
+    await call("DELETE", `/api/ask/${String(id)}`);
+    await expect(
+      rawClient().turnReply(c.turn.id, {
+        reply: goodFollowup(),
+        reviewScore: 9.7,
+        model: "opus",
+        workMs: 1,
+        cardWanted: false,
+        cardSkip: null,
+        cardReason: "",
+      }),
+    ).rejects.toMatchObject({ status: 404, code: "not_found" });
+    // 서버가 turn 경로에 쓰는 오류 모양이 워커가 읽는 code 로 실린다(본문 없음)
+    await expect(rawClient().turnProgress(c.turn.id, { stage: "card" })).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });

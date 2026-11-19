@@ -2,7 +2,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { jsonResponse } from "../http/errors";
-import { readWorkerSeen } from "../ask/seen";
+import { workerOnline } from "../ask/seen";
+import { TURN_ACTIVE } from "../ask/turns";
 import { readIngestState } from "../lib/ingest-state";
 import { readSyncSummary } from "../lib/sync-state";
 import { previewOfDay } from "../../src/lib/notePreview";
@@ -95,9 +96,20 @@ overviewRoutes.get("/api/overview", async (c) => {
       "SELECT COUNT(*) AS n FROM ask_question WHERE deleted_at IS NULL AND status IN ('pending','claimed','answering','reviewing')",
     )
     .first<{ n: number }>();
+  // 대화 중에는 질문이 done 이라 대기 중인 후속·카드가 빠지지 않게 활성 턴(삭제 안 된 질문의 것)을 더한다.
+  const askTurns = await db
+    .prepare(
+      `SELECT COUNT(CASE WHEN t.status IN ${TURN_ACTIVE} OR t.card_status = 'pending' THEN 1 END) AS active,
+              COUNT(CASE WHEN t.red_flag = 1 AND t.card_status = 'failed' THEN 1 END) AS red_unhandled
+       FROM ask_turn t JOIN ask_question q ON q.id = t.question_id
+       WHERE t.deleted_at IS NULL AND q.deleted_at IS NULL`,
+    )
+    .first<{ active: number; red_unhandled: number }>();
+  // 7일 창은 질문 시각으로 건다: 카드 갱신이 ask_answer.created_at 을 새로 쓰므로 오래된 질문의 첫 답 소요가 다시 들어오지 않게.
   const askTimes = await db
     .prepare(
-      "SELECT total_ms FROM ask_answer WHERE total_ms IS NOT NULL AND created_at > ?1 ORDER BY total_ms LIMIT 1000",
+      `SELECT a.total_ms FROM ask_answer a JOIN ask_question q ON q.id = a.question_id
+       WHERE a.total_ms IS NOT NULL AND q.created_at > ?1 ORDER BY a.total_ms LIMIT 1000`,
     )
     .bind(new Date(nowMs - 7 * 24 * 60 * 60_000).toISOString())
     .all<{ total_ms: number }>();
@@ -125,6 +137,14 @@ overviewRoutes.get("/api/overview", async (c) => {
     .first<{ n: number }>();
 
   const observedN = observed?.n ?? 0;
+  // redUnhandled: 카드를 만들지 못한 위급 턴 수(홈 워커 상태 줄). 화면 스키마(Overview)에 필드가 생기기 전에도 보낸다.
+  const ask = {
+    pending: (askPending?.n ?? 0) + (askTurns?.active ?? 0),
+    worker: await workerOnline(db, nowMs),
+    medianTotalMs7d,
+    feedback7d: { up: fbVotes?.up ?? 0, down: fbVotes?.down ?? 0, notes: fbNotes?.n ?? 0 },
+    redUnhandled: askTurns?.red_unhandled ?? 0,
+  };
   const body: Overview = {
     noteDays: days?.n ?? 0,
     reports: days?.reports ?? 0,
@@ -136,12 +156,7 @@ overviewRoutes.get("/api/overview", async (c) => {
     lastIngest: ingest
       ? { at: ingest.at, status: ingest.status, commit: ingest.source_commit }
       : null,
-    ask: {
-      pending: askPending?.n ?? 0,
-      worker: await readWorkerSeen(db, nowMs),
-      medianTotalMs7d,
-      feedback7d: { up: fbVotes?.up ?? 0, down: fbVotes?.down ?? 0, notes: fbNotes?.n ?? 0 },
-    },
+    ask,
     milestones: { observed: observedN, unobserved: Math.max(0, (total?.n ?? 0) - observedN) },
     recentNotes: recentNotes.results.map((r) => ({
       date: r.date,

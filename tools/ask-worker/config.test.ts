@@ -131,6 +131,18 @@ describe("T-Q4a 설정 키", () => {
     expect(load("ASK_REVIEW_MODEL=so net; rm\n").reviewModel).toBe("opus");
     expect(load("ASK_REVIEW_MODEL=x\n").reviewModel).toBe("opus");
   });
+  it("ASK_FOLLOWUP_REVIEW_MODEL(T-Q5): 기본 sonnet, ASK_REVIEW_MODEL 과 따로, 허용 패턴 밖이면 sonnet", () => {
+    expect(load("").followupReviewModel).toBe("sonnet");
+    expect(load("ASK_REVIEW_MODEL=opus\n").followupReviewModel).toBe("sonnet");
+    expect(load("ASK_FOLLOWUP_REVIEW_MODEL=opus\n").followupReviewModel).toBe("opus");
+    expect(load("ASK_FOLLOWUP_REVIEW_MODEL=claude-sonnet-5-5\n").followupReviewModel).toBe(
+      "claude-sonnet-5-5",
+    );
+    expect(load("ASK_FOLLOWUP_REVIEW_MODEL=so net; rm\n").followupReviewModel).toBe("sonnet");
+    expect(load("ASK_FOLLOWUP_REVIEW_MODEL=x\n").followupReviewModel).toBe("sonnet");
+    // 첫 질문 검토 모델은 그대로
+    expect(load("ASK_FOLLOWUP_REVIEW_MODEL=opus\n").reviewModel).toBe("opus");
+  });
   it("ASK_AUTH_PAUSE: 기본 켬, 0 이면 끔", () => {
     expect(load("").authPause).toBe(true);
     expect(load("ASK_AUTH_PAUSE=1\n").authPause).toBe(true);

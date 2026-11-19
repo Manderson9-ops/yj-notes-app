@@ -6,7 +6,7 @@ import {
   workerAnswerBody,
   workerCall,
 } from "../test-utils/ask";
-import { ASK_REASK_MAX, ASK_VOTERS_MAX } from "../../shared/ask-schema";
+import { ASK_VOTERS_MAX } from "../../shared/ask-schema";
 import { ORIGIN, TEST_PIN, cookieFrom, createHarness, type Harness } from "../test-utils/harness";
 import { ASK_RATE } from "./ask";
 
@@ -263,6 +263,8 @@ interface Detail {
   history: { version: number; level: number | null; answer: { summary: string } }[];
   reask: { count: number; reason: string | null; by: string | null };
   answer?: { level: number };
+  threadActive: boolean;
+  turns: { kind: string; cardStatus: string; reply: unknown }[];
 }
 const detail = async (id: number): Promise<Detail> =>
   (await call("GET", `/api/ask/${String(id)}`)).json<Detail>();
@@ -377,10 +379,10 @@ describe("PUT /api/ask/:id/vote", () => {
   });
 });
 
-describe("POST /api/ask/:id/reask", () => {
+describe("POST /api/ask/:id/reask (카드만 만드는 턴)", () => {
   const reask = (id: number, json: unknown) => call("POST", `/api/ask/${String(id)}/reask`, json);
 
-  it("done 만: 현재 답을 이력 1 로 옮기고 대기로 돌린다", async () => {
+  it("done 질문에 reask 턴을 만들고, 질문은 done·카드는 그대로 남는다", async () => {
     const id = await doneQuestion();
     const before = await detail(id);
     expect(before.answer?.level).toBe(5);
@@ -390,49 +392,58 @@ describe("POST /api/ask/:id/reask", () => {
       text: "안아 주기는 했어요",
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: "pending", reaskCount: 1 });
+    expect(await res.json()).toEqual({ status: "done", reaskCount: 1, id: 1, seq: 1 });
     const d = await detail(id);
-    expect(d.status).toBe("pending");
-    expect(d.answer).toBeUndefined();
-    expect(d.history).toHaveLength(1);
-    expect(d.history[0]).toMatchObject({ version: 1, level: 5 });
+    expect(d.status).toBe("done"); // 질문은 대화 내내 done
+    expect(d.answer?.level).toBe(5); // 카드가 비는 순간이 없다
+    expect(d.history).toHaveLength(0); // 이력은 새 카드가 올라올 때 쌓인다
     expect(d.reask).toEqual({
       count: 1,
       reason: "이미 해 봤어요 · 안아 주기는 했어요",
       by: "아빠",
     });
-    const [qrow] = rows<{ attempts: number; status: string }>(
-      h,
-      `SELECT attempts, status FROM ask_question WHERE id = ${String(id)}`,
-    );
-    expect(qrow).toEqual({ attempts: 0, status: "pending" });
-    expect(rows(h, "SELECT 1 FROM ask_answer")).toHaveLength(0);
+    expect(rows(h, "SELECT 1 FROM ask_answer")).toHaveLength(1);
+    const [t] = rows<Record<string, unknown>>(h, "SELECT * FROM ask_turn");
+    expect(t).toMatchObject({
+      question_id: id,
+      seq: 1,
+      kind: "reask",
+      asked_by: "아빠",
+      body: "안아 주기는 했어요",
+      reask_reason: "이미 해 봤어요 · 안아 주기는 했어요",
+      red_flag: 0,
+      status: "done",
+      reply_json: null,
+      card_status: "pending",
+    });
+    expect(d.threadActive).toBe(true);
+    expect(d.turns[0]).toMatchObject({ kind: "reask", cardStatus: "pending", reply: null });
   });
 
-  it("이력 버전이 쌓이고(1,2,3) 4번째는 429", async () => {
+  it("카드 갱신 3번을 쓰면 4번째는 429 card_limit, 진행 중이면 409 turn_active", async () => {
     const id = await doneQuestion();
-    for (let n = 1; n <= ASK_REASK_MAX; n++) {
-      h.clock.t += 1000;
-      expect((await reask(id, { by: "엄마", choice: "너무 일반적이에요" })).status).toBe(200);
-      const claim = await workerCall(h, "POST", "/api/worker/ask/claim");
-      expect(claim.status).toBe(200);
-      const body = workerAnswerBody(5, { summary: `합성 답변 ${String(n + 1)}번째예요` });
-      expect(
-        (await workerCall(h, "POST", `/api/worker/ask/${String(id)}/answer`, body)).status,
-      ).toBe(200);
-    }
-    const d = await detail(id);
-    expect(d.history.map((x) => x.version)).toEqual([1, 2, 3]);
-    expect(d.history[2]?.answer.summary).toBe("합성 답변 3번째예요");
-    expect(d.reask.count).toBe(3);
-    expect((await reask(id, { by: "엄마", choice: "너무 일반적이에요" })).status).toBe(429);
+    // 진행 중인 reask 턴이 있으면 409(한 번에 1건)
+    expect((await reask(id, { by: "엄마", choice: "너무 일반적이에요" })).status).toBe(200);
+    const busy = await reask(id, { by: "아빠", choice: "너무 일반적이에요" });
+    expect(busy.status).toBe(409);
+    expect((await busy.json<{ error: string }>()).error).toBe("turn_active");
+    // 카드가 세 번 갱신된 상태(card_updates=3)에서는 429 card_limit
+    h.fake.sqlite.exec(
+      "UPDATE ask_turn SET card_status = 'done'; UPDATE ask_question SET card_updates = 3, reask_count = 3",
+    );
+    const limited = await reask(id, { by: "엄마", choice: "너무 일반적이에요" });
+    expect(limited.status).toBe(429);
+    expect((await limited.json<{ error: string }>()).error).toBe("card_limit");
     expect((await detail(id)).status).toBe("done");
+    expect(rows(h, "SELECT 1 FROM ask_turn")).toHaveLength(1); // 거절된 요청은 아무것도 만들지 않는다
   });
 
-  it("답이 끝나기 전·실패·삭제된 질문은 409/404, 검증 오류는 422", async () => {
+  it("끝나기 전·삭제된 질문은 409/404, 검증 오류는 422, 위급 잠금 질문은 422 redflag_level", async () => {
     const id = await doneQuestion();
     const pending = (await (await ask("대기 중")).json<{ id: number }>()).id;
-    expect((await reask(pending, { by: "엄마", choice: "너무 일반적이에요" })).status).toBe(409);
+    const busy = await reask(pending, { by: "엄마", choice: "너무 일반적이에요" });
+    expect(busy.status).toBe(409);
+    expect((await busy.json<{ error: string }>()).error).toBe("question_busy");
     expect((await reask(id, { by: "엄마", choice: "아무 이유" })).status).toBe(422);
     expect((await reask(id, { by: "엄마" })).status).toBe(422);
     expect(
@@ -440,29 +451,33 @@ describe("POST /api/ask/:id/reask", () => {
     ).toBe(422);
     expect((await reask(id, { by: "엄마", choice: "이미 해 봤어요", more: 1 })).status).toBe(422);
     expect((await reask(999, { by: "엄마", choice: "이미 해 봤어요" })).status).toBe(404);
-    expect((await detail(id)).status).toBe("done"); // 검증 실패는 아무것도 바꾸지 않는다
+    expect(rows(h, "SELECT 1 FROM ask_turn")).toHaveLength(0); // 검증 실패는 아무것도 바꾸지 않는다
+    // 위급 잠금 질문
+    h.fake.sqlite.prepare("UPDATE ask_question SET red_lock = 1 WHERE id = ?").run(id);
+    const locked = await reask(id, { by: "엄마", choice: "이미 해 봤어요" });
+    expect(locked.status).toBe(422);
+    expect(await locked.json()).toMatchObject({ error: "validation_error", code: "redflag_level" });
+    h.fake.sqlite.prepare("UPDATE ask_question SET red_lock = 0 WHERE id = ?").run(id);
     expect((await reask(id, { by: "엄마", choice: "이미 해 봤어요" })).status).toBe(200);
-    // 이미 대기로 돌아간 질문에 또 누르면 409(중복 요청은 한 번만 먹는다)
-    expect((await reask(id, { by: "아빠", choice: "이미 해 봤어요" })).status).toBe(409);
-    expect((await detail(id)).reask.count).toBe(1);
     await call("DELETE", `/api/ask/${String(id)}`);
     expect((await reask(id, { by: "엄마", choice: "이미 해 봤어요" })).status).toBe(404);
   });
 
-  it("다시 답변 뒤 소요 시간은 요청 시각부터 센다", async () => {
+  it("자유 글에 위급 신호가 있으면 reask 가 아니라 위급 후속 턴(kind=followup)이 된다", async () => {
     const id = await doneQuestion();
-    h.clock.t += 3 * 24 * 3600_000; // 사흘 뒤
-    await reask(id, { by: "엄마", choice: "더 자세히 알고 싶어요" });
-    h.clock.t += 20_000;
-    await workerCall(h, "POST", "/api/worker/ask/claim");
-    h.clock.t += 40_000;
-    await workerCall(h, "POST", `/api/worker/ask/${String(id)}/answer`, workerAnswerBody(5));
-    const [a] = rows<{ total_ms: number; wait_ms: number }>(
+    const res = await reask(id, {
+      by: "아빠",
+      choice: "더 자세히 알고 싶어요",
+      text: "자다가 경련을 했어요",
+    });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ redFlag: true });
+    const [t] = rows<{ kind: string; red_flag: number; card_status: string }>(
       h,
-      "SELECT total_ms, wait_ms FROM ask_answer",
+      "SELECT kind, red_flag, card_status FROM ask_turn",
     );
-    expect(a?.total_ms).toBe(60_000);
-    expect(a?.wait_ms).toBe(20_000);
+    expect(t).toEqual({ kind: "followup", red_flag: 1, card_status: "pending" });
+    expect((await detail(id)).reask.count).toBe(0); // 위급 갱신은 다시 답변 횟수를 세지 않는다
   });
 });
 
@@ -476,6 +491,7 @@ describe("GET /api/overview ask", () => {
         worker: { online: boolean; seenAt: string | null };
         medianTotalMs7d: number | null;
         feedback7d: { up: number; down: number; notes: number };
+        redUnhandled: number;
       };
     }>();
     expect(empty.ask).toEqual({
@@ -483,6 +499,7 @@ describe("GET /api/overview ask", () => {
       worker: { online: false, seenAt: null },
       medianTotalMs7d: null,
       feedback7d: { up: 0, down: 0, notes: 0 },
+      redUnhandled: 0,
     });
 
     await ask("질문 하나");
@@ -499,13 +516,15 @@ describe("GET /api/overview ask", () => {
     expect(ov.ask.worker.seenAt).not.toBeNull();
 
     // 중앙값: 10s, 20s, 60s -> 20s ; 하나 더(100s) -> (20+60)/2
+    // 7일 창은 ask_question.created_at 으로 거므로(JOIN) 합성 답마다 질문 행이 있어야 한다: 질문 둘을 더 만든다.
+    await ask("질문 셋");
+    await ask("질문 넷");
     h.fake.sqlite.exec("PRAGMA foreign_keys = OFF");
     const ins = h.fake.sqlite.prepare(
       "INSERT INTO ask_answer (question_id, level, answer_json, total_ms, created_at) VALUES (?, 2, '{}', ?, ?)",
     );
     const nowIso = new Date(h.clock.t).toISOString();
     [10_000, 20_000, 60_000].forEach((ms, i) => ins.run(i + 1, ms, nowIso));
-    // 질문 행은 두 건뿐이라 외래키 검사를 끄고 합성 답 시간만 넣는다
     ov = await (await call("GET", "/api/overview")).json<typeof empty>();
     expect(ov.ask.medianTotalMs7d).toBe(20_000);
     ins.run(4, 100_000, nowIso);

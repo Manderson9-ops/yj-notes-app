@@ -42,6 +42,7 @@ const cfg: WorkerConfig = {
   claudeTimeoutMs: 240_000,
   expandModel: "sonnet",
   reviewModel: "opus",
+  followupReviewModel: "sonnet",
   authPause: true,
   logKeepDays: 14,
   home: root,

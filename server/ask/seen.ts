@@ -28,3 +28,27 @@ export async function readWorkerSeen(
   const t = seenAt === null ? Number.NaN : Date.parse(seenAt);
   return { online: Number.isFinite(t) && nowMs - t <= ONLINE_WINDOW_MS, seenAt };
 }
+
+/**
+ * 앱에 보이는 「워커 온라인」: seen 이 2분 안이거나, 리스가 살아 있는 작업(질문·턴 짧은 답·턴 카드)이 하나라도 있다.
+ * 작업 중에는 claim 을 하지 않아 seen 이 끊길 수 있으므로 리스를 함께 본다. 상세 API 와 overview 가 같이 쓴다.
+ * (seen 이 이미 온라인이면 EXISTS 를 읽지 않는다. 일시정지 상태 제외 조건은 T-Q4b.)
+ */
+export async function workerOnline(
+  db: D1Database,
+  nowMs: number,
+): Promise<{ online: boolean; seenAt: string | null }> {
+  const seen = await readWorkerSeen(db, nowMs);
+  if (seen.online) return seen;
+  const live = await db
+    .prepare(
+      `SELECT (
+         EXISTS (SELECT 1 FROM ask_question WHERE deleted_at IS NULL AND status IN ('claimed','answering','reviewing') AND lease_until >= ?1)
+         OR EXISTS (SELECT 1 FROM ask_turn WHERE deleted_at IS NULL AND status IN ('claimed','answering','reviewing') AND lease_until >= ?1)
+         OR EXISTS (SELECT 1 FROM ask_turn WHERE deleted_at IS NULL AND card_status = 'pending' AND card_lease_until >= ?1)
+       ) AS live`,
+    )
+    .bind(iso(nowMs))
+    .first<{ live: number }>();
+  return { online: live?.live === 1, seenAt: seen.seenAt };
+}

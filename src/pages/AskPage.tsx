@@ -1,5 +1,5 @@
 import { useState, type SyntheticEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { RedFlagCard } from "../components/ask/RedFlagCard";
 import { LevelBadge } from "../components/ask/LevelBadge";
 import { Chip } from "../components/Chip";
@@ -18,13 +18,20 @@ import "../styles/ask.css";
 const BODY_MAX = 1000;
 
 /** S50 물어보기: 질문 입력(위급 신호는 쓰는 즉시 경고) + 최근 질문 목록. */
+/** 「새 질문으로 이어가기」가 넘긴 초안(원 질문 링크가 들어 있다). 없거나 모양이 다르면 빈 칸. */
+function draftOf(state: unknown): string {
+  if (typeof state !== "object" || state === null || !("draft" in state)) return "";
+  return typeof state.draft === "string" ? state.draft.slice(0, BODY_MAX) : "";
+}
+
 export default function AskPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const overview = useOverview();
   const create = useCreateAsk();
   const list = useAskList();
   const [recorder, setRecorder] = useState(() => getDefaultRecorder() ?? "");
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => draftOf(location.state));
   const red = detectRedFlag(text).redFlag;
   const canSend = recorder !== "" && text.trim() !== "" && !create.isPending;
   const worker = overview.data?.ask.worker;

@@ -3,7 +3,7 @@
 // 모델 호출 전에 코드로 먼저 걸러 검토 한 판을 아낀다.
 import { hasForbiddenWord } from "../../shared/ask-forbidden.ts";
 import { checkLevelTemplate, checkSpecialist, LEVEL_TEMPLATES } from "../../shared/ask-levels.ts";
-import { GENERAL_BASIS } from "../../shared/ask-schema.ts";
+import { FollowupSchema, GENERAL_BASIS, type Followup } from "../../shared/ask-schema.ts";
 import {
   answerSchema,
   ISSUE_CATEGORIES,
@@ -246,7 +246,10 @@ export function claimRefuted(sentence: string, s: SearchSummary): string | null 
 
 /** evidence.ref·tryNow.basis 가 묶음에 실재하는가(HARD). FAMILY-Q ref 는 이번 묶음의 가족 결과에 있어야 한다. */
 function checkRefs(
-  answer: Answer,
+  answer: {
+    evidence: readonly { ref: string }[];
+    tryNow: readonly { basis: string }[];
+  },
   refs: ReadonlySet<string>,
   hard: (category: CheckCategory, text: string) => void,
 ): void {
@@ -598,4 +601,111 @@ export function checkAnswer(raw: unknown, info: PackInfo, redFlag: boolean): Che
     soft("safety", "INT-FLUENCY 근거를 썼으니 upIf 에 언어재활사를 이름으로 적어요");
   }
   return done(answer);
+}
+
+// ── 후속 짧은 답(T-Q5) ───────────────────────────────────────
+
+export interface FollowupCheckResult {
+  /** 지적이 하나도 없음(HARD·SOFT 모두). */
+  ok: boolean;
+  issues: string[];
+  items: CheckIssue[];
+  hard: CheckIssue[];
+  soft: CheckIssue[];
+  reply: Followup | null;
+}
+
+/** 「3단계」처럼 단계 숫자를 말하는 곳. 짧은 답에는 단계가 없어서 카드와 어긋날 수 있다. */
+const STEP_NUMBER = /(\d{1,2})\s*단계/g;
+/** 「단계를 올려야」「더 높은 단계」처럼 카드 단계가 바뀐다고 단정하는 말. */
+const STEP_CHANGE =
+  /단계(?:를|가|는|은)?\s*(?:올리|올려|높이|높여|낮추|낮춰|바꾸|바꿔|바뀌|달라)|(?:더\s*)?(?:높은|낮은)\s*단계|단계(?:가|를)?\s*(?:올라|내려)/;
+
+export interface FollowupCheckContext {
+  /** 지금 카드의 단계(모르거나 단계가 없는 카드면 undefined). */
+  cardLevel?: number | undefined;
+}
+
+/**
+ * 후속 짧은 답의 결정적 검사. HARD: 스키마·금지어·내부 표지 누수·evidence.ref 와 fromRecords.date 실재.
+ * SOFT: 카드를 바꾸지 않는다고 하면서(needed=false) 다른 단계를 말하거나, 짧은 답 안에서 카드와 다른 단계 숫자를 쓰는 것.
+ */
+export function checkFollowup(
+  raw: unknown,
+  info: PackInfo,
+  ctx: FollowupCheckContext = {},
+): FollowupCheckResult {
+  const items: CheckIssue[] = [];
+  const hard = (category: CheckCategory, text: string) =>
+    items.push({ severity: "hard", category, text });
+  const soft = (category: IssueCategory, text: string) =>
+    items.push({ severity: "soft", category, text });
+  const done = (reply: Followup | null): FollowupCheckResult => ({
+    ok: items.length === 0 && reply !== null,
+    issues: items.map((i) => i.text),
+    items,
+    hard: items.filter((i) => i.severity === "hard"),
+    soft: items.filter((i) => i.severity === "soft"),
+    reply,
+  });
+
+  const parsed = FollowupSchema.safeParse(raw);
+  if (!parsed.success) {
+    for (const i of parsed.error.issues.slice(0, 8)) {
+      hard("schema", `스키마: ${i.path.join(".") || "(root)"} ${i.code}`);
+    }
+    return done(null);
+  }
+  const reply = parsed.data;
+  const strings = collectStrings(reply);
+  if (strings.some(hasForbiddenWord)) hard("forbidden", "금지어(판정·꼬리표 어휘)를 썼어요");
+
+  // 가족에게 보이는 칸(근거 point 는 작은 출처 표시라 내부 규칙·건수만 본다)
+  const family = collectStrings({
+    reply: reply.reply,
+    say: reply.say,
+    fromRecords: reply.fromRecords.map((r) => [r.what, r.link]),
+    limits: reply.limits,
+  });
+  if (
+    [...family, ...reply.evidence.map((e) => e.point)].some(
+      (s) => INTERNAL_PHRASE.test(s) || SEARCH_COUNT.test(s),
+    )
+  ) {
+    hard(
+      "leak",
+      "내부 규칙(보수적인 쪽 등)과 검색 건수(「N건」)는 가족에게 보이는 글에 쓰지 않아요: 지우고 내용만 말해요",
+    );
+  }
+  if (family.some((s) => INTERNAL_LABEL.test(s))) {
+    hard(
+      "leak",
+      "가족에게 보이는 글에 내부 표지·파일·ID(권장 단계·장소 모름·records/·가이드 §·guide:·묶음·전수·INT-·NORM-)를 쓰지 않아요: 가족 말로 바꾸고, 근거 ID 는 evidence.ref 에만 써요",
+    );
+  }
+
+  checkRefs({ evidence: reply.evidence, tryNow: [] }, new Set(info.refs), hard);
+  const dates = packDates(info.pack);
+  for (const r of reply.fromRecords) {
+    if (!dates.has(r.date)) hard("factual", `fromRecords 날짜가 근거 묶음에 없어요: ${r.date}`);
+  }
+
+  const needed = reply.cardUpdate.needed;
+  const stated = [...reply.reply.matchAll(STEP_NUMBER)].map((m) => Number(m[1]));
+  const other = stated.filter((n) => ctx.cardLevel === undefined || n !== ctx.cardLevel);
+  if (other.length > 0) {
+    soft(
+      "template",
+      needed
+        ? "reply 에 단계 숫자를 쓰지 않아요: 단계는 새로 만드는 카드가 정해요"
+        : `카드는 그대로인데 reply 가 카드와 다른 단계(${other.slice(0, 2).join("·")}단계)를 말해요 — 단계 숫자를 빼거나 cardUpdate.needed 를 다시 판단해요`,
+    );
+  }
+  if (!needed && STEP_CHANGE.test(reply.reply)) {
+    soft(
+      "template",
+      "cardUpdate.needed 가 false 인데 reply 가 단계가 바뀐다고 말해요 — 카드를 바꾸지 않으면 다른 단계를 말하지 않아요",
+    );
+  }
+  return done(reply);
 }

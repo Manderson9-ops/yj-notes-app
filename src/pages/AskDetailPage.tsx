@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnswerCard } from "../components/ask/AnswerCard";
 import { ShareBar } from "../components/ask/ShareBar";
+import { Conversation } from "../components/ask/Conversation";
 import { VoteBar } from "../components/ask/VoteBar";
 import { RedFlagCard } from "../components/ask/RedFlagCard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -17,6 +18,7 @@ import {
 } from "../lib/ask/api";
 import { COPY } from "../lib/ask/copy";
 import { LABELS } from "../lib/ask/labels";
+import { hasRedCardFailed, isCardActive } from "../lib/ask/thread";
 import type { ShareMode } from "../lib/ask/share";
 import {
   oldAnswerLine,
@@ -274,7 +276,11 @@ function Body({
   // 다시 답변을 요청하면 포커스를 진행 상황으로 옮기고 알린다(알림 칸은 늘 떠 있어야 읽힌다).
   const [announce, setAnnounce] = useState("");
   const progressRef = useRef<HTMLHeadingElement>(null);
+  const chatRef = useRef<HTMLHeadingElement>(null);
   const focusPending = useRef(false);
+  // 위급 턴의 카드를 끝내 만들지 못했으면 이전 카드 위에 경고를 고정한다(정상 종료로 다루지 않는다).
+  const redFailed = hasRedCardFailed(detail);
+  const cardRedo = detail.turns.some(isCardActive);
   useEffect(() => {
     if (focusPending.current && status !== "done") {
       focusPending.current = false;
@@ -289,7 +295,19 @@ function Body({
       <p role="status" aria-live="polite" className="sr-only" data-testid="ask-announce">
         {announce}
       </p>
-      {detail.redFlag && <RedFlagCard />}
+      {(detail.redFlag || redFailed) && <RedFlagCard />}
+      {redFailed && (
+        <div role="alert" data-testid="ask-red-failed">
+          <Notice tone="alert">{COPY.redFailed}</Notice>
+        </div>
+      )}
+      {detail.originQuestionId !== null && (
+        <p>
+          <Link to={`/ask/${String(detail.originQuestionId)}`} className="link">
+            {COPY.originLink}
+          </Link>
+        </p>
+      )}
       <section aria-labelledby="ask-q">
         <h2 id="ask-q">질문</h2>
         <div className="card">
@@ -323,7 +341,7 @@ function Body({
               </Notice>
               <p>
                 <Link to="/ask" className="btn">
-                  새로 질문하기
+                  {LABELS.askNew}
                 </Link>
               </p>
             </>
@@ -338,6 +356,11 @@ function Body({
           <h2 id="ask-answer">답변</h2>
           {detail.answer ? (
             <>
+              {cardRedo && (
+                <p className="meta" data-testid="ask-card-redo-top">
+                  {COPY.cardRedoTop}
+                </p>
+              )}
               <AnswerCard
                 level={detail.answer.level ?? detail.answer.answer.level}
                 answer={detail.answer.answer}
@@ -351,12 +374,16 @@ function Body({
         </section>
       )}
 
+      {status === "done" && <Conversation detail={detail} headingRef={chatRef} />}
+
       {status === "done" && (
         <VoteBar
           detail={detail}
           onReasked={() => {
+            // 새 서버: 질문은 done 으로 남고 대화에 다시 답변 턴이 생긴다 → 포커스를 대화로. 옛 서버(질문이 대기로 돌아감)는 아래 효과가 진행 상황으로 옮긴다.
             focusPending.current = true;
             setAnnounce(COPY.reaskSent);
+            chatRef.current?.focus();
           }}
         />
       )}

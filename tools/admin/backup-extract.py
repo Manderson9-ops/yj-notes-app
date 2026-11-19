@@ -14,7 +14,7 @@
 import sqlite3
 import sys
 
-# 앱에서만 생기는 표. ask_* 는 물어보기(질문·답·메모·표·이전 답 이력, 외래키 순서대로). worker_auth_fail(워커 토큰 실패 기록)은
+# 앱에서만 생기는 표. ask_* 는 물어보기(질문·답·메모·표·이전 답 이력·대화 턴, 외래키 순서대로). worker_auth_fail(워커 토큰 실패 기록)은
 # 일시적 보안 상태라 일부러 넣지 않는다(복구하면 지난 잠금 근거를 되살린다).
 # sync_run(알림장 자동 업데이트 실행 기록, T-S1)도 넣지 않는다: 다시 만들 수 있는 로그이고, 복원하면 지난 실행이 오늘 상태를 오도한다.
 APP_TABLES = (
@@ -25,6 +25,7 @@ APP_TABLES = (
     "ask_feedback",
     "ask_vote",
     "ask_answer_history",
+    "ask_turn",
     "app_setting",
 )
 MAX_STMT = 90_000  # D1 문장 한도(100KB)보다 작게

@@ -119,6 +119,8 @@ export const overviewSchema = z.object({
     pending: z.number().int(),
     worker: z.object({ online: z.boolean(), seenAt: z.string().nullable() }),
     medianTotalMs7d: z.number().int().nullable(),
+    /** 위급 후속의 카드를 끝내 만들지 못한 턴 수(삭제 안 된 질문). 0보다 크면 홈에 경고 한 줄. 옛 서버 응답에는 없다. */
+    redUnhandled: z.number().int().default(0),
     /** 최근 7일 가족 의견 수(표 · 메모). */
     feedback7d: z
       .object({ up: z.number().int(), down: z.number().int(), notes: z.number().int() })

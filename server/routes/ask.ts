@@ -4,17 +4,22 @@ import { z } from "zod";
 import type { AppEnv } from "../app";
 import { instantResults } from "../ask/instant";
 import { detectRedFlag } from "../ask/redflags";
+import { workerOnline } from "../ask/seen";
+import { parseFollowup } from "../ask/turns";
 import { errorResponse, jsonResponse } from "../http/errors";
 import {
   AnswerSchema,
   AskCreateSchema,
   AskFeedbackSchema,
-  AskReaskSchema,
   AskVoteSchema,
+  ASK_CARD_NOTES,
   ASK_REASK_MAX,
   ASK_VOTERS_MAX,
-  joinReaskReason,
+  type AskCardNote,
+  type AskCardStatus,
   type AskStatus,
+  type AskTurnKind,
+  type Followup,
 } from "../../shared/ask-schema";
 
 export const askRoutes = new Hono<AppEnv>();
@@ -28,14 +33,14 @@ const VOTE_COUNT = (v: 0 | 1): string =>
   `(SELECT COUNT(*) FROM ask_vote v WHERE v.question_id = q.id AND v.helpful = ${String(v)})`;
 const ID = /^[0-9]{1,9}$/;
 
-const iso = (ms: number): string => new Date(ms).toISOString();
-const notFound = () => errorResponse(404, "not_found", "찾을 수 없어요.");
+export const iso = (ms: number): string => new Date(ms).toISOString();
+export const notFound = () => errorResponse(404, "not_found", "찾을 수 없어요.");
 
-function parseId(raw: string): number | null {
+export function parseId(raw: string): number | null {
   return ID.test(raw) ? Number(raw) : null;
 }
 
-async function readBody(req: Request): Promise<unknown> {
+export async function readBody(req: Request): Promise<unknown> {
   try {
     return await req.json();
   } catch {
@@ -43,9 +48,11 @@ async function readBody(req: Request): Promise<unknown> {
   }
 }
 
-const invalid = () => errorResponse(422, "validation_error", "입력을 확인해 주세요.");
-const conflict = () => errorResponse(409, "conflict", "지금 상태에서는 할 수 없어요.");
-const badRequest = () => errorResponse(400, "bad_request", "잘못된 요청이에요.");
+export const invalid = () => errorResponse(422, "validation_error", "입력을 확인해 주세요.");
+export const conflict = () => errorResponse(409, "conflict", "지금 상태에서는 할 수 없어요.");
+export const badRequest = () => errorResponse(400, "bad_request", "잘못된 요청이에요.");
+export const tooMany = () =>
+  errorResponse(429, "too_many", "질문을 너무 많이 보냈어요. 잠시 뒤에 다시 해 주세요.");
 
 interface QuestionRow {
   id: number;
@@ -57,6 +64,48 @@ interface QuestionRow {
   reask_count: number;
   reask_reason: string | null;
   reask_by: string | null;
+  red_lock: number;
+  card_updates: number;
+  origin_question_id: number | null;
+}
+
+/**
+ * 같은 사람이 10분 안에 보낸 질문+후속(턴) 수가 한도에 이르렀는가. 질문과 턴이 한도를 나눠 쓴다.
+ * 위급 글은 이 검사를 건너뛰지만(호출하는 쪽이 결정) 행으로는 남아 카운트에 들어간다.
+ */
+export async function rateLimited(
+  db: D1Database,
+  askedBy: string,
+  nowMs: number,
+): Promise<boolean> {
+  const since = iso(nowMs - ASK_RATE.windowMs);
+  const recent = await db
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM ask_question WHERE asked_by = ?1 AND created_at > ?2)
+            + (SELECT COUNT(*) FROM ask_turn WHERE asked_by = ?1 AND created_at > ?2) AS n`,
+    )
+    .bind(askedBy, since)
+    .first<{ n: number }>();
+  return (recent?.n ?? 0) >= ASK_RATE.max;
+}
+
+/** 새 질문 한 행(`red_lock` 은 `red_flag` 와 같게). 이어진 위급 질문이면 원 질문 번호를 함께 둔다. */
+export async function insertQuestion(
+  db: D1Database,
+  askedBy: string,
+  text: string,
+  red: 0 | 1,
+  nowIso: string,
+  originQuestionId: number | null,
+): Promise<number> {
+  const ins = await db
+    .prepare(
+      `INSERT INTO ask_question (asked_by, body, status, red_flag, red_lock, origin_question_id, created_at, updated_at)
+       VALUES (?1, ?2, 'pending', ?3, ?3, ?4, ?5, ?5)`,
+    )
+    .bind(askedBy, text, red, originQuestionId, nowIso)
+    .run();
+  return ins.meta.last_row_id;
 }
 
 askRoutes.post("/api/ask", async (c) => {
@@ -69,25 +118,13 @@ askRoutes.post("/api/ask", async (c) => {
   const nowMs = c.get("deps").now();
   const nowIso = iso(nowMs);
 
-  const recent = await db
-    .prepare("SELECT COUNT(*) AS n FROM ask_question WHERE asked_by = ?1 AND created_at > ?2")
-    .bind(askedBy, iso(nowMs - ASK_RATE.windowMs))
-    .first<{ n: number }>();
-  if ((recent?.n ?? 0) >= ASK_RATE.max) {
-    return errorResponse(429, "too_many", "질문을 너무 많이 보냈어요. 잠시 뒤에 다시 해 주세요.");
-  }
-
+  // 위급 판정을 레이트리밋보다 먼저: 대화로 한도를 쓴 가족의 위급 글이 429 로 막히지 않게 한다.
   const red = detectRedFlag(text).redFlag ? 1 : 0;
-  const ins = await db
-    .prepare(
-      `INSERT INTO ask_question (asked_by, body, status, red_flag, created_at, updated_at)
-       VALUES (?1, ?2, 'pending', ?3, ?4, ?4)`,
-    )
-    .bind(askedBy, text, red, nowIso)
-    .run();
+  if (red === 0 && (await rateLimited(db, askedBy, nowMs))) return tooMany();
+  const newId = await insertQuestion(db, askedBy, text, red, nowIso, null);
   const instant = await instantResults(db, text);
   return jsonResponse(201, {
-    id: ins.meta.last_row_id,
+    id: newId,
     status: "pending",
     redFlag: red === 1,
     instant,
@@ -146,11 +183,61 @@ askRoutes.get("/api/ask", async (c) => {
 async function loadQuestion(db: D1Database, id: number): Promise<QuestionRow | null> {
   return db
     .prepare(
-      `SELECT id, asked_by, body, status, red_flag, created_at, reask_count, reask_reason, reask_by
+      `SELECT id, asked_by, body, status, red_flag, created_at, reask_count, reask_reason, reask_by,
+              red_lock, card_updates, origin_question_id
        FROM ask_question WHERE id = ?1 AND deleted_at IS NULL`,
     )
     .bind(id)
     .first<QuestionRow>();
+}
+
+interface TurnRow {
+  id: number;
+  seq: number;
+  kind: AskTurnKind;
+  asked_by: string;
+  body: string;
+  reask_reason: string | null;
+  red_flag: number;
+  status: AskStatus;
+  reply_json: string | null;
+  review_score: number | null;
+  card_status: AskCardStatus;
+  card_note: string | null;
+  card_version: number | null;
+  created_at: string;
+  replied_at: string | null;
+}
+
+const ACTIVE_TURN_STATUSES: ReadonlySet<string> = new Set([
+  "pending",
+  "claimed",
+  "answering",
+  "reviewing",
+]);
+
+function turnView(r: TurnRow) {
+  const note = (ASK_CARD_NOTES as readonly string[]).includes(r.card_note ?? "")
+    ? (r.card_note as AskCardNote)
+    : null;
+  const reply: Followup | null = parseFollowup(r.reply_json);
+  return {
+    id: r.id,
+    seq: r.seq,
+    kind: r.kind,
+    askedBy: r.asked_by,
+    body: r.body,
+    reaskReason: r.reask_reason,
+    redFlag: r.red_flag === 1,
+    status: r.status,
+    reply,
+    reviewScore: r.review_score,
+    cardStatus: r.card_status,
+    cardNote: note,
+    cardVersion: r.card_version,
+    createdAt: r.created_at,
+    repliedAt: r.replied_at,
+  };
 }
 
 askRoutes.get("/api/ask/:id", async (c) => {
@@ -232,10 +319,30 @@ askRoutes.get("/api/ask/:id", async (c) => {
       answer: parsed.data,
     });
   }
+  const turnRows = await db
+    .prepare(
+      `SELECT id, seq, kind, asked_by, body, reask_reason, red_flag, status, reply_json, review_score,
+              card_status, card_note, card_version, created_at, replied_at
+       FROM ask_turn WHERE question_id = ?1 AND deleted_at IS NULL ORDER BY seq`,
+    )
+    .bind(id)
+    .all<TurnRow>();
+  const turns = turnRows.results.map(turnView);
+  const threadActive = turnRows.results.some(
+    (r) => ACTIVE_TURN_STATUSES.has(r.status) || r.card_status === "pending",
+  );
+  const online = await workerOnline(db, c.get("deps").now());
   return jsonResponse(200, {
     question: { id: q.id, askedBy: q.asked_by, body: q.body, createdAt: q.created_at },
     status: q.status,
     redFlag: q.red_flag === 1,
+    workerOnline: online.online,
+    threadActive,
+    redLock: q.red_lock === 1 || q.red_flag === 1,
+    cardUpdates: { used: q.card_updates, max: ASK_REASK_MAX },
+    turnsUsed: turnRows.results.filter((r) => r.red_flag === 0).length,
+    originQuestionId: q.origin_question_id,
+    turns,
     ...(answer ? { answer } : {}),
     feedback: fb.results.map((f) => ({
       id: f.id,
@@ -340,65 +447,21 @@ askRoutes.put("/api/ask/:id/vote", async (c) => {
   });
 });
 
-// 다시 답변: 현재 답을 이력으로 옮기고 대기로 되돌린다(질문당 최대 3회). 한 묶음(트랜잭션)이라 동시 요청에도 한 번만 먹는다.
-askRoutes.post("/api/ask/:id/reask", async (c) => {
-  const id = parseId(c.req.param("id"));
-  if (id === null) return notFound();
-  const body = await readBody(c.req.raw);
-  if (body === undefined) return badRequest();
-  const parsed = AskReaskSchema.safeParse(body);
-  if (!parsed.success) return invalid();
-  const db = c.env.DB;
-  const q = await loadQuestion(db, id);
-  if (!q) return notFound();
-  if (q.status !== "done") return conflict();
-  if (q.reask_count >= ASK_REASK_MAX) {
-    return errorResponse(429, "too_many", "다시 답변은 세 번까지 받을 수 있어요.");
-  }
-  const { by, choice, text } = parsed.data;
-  const reason = joinReaskReason(choice, text);
-  const now = iso(c.get("deps").now());
-  const [moved, bumped] = await db.batch([
-    db
-      .prepare(
-        `INSERT INTO ask_answer_history (question_id, version, level, answer_json, review_score, model, total_ms, created_at)
-         SELECT a.question_id,
-                (SELECT COALESCE(MAX(h.version), 0) + 1 FROM ask_answer_history h WHERE h.question_id = a.question_id),
-                a.level, a.answer_json, a.review_score, a.model, a.total_ms, a.created_at
-         FROM ask_answer a JOIN ask_question q ON q.id = a.question_id
-         WHERE q.id = ?1 AND q.deleted_at IS NULL AND q.status = 'done' AND q.reask_count < ?2`,
-      )
-      .bind(id, ASK_REASK_MAX),
-    db
-      .prepare(
-        `UPDATE ask_question
-         SET status = 'pending', attempts = 0, claimed_at = NULL, lease_until = NULL, fail_code = NULL,
-             reask_count = reask_count + 1, reask_reason = ?3, reask_by = ?4, reask_at = ?5, updated_at = ?5
-         WHERE id = ?1 AND deleted_at IS NULL AND status = 'done' AND reask_count < ?2
-           AND EXISTS (SELECT 1 FROM ask_answer WHERE question_id = ?1)`,
-      )
-      .bind(id, ASK_REASK_MAX, reason, by, now),
-    // 이력으로 옮겨진 뒤에만 현재 답을 지운다(대기 중인 질문에는 현재 답이 없다).
-    db
-      .prepare(
-        `DELETE FROM ask_answer WHERE question_id = ?1
-           AND EXISTS (SELECT 1 FROM ask_question WHERE id = ?1 AND status = 'pending' AND reask_at = ?2)`,
-      )
-      .bind(id, now),
-  ]);
-  if (moved?.meta.changes !== 1 || bumped?.meta.changes !== 1) return conflict();
-  return jsonResponse(200, { status: "pending", reaskCount: q.reask_count + 1 });
-});
-
+// 소프트 삭제: 같은 묶음(트랜잭션)에서 그 질문의 대화 턴도 함께 지운다(턴만 따로 지우는 경로는 없다).
 askRoutes.delete("/api/ask/:id", async (c) => {
   const id = parseId(c.req.param("id"));
   if (id === null) return notFound();
   const nowIso = iso(c.get("deps").now());
-  const res = await c.env.DB.prepare(
-    "UPDATE ask_question SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
-  )
-    .bind(nowIso, id)
-    .run();
-  if (res.meta.changes === 0) return notFound();
+  const [res] = await c.env.DB.batch([
+    c.env.DB.prepare(
+      "UPDATE ask_question SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2 AND deleted_at IS NULL",
+    ).bind(nowIso, id),
+    c.env.DB.prepare(
+      `UPDATE ask_turn SET deleted_at = ?1, updated_at = ?1
+       WHERE question_id = ?2 AND deleted_at IS NULL
+         AND EXISTS (SELECT 1 FROM ask_question WHERE id = ?2 AND deleted_at = ?1)`,
+    ).bind(nowIso, id),
+  ]);
+  if (res?.meta.changes === 0) return notFound();
   return new Response(null, { status: 204 });
 });

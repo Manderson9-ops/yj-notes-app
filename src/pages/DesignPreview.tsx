@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AnswerCard } from "../components/ask/AnswerCard";
 import { LevelBadge } from "../components/ask/LevelBadge";
+import { TurnBubble } from "../components/ask/ChatBubble";
+import { ChatInput } from "../components/ask/ChatInput";
 import { RedFlagCard } from "../components/ask/RedFlagCard";
 import { Chip } from "../components/Chip";
 import { Notice } from "../components/Notice";
@@ -11,6 +13,7 @@ import { TextSettings } from "../components/TextSettings";
 import { ThemePicker } from "../components/ThemePicker";
 import "../styles/ask.css";
 import { previewAnswer } from "./previewAnswer";
+import { PREVIEW_CHANGE, PREVIEW_TURNS } from "./previewTurns";
 
 // S91 디자인 미리보기. 합성 자료만 쓴다: 이름은 테스트아이·교사A·친구A, 날짜는 2020-01-15 근처.
 // 화면에 보이는 숫자는 시안임을 "예시"로 표시한다(P3: 실제 화면의 숫자는 API 값).
@@ -21,6 +24,7 @@ const PERIODS = ["최근 1달", "최근 3달", "전체"] as const;
 export function DesignPreview() {
   const [choice, setChoice] = useState<(typeof CHOICES)[number]>("보통");
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>("최근 1달");
+  const [chat, setChat] = useState("");
 
   return (
     <>
@@ -160,6 +164,35 @@ export function DesignPreview() {
           />
           <AnswerCard level={10} answer={previewAnswer(10, "지금 바로 연락이 필요해요 (예시)")} />
         </div>
+      </section>
+
+      <section aria-labelledby="pv-chat">
+        <h2 id="pv-chat">대화</h2>
+        <ol className="ask-turns" aria-labelledby="pv-chat">
+          {PREVIEW_TURNS.map((t) => (
+            <TurnBubble key={t.id} turn={t} change={t.id === 1 ? PREVIEW_CHANGE : null} />
+          ))}
+        </ol>
+        <ChatInput
+          idBase="pv-chat-free"
+          value={chat}
+          onChange={setChat}
+          onSend={() => {
+            setChat("");
+          }}
+          lock={null}
+          sending={false}
+          red={false}
+        />
+        <ChatInput
+          idBase="pv-chat-lock"
+          value=""
+          onChange={() => undefined}
+          onSend={() => undefined}
+          lock="card"
+          sending={false}
+          red={false}
+        />
       </section>
 
       <section aria-labelledby="pv-notice">

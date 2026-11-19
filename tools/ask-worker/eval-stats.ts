@@ -11,7 +11,10 @@ import { ISSUE_CATEGORIES, type IssueCategory } from "./answer-schema.ts";
 export type Deductions = Record<IssueCategory, number>;
 
 export interface EvalRun {
+  /** 짧은 답 평가(--prompt followup)는 단계가 없어 0. */
   level: number;
+  /** 짧은 답 평가만: 모델이 카드 갱신이 필요하다고 판단했는가(「단계가 바뀌어야 하는/안 바뀌어야 하는 후속」 판단 점검용). */
+  cardNeeded?: boolean;
   score: number;
   /** 지적 범주별 감점 */
   deductions: Deductions;
