@@ -261,7 +261,7 @@ UPDATE ask_question SET card_updates = reask_count, red_lock = red_flag;       -
 - **카드 갱신**: 서버가 한 묶음에서 현재 `ask_answer` 를 `ask_answer_history` 로 옮기고(`INSERT … SELECT`, 버전은 `MAX+1`) `ask_answer` 를 UPDATE 한다(DELETE 없음). 시간 열(`wait_ms`·`work_ms`·`total_ms`)은 첫 답의 값을 둔다.
 - `reask_count` 는 「다시 답변 요청 수」(reask 턴을 만들 때 +1), `card_updates` 는 「실제로 갱신된 카드 수」(`/card` 성공 때 +1, 위급 턴은 제외)이며 한도 판정은 `card_updates` 만 쓴다.
 - 질문·턴 본문과 짧은 답은 가족 자료(S1)다. 로그·오류에 쓰지 않는다. 질문 삭제(소프트)는 같은 묶음에서 그 질문의 턴도 `deleted_at` 을 채운다.
-- 백업 추출(`tools/admin/backup-extract.py`)의 앱 표 목록 갱신은 이 카드에서 하지 않았다(`09` §5-1 — 확인 필요).
+- 백업 추출(`tools/admin/backup-extract.py`)의 앱 표 목록에 `ask_turn` 이 들어 있다(질문 뒤, `09` §5-1).
 
 ## 3. 가족 기록 종류 (`log_type.schema_json`)
 
