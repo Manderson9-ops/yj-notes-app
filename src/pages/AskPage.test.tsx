@@ -345,7 +345,10 @@ describe("AskDetailPage (진행·답변·의견)", () => {
     routes["GET /ask/7"] = () => json(200, detail("failed"));
     renderAt("/ask/7");
     expect(
-      await screen.findByText("답을 만들지 못했어요.", { selector: "span" }),
+      await screen.findByText("답을 만들지 못한 질문이에요.", { selector: "span" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("새 질문으로 물어봐 주세요.", { selector: "span" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "새로 질문하기" })).toBeInTheDocument();
   });

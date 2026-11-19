@@ -5,6 +5,7 @@ import { NoteRow } from "../components/NoteRow";
 import { QueryError } from "../components/QueryError";
 import { ThemeDecor } from "../components/decor/ThemeDecor";
 import { daysSince, formatDateKo, formatYmdKo, seoulDateOf } from "../lib/dateFormat";
+import { COPY } from "../lib/ask/copy";
 import { useOverview } from "../lib/notesApi";
 import {
   syncHead,
@@ -78,6 +79,18 @@ function HomeBody({ data }: { data: NonNullable<ReturnType<typeof useOverview>["
 
   return (
     <>
+      {data.ask.redUnhandled > 0 && (
+        <div role="status" data-testid="home-red-unhandled">
+          <Notice tone="alert">
+            <span>
+              {COPY.homeRed} {num(data.ask.redUnhandled)}건.
+            </span>{" "}
+            <Link to="/ask" className="link">
+              {COPY.homeRedGo}
+            </Link>
+          </Notice>
+        </div>
+      )}
       {data.ingestState === "running" && !syncNotice && (
         <Notice tone="info">
           {/* 문장 단위로 나눈다: 번들 한글 장문 검사(G7)에 걸리지 않게(문구는 한 줄로 읽힌다) */}

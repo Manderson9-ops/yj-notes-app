@@ -7,6 +7,12 @@ export const LABELS = {
   oldTitle: "이전 답변",
   reaskGo: "다시 답변 받기",
   reasonSave: "다시 답변 없이 이유만 저장",
+  // 대화(T-Q5): 장식 글꼴 부분 집합에 이미 있는 글자만 쓴다(새 글자를 더하면 80 KiB 한도를 넘는다).
+  chatTitle: "대화",
+  chatSend: "보내기",
+  chatSending: "보내는 중",
+  chatNew: "새 질문으로 이어가기",
+  askNew: "새로 질문하기",
 } as const;
 
 /**

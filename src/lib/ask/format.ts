@@ -78,3 +78,17 @@ export function oldAnswerLine(version: number, iso: string): string {
   const [, m = "0", d = "0"] = seoulDateOf(iso).split("-");
   return `${String(version)}번째 답 · ${String(Number(m))}월 ${String(Number(d))}일`;
 }
+
+/** 「이어서 묻기 3/10」: 위급이 아닌 턴 수(API 값)와 한도. */
+export function turnCountLine(used: number, max: number): string {
+  return `이어서 묻기 ${String(used)}/${String(max)}`;
+}
+
+/** 「카드가 새로 정리됐어요 (단계 5 → 7)」. 단계가 같으면 「단계 5 그대로」, 단계가 없는 카드면 숫자 없이. */
+export function cardChangeLine(change: { from: number | null; to: number | null }): string {
+  const head = "카드가 새로 정리됐어요";
+  const { from, to } = change;
+  if (from === null || to === null) return head;
+  if (from === to) return `${head} (단계 ${String(to)} 그대로)`;
+  return `${head} (단계 ${String(from)} → ${String(to)})`;
+}

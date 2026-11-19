@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { settle, stableShot } from "./helpers";
+import { stableShot, tallViewport } from "./helpers";
 
 // 물어보기 2차(T-Q3): 표 선택·다시 답변 이유·다시 작성 중·공유 — 3테마 × 라이트/다크 × 보통/선명하게(high), axe serious/critical 0.
 // 목업 API(vite-plugins/mock/ask.ts): 1 완료(가족 표·메모 있음) · 2 완료 · 6 다시 작성 중. 합성 자료만.
@@ -48,8 +48,7 @@ for (const mode of ["normal", "high"] as const) {
             await stableShot(page, `ask2-${name}-${suffix}`, true);
           };
           const check = async () => {
-            await page.setViewportSize({ width: 360, height: 4200 });
-            await settle(page);
+            await tallViewport(page);
             const found = await seriousViolations(page);
             await page.setViewportSize({ width: 360, height: 740 });
             expect(found).toEqual([]);
@@ -104,7 +103,9 @@ test("표: 같은 쪽 다시 누르면 취소, 다른 쪽 누르면 바꾸기", 
   await expect(page.getByTestId("ask-vote-live")).toContainText("취소");
 });
 
-test("다시 답변 받기: 이유 → 다시 작성 중 → 새 답 + 이전 답변 보관", async ({ page }) => {
+test("다시 답변 받기: 이유 → 대화에 카드 다시 정리 → 새 카드 + 이전 답변 보관(질문은 done 그대로)", async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     localStorage.setItem("yj.recorder", "아빠");
   });
@@ -114,8 +115,13 @@ test("다시 답변 받기: 이유 → 다시 작성 중 → 새 답 + 이전 �
   await page.getByRole("radio", { name: "더 자세히 알고 싶어요", exact: true }).click();
   await page.getByLabel("더 알려 주고 싶은 점(선택)").fill("할 말 예시가 더 있으면 좋아요");
   await page.getByRole("button", { name: "다시 답변 받기" }).click();
-  await expect(page.getByText(/다시 작성/).first()).toBeVisible();
-  await expect(page.getByRole("article", { name: "답변" })).toBeVisible({ timeout: 30_000 });
+  // 질문은 done 으로 남아 카드가 그대로 보이고, 대화에 「카드를 다시 정리하는 중」 턴이 생긴다
+  await expect(page.getByRole("article", { name: "답변" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "진행 단계" })).toHaveCount(0);
+  await expect(page.getByText("다시 답변 요청: 더 자세히 알고 싶어요")).toBeVisible();
+  await expect(page.getByText("카드가 새로 정리됐어요 (단계 1 그대로)")).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(page.getByText("1번째 답 · 1월 15일")).toBeVisible();
   // 이전 답의 표는 새 답에는 세지 않는다
   await expect(page.getByRole("button", { name: "도움이 안 됐어요", exact: true })).toHaveAttribute(

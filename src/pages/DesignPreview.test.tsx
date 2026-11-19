@@ -18,7 +18,7 @@ function renderPreview() {
 }
 
 describe("DesignPreview", () => {
-  it("shows the theme picker and all nine sample sections", () => {
+  it("shows the theme picker and all ten sample sections", () => {
     renderPreview();
     expect(screen.getByRole("heading", { level: 1, name: "디자인 미리보기" })).toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "화면 테마" })).toBeInTheDocument();
@@ -31,6 +31,7 @@ describe("DesignPreview", () => {
       "알림장 검색",
       "자료",
       "물어보기",
+      "대화",
       "안내 상자",
       "검진",
       "빈 상태",
@@ -40,8 +41,8 @@ describe("DesignPreview", () => {
 
   it("has four notices, a serious checkup card, and highlighted matches", () => {
     const { container } = renderPreview();
-    // 안내 상자 4개 + 물어보기의 위급 경고 카드 1개
-    expect(container.querySelectorAll(".notice")).toHaveLength(5);
+    // 안내 상자 4개 + 물어보기의 위급 경고 카드 1개 + 대화 시안의 카드 갱신·한도 안내 2개
+    expect(container.querySelectorAll(".notice")).toHaveLength(7);
     expect(container.querySelector('.card[data-tone="serious"]')).not.toBeNull();
     expect(container.querySelectorAll("mark").length).toBeGreaterThanOrEqual(2);
   });
@@ -81,5 +82,20 @@ describe("DesignPreview", () => {
       expect(s).toHaveAttribute("focusable", "false");
     }
     expect(within(empty).queryByText("아직 기록이 없어요 (예시)")).toBeInTheDocument();
+  });
+});
+
+describe("DesignPreview 대화 시안", () => {
+  it("말풍선 3턴 + 입력창 둘(자유·잠금) — id 가 겹치지 않고 잠금 문구가 보인다", () => {
+    const { container } = renderPreview();
+    expect(container.querySelectorAll(".ask-turn")).toHaveLength(3);
+    const ids = [...container.querySelectorAll("[id]")].map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(
+      screen.getByText("카드를 정리하는 중이에요 · 끝나면 이어서 물어볼 수 있어요"),
+    ).toBeVisible();
+    expect(screen.getByText("카드가 새로 정리됐어요 (단계 5 → 4)")).toBeInTheDocument();
+    expect(screen.getByText("카드를 다시 정리하는 중이에요")).toBeInTheDocument();
+    expect(screen.getByText("카드는 세 번까지 다시 만들 수 있어요")).toBeInTheDocument();
   });
 });

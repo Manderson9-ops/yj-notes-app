@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { settle, stableShot } from "./helpers";
+import { settle, stableShot, tallViewport } from "./helpers";
 
 // 물어보기(S50)의 접근성(axe serious/critical 0), 3테마 × 라이트/다크, 큰 글씨, 터치 영역, 진행 흐름.
 // 목업 API(vite-plugins/mock/ask.ts): 1 완료(단계 5) · 2 완료(단계 1) · 3 완료(위급, 단계 10) · 4 대기 · 5 작성 중 · 6 다시 작성 중. 합성 자료만.
@@ -43,8 +43,7 @@ for (const theme of THEMES) {
         };
         const check = async () => {
           // 아래쪽 따라오는(sticky) 탭바가 긴 화면을 가리면 axe 가 겹침으로 본다: 한 화면에 다 들어오게 키워서 잰다.
-          await page.setViewportSize({ width: 360, height: 3600 });
-          await settle(page);
+          await tallViewport(page);
           const found = await seriousViolations(page);
           await page.setViewportSize({ width: 360, height: 740 });
           expect(found).toEqual([]);
@@ -146,7 +145,7 @@ test.describe("큰 글씨", () => {
       );
       await login(page);
       const noOverflow = async (label: string) => {
-        await page.setViewportSize({ width: 360, height: 4200 });
+        await tallViewport(page);
         const wide = await page.evaluate(
           "document.documentElement.scrollWidth > document.documentElement.clientWidth + 1",
         );

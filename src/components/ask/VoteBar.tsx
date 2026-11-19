@@ -1,7 +1,6 @@
 // font-subset: skip (본문 글만: 장식 글꼴 대상이 아니다 — tools/fonts/collect.ts). 제목·버튼 글자는 lib/ask/labels.ts 에 있다.
 import { useState } from "react";
 import {
-  ASK_REASK_MAX,
   ASK_REASK_TEXT_MAX,
   ASK_VOTE_REASON_MAX,
   REASK_CHOICES,
@@ -13,6 +12,7 @@ import { useAskReask, useAskVote, type AskDetail, type AskVoteItem } from "../..
 import { COPY } from "../../lib/ask/copy";
 import { reaskLeftLine } from "../../lib/ask/format";
 import { LABELS } from "../../lib/ask/labels";
+import { turnLimitReached } from "../../lib/ask/thread";
 import { getDefaultRecorder } from "../../lib/logs/ids";
 import { Chip } from "../Chip";
 import { ChipRadioGroup } from "../ChipRadioGroup";
@@ -47,8 +47,9 @@ type Notice3 = "saved" | "down" | "cleared" | null;
 
 /**
  * 표(도움이 됐어요/안 됐어요): 선택은 테두리 + 굵게 + 체크 아이콘 + aria-pressed(공용 Chip). 같은 쪽을 다시 누르면 취소,
- * 다른 쪽을 누르면 바꾸기. 👎 를 누르면 이유를 고르고 「다시 답변 받기」(질문당 3회) 또는 이유만 저장.
- * onReasked: 다시 답변을 요청한 직후(포커스를 진행 상황으로 옮기고 알리는 일은 부모가 한다).
+ * 다른 쪽을 누르면 바꾸기. 👎 를 누르면 이유를 고르고 「다시 답변 받기」(카드 갱신은 질문당 3번) 또는 이유만 저장.
+ * 다시 답변은 대화 속 빠른 답이다: 질문은 done 으로 남고 카드만 다시 만드는 턴이 대화에 생긴다. 남은 횟수는 cardUpdates 로 센다.
+ * onReasked: 다시 답변을 요청한 직후(알리고 포커스를 대화로 옮기는 일은 부모가 한다).
  */
 export function VoteBar({ detail, onReasked }: { detail: AskDetail; onReasked: () => void }) {
   const id = detail.question.id;
@@ -61,7 +62,11 @@ export function VoteBar({ detail, onReasked }: { detail: AskDetail; onReasked: (
   const [open, setOpen] = useState(false);
   const [choice, setChoice] = useState<ReaskChoice | null>(null);
   const [text, setText] = useState("");
-  const left = Math.max(0, ASK_REASK_MAX - detail.reask.count);
+  const left = Math.max(0, detail.cardUpdates.max - detail.cardUpdates.used);
+  // 위급 잠금(카드는 10단계로 고정)·진행 중 턴(한 번에 1건)·후속 10번 한도: 서버가 422·409·429 로 막는 것을 미리 막는다.
+  const locked = detail.redLock || detail.redFlag;
+  const busy = detail.threadActive;
+  const turnFull = turnLimitReached(detail);
   const down = mine?.helpful === false;
   // 👎 만 있고 이유가 아직 없으면 패널을 바로 연다. 이유가 있으면 링크 버튼으로 다시 연다.
   const autoOpen = mine?.helpful === false && mine.reason === null;
@@ -226,18 +231,26 @@ export function VoteBar({ detail, onReasked }: { detail: AskDetail; onReasked: (
               {COPY.reasonHelp}
             </p>
           )}
-          {left > 0 ? (
-            <p className="meta">{reaskLeftLine(left)}</p>
-          ) : (
+          {locked ? (
+            <Notice tone="info">{COPY.reaskLocked}</Notice>
+          ) : left === 0 ? (
             <Notice tone="info">{COPY.reaskMax}</Notice>
+          ) : turnFull ? (
+            <Notice tone="info">{COPY.reaskTurnMax}</Notice>
+          ) : busy ? (
+            <p className="meta">{COPY.reaskBusy}</p>
+          ) : (
+            <p className="meta">{reaskLeftLine(left)}</p>
           )}
           <div className="actions">
-            {left > 0 && (
+            {(left > 0 || locked) && (
               <button
                 type="button"
                 className="btn btn-primary"
                 aria-describedby={help}
-                disabled={noChoice || vote.isPending || reask.isPending}
+                disabled={
+                  noChoice || vote.isPending || reask.isPending || locked || busy || turnFull
+                }
                 onClick={askAgain}
               >
                 {LABELS.reaskGo}
